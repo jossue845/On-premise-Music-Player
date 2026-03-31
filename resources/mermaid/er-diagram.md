@@ -8,9 +8,10 @@ erDiagram
         string album
         string albumArtist
         string genre
-        date date
+        int year
+        int month
+        int day
         int bitrate
-        time duration
         int trackNumber
         string path
         string imageId
