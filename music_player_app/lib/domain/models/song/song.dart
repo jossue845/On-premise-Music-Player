@@ -12,8 +12,6 @@ abstract class Song with _$Song {
     required String album,
     String? genre,
     int? year,
-    int? month,
-    int? day,
     int? bitrate,
     int? trackNumber,
     required String path,

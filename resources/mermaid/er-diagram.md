@@ -9,8 +9,6 @@ erDiagram
         string albumArtist
         string genre
         int year
-        int month
-        int day
         int bitrate
         int trackNumber
         string path
