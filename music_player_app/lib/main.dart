@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'presentation/screens/home_dashboard.dart';
+import 'presentation/screens/home_dashboard.dart'; // Import the new file!
 
 void main() {
   runApp(
@@ -37,7 +37,7 @@ class _MusicDashboardState extends State<MusicDashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        
+        title: const Text('Name pending'),
       ),
       body: _pages[_selectedIndex], 
       
@@ -48,7 +48,7 @@ class _MusicDashboardState extends State<MusicDashboard> {
         selectedItemColor: Colors.deepPurple,
         unselectedItemColor: Colors.grey,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.album), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.album), label: 'Albums'),
           BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Search'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Artist'),
           BottomNavigationBarItem(icon: Icon(Icons.queue_music), label: 'Playlists'),
