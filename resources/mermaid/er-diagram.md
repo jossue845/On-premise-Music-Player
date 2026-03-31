@@ -2,34 +2,34 @@
 erDiagram
     direction LR
     SONG{
-        int id PK
-        string title
+        int song_id PK
+        string song_title
         string artist
         string album
-        string albumArtist
+        string album_artist
         string genre
         int year
         int bitrate
-        int trackNumber
+        int track_number
         string path
-        string imageId
+        string image_id
     }
     PLAYLIST{
-        int id PK
-        string title
+        int playlist_id PK
+        string playlist_title
     }
-    PLAYLIST_TRACKS{
-        int playlistId PK, FK
-        int songId PK, FK
+    PLAYLIST_TRACK{
+        int playlist_id PK, FK
+        int song_id PK, FK
     }
 
-    SONG_IN_QUEUE{
-        string songId PK, FK
+    QUEUED_SONG{
+        string song_id PK, FK
         int position
-        bool currentSong
+        bool current_song
     }
-    PLAYLIST_TRACKS }o--o{ SONG : "made of"
-    PLAYLIST }o--o{ PLAYLIST_TRACKS : "has"
-    SONG_IN_QUEUE o|--|| SONG : "is"
+    PLAYLIST_TRACK }o--|| SONG : "made of"
+    PLAYLIST ||--o{ PLAYLIST_TRACK : "has"
+    QUEUED_SONG o|--|| SONG : "is"
 ```
 ```
