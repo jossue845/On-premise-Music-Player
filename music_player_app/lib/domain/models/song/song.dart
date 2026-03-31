@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:flutter/foundation.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -8,7 +10,7 @@ abstract class Song with _$Song {
   const factory Song({
     required int id,
     required String title,
-    required String artist,
+    required UnmodifiableListView<String> artist,
     required String album,
     String? genre,
     int? year,

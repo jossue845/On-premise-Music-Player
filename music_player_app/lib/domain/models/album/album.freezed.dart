@@ -14,7 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$Album implements DiagnosticableTreeMixin {
 
- String get title; String? get albumArtist; String? get date; String? get imageId; UnmodifiableListView<int> get songIds;
+ int get id; String get title; UnmodifiableListView<String> get albumArtist; String? get date; String? get imageId; UnmodifiableListView<int> get songIds;
 /// Create a copy of Album
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -26,21 +26,21 @@ $AlbumCopyWith<Album> get copyWith => _$AlbumCopyWithImpl<Album>(this as Album, 
 void debugFillProperties(DiagnosticPropertiesBuilder properties) {
   properties
     ..add(DiagnosticsProperty('type', 'Album'))
-    ..add(DiagnosticsProperty('title', title))..add(DiagnosticsProperty('albumArtist', albumArtist))..add(DiagnosticsProperty('date', date))..add(DiagnosticsProperty('imageId', imageId))..add(DiagnosticsProperty('songIds', songIds));
+    ..add(DiagnosticsProperty('id', id))..add(DiagnosticsProperty('title', title))..add(DiagnosticsProperty('albumArtist', albumArtist))..add(DiagnosticsProperty('date', date))..add(DiagnosticsProperty('imageId', imageId))..add(DiagnosticsProperty('songIds', songIds));
 }
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Album&&(identical(other.title, title) || other.title == title)&&(identical(other.albumArtist, albumArtist) || other.albumArtist == albumArtist)&&(identical(other.date, date) || other.date == date)&&(identical(other.imageId, imageId) || other.imageId == imageId)&&const DeepCollectionEquality().equals(other.songIds, songIds));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Album&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&const DeepCollectionEquality().equals(other.albumArtist, albumArtist)&&(identical(other.date, date) || other.date == date)&&(identical(other.imageId, imageId) || other.imageId == imageId)&&const DeepCollectionEquality().equals(other.songIds, songIds));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,title,albumArtist,date,imageId,const DeepCollectionEquality().hash(songIds));
+int get hashCode => Object.hash(runtimeType,id,title,const DeepCollectionEquality().hash(albumArtist),date,imageId,const DeepCollectionEquality().hash(songIds));
 
 @override
 String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
-  return 'Album(title: $title, albumArtist: $albumArtist, date: $date, imageId: $imageId, songIds: $songIds)';
+  return 'Album(id: $id, title: $title, albumArtist: $albumArtist, date: $date, imageId: $imageId, songIds: $songIds)';
 }
 
 
@@ -51,7 +51,7 @@ abstract mixin class $AlbumCopyWith<$Res>  {
   factory $AlbumCopyWith(Album value, $Res Function(Album) _then) = _$AlbumCopyWithImpl;
 @useResult
 $Res call({
- String title, String? albumArtist, String? date, String? imageId, UnmodifiableListView<int> songIds
+ int id, String title, UnmodifiableListView<String> albumArtist, String? date, String? imageId, UnmodifiableListView<int> songIds
 });
 
 
@@ -68,11 +68,12 @@ class _$AlbumCopyWithImpl<$Res>
 
 /// Create a copy of Album
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? title = null,Object? albumArtist = freezed,Object? date = freezed,Object? imageId = freezed,Object? songIds = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? title = null,Object? albumArtist = null,Object? date = freezed,Object? imageId = freezed,Object? songIds = null,}) {
   return _then(_self.copyWith(
-title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
-as String,albumArtist: freezed == albumArtist ? _self.albumArtist : albumArtist // ignore: cast_nullable_to_non_nullable
-as String?,date: freezed == date ? _self.date : date // ignore: cast_nullable_to_non_nullable
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as int,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
+as String,albumArtist: null == albumArtist ? _self.albumArtist : albumArtist // ignore: cast_nullable_to_non_nullable
+as UnmodifiableListView<String>,date: freezed == date ? _self.date : date // ignore: cast_nullable_to_non_nullable
 as String?,imageId: freezed == imageId ? _self.imageId : imageId // ignore: cast_nullable_to_non_nullable
 as String?,songIds: null == songIds ? _self.songIds : songIds // ignore: cast_nullable_to_non_nullable
 as UnmodifiableListView<int>,
@@ -160,10 +161,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String title,  String? albumArtist,  String? date,  String? imageId,  UnmodifiableListView<int> songIds)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String title,  UnmodifiableListView<String> albumArtist,  String? date,  String? imageId,  UnmodifiableListView<int> songIds)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Album() when $default != null:
-return $default(_that.title,_that.albumArtist,_that.date,_that.imageId,_that.songIds);case _:
+return $default(_that.id,_that.title,_that.albumArtist,_that.date,_that.imageId,_that.songIds);case _:
   return orElse();
 
 }
@@ -181,10 +182,10 @@ return $default(_that.title,_that.albumArtist,_that.date,_that.imageId,_that.son
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String title,  String? albumArtist,  String? date,  String? imageId,  UnmodifiableListView<int> songIds)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String title,  UnmodifiableListView<String> albumArtist,  String? date,  String? imageId,  UnmodifiableListView<int> songIds)  $default,) {final _that = this;
 switch (_that) {
 case _Album():
-return $default(_that.title,_that.albumArtist,_that.date,_that.imageId,_that.songIds);case _:
+return $default(_that.id,_that.title,_that.albumArtist,_that.date,_that.imageId,_that.songIds);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -201,10 +202,10 @@ return $default(_that.title,_that.albumArtist,_that.date,_that.imageId,_that.son
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String title,  String? albumArtist,  String? date,  String? imageId,  UnmodifiableListView<int> songIds)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String title,  UnmodifiableListView<String> albumArtist,  String? date,  String? imageId,  UnmodifiableListView<int> songIds)?  $default,) {final _that = this;
 switch (_that) {
 case _Album() when $default != null:
-return $default(_that.title,_that.albumArtist,_that.date,_that.imageId,_that.songIds);case _:
+return $default(_that.id,_that.title,_that.albumArtist,_that.date,_that.imageId,_that.songIds);case _:
   return null;
 
 }
@@ -216,11 +217,12 @@ return $default(_that.title,_that.albumArtist,_that.date,_that.imageId,_that.son
 
 
 class _Album with DiagnosticableTreeMixin implements Album {
-  const _Album({required this.title, this.albumArtist, this.date, this.imageId, required this.songIds});
+  const _Album({required this.id, required this.title, required this.albumArtist, this.date, this.imageId, required this.songIds});
   
 
+@override final  int id;
 @override final  String title;
-@override final  String? albumArtist;
+@override final  UnmodifiableListView<String> albumArtist;
 @override final  String? date;
 @override final  String? imageId;
 @override final  UnmodifiableListView<int> songIds;
@@ -236,21 +238,21 @@ _$AlbumCopyWith<_Album> get copyWith => __$AlbumCopyWithImpl<_Album>(this, _$ide
 void debugFillProperties(DiagnosticPropertiesBuilder properties) {
   properties
     ..add(DiagnosticsProperty('type', 'Album'))
-    ..add(DiagnosticsProperty('title', title))..add(DiagnosticsProperty('albumArtist', albumArtist))..add(DiagnosticsProperty('date', date))..add(DiagnosticsProperty('imageId', imageId))..add(DiagnosticsProperty('songIds', songIds));
+    ..add(DiagnosticsProperty('id', id))..add(DiagnosticsProperty('title', title))..add(DiagnosticsProperty('albumArtist', albumArtist))..add(DiagnosticsProperty('date', date))..add(DiagnosticsProperty('imageId', imageId))..add(DiagnosticsProperty('songIds', songIds));
 }
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Album&&(identical(other.title, title) || other.title == title)&&(identical(other.albumArtist, albumArtist) || other.albumArtist == albumArtist)&&(identical(other.date, date) || other.date == date)&&(identical(other.imageId, imageId) || other.imageId == imageId)&&const DeepCollectionEquality().equals(other.songIds, songIds));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Album&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&const DeepCollectionEquality().equals(other.albumArtist, albumArtist)&&(identical(other.date, date) || other.date == date)&&(identical(other.imageId, imageId) || other.imageId == imageId)&&const DeepCollectionEquality().equals(other.songIds, songIds));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,title,albumArtist,date,imageId,const DeepCollectionEquality().hash(songIds));
+int get hashCode => Object.hash(runtimeType,id,title,const DeepCollectionEquality().hash(albumArtist),date,imageId,const DeepCollectionEquality().hash(songIds));
 
 @override
 String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
-  return 'Album(title: $title, albumArtist: $albumArtist, date: $date, imageId: $imageId, songIds: $songIds)';
+  return 'Album(id: $id, title: $title, albumArtist: $albumArtist, date: $date, imageId: $imageId, songIds: $songIds)';
 }
 
 
@@ -261,7 +263,7 @@ abstract mixin class _$AlbumCopyWith<$Res> implements $AlbumCopyWith<$Res> {
   factory _$AlbumCopyWith(_Album value, $Res Function(_Album) _then) = __$AlbumCopyWithImpl;
 @override @useResult
 $Res call({
- String title, String? albumArtist, String? date, String? imageId, UnmodifiableListView<int> songIds
+ int id, String title, UnmodifiableListView<String> albumArtist, String? date, String? imageId, UnmodifiableListView<int> songIds
 });
 
 
@@ -278,11 +280,12 @@ class __$AlbumCopyWithImpl<$Res>
 
 /// Create a copy of Album
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? title = null,Object? albumArtist = freezed,Object? date = freezed,Object? imageId = freezed,Object? songIds = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? title = null,Object? albumArtist = null,Object? date = freezed,Object? imageId = freezed,Object? songIds = null,}) {
   return _then(_Album(
-title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
-as String,albumArtist: freezed == albumArtist ? _self.albumArtist : albumArtist // ignore: cast_nullable_to_non_nullable
-as String?,date: freezed == date ? _self.date : date // ignore: cast_nullable_to_non_nullable
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as int,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
+as String,albumArtist: null == albumArtist ? _self.albumArtist : albumArtist // ignore: cast_nullable_to_non_nullable
+as UnmodifiableListView<String>,date: freezed == date ? _self.date : date // ignore: cast_nullable_to_non_nullable
 as String?,imageId: freezed == imageId ? _self.imageId : imageId // ignore: cast_nullable_to_non_nullable
 as String?,songIds: null == songIds ? _self.songIds : songIds // ignore: cast_nullable_to_non_nullable
 as UnmodifiableListView<int>,

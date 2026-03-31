@@ -8,8 +8,9 @@ part 'album.freezed.dart';
 @freezed
 abstract class Album with _$Album {
   const factory Album({
+    required int id,
     required String title,
-    String? albumArtist,
+    required UnmodifiableListView<String> albumArtist,
     String? date,
     String? imageId,
     required UnmodifiableListView<int> songIds,

@@ -8,6 +8,7 @@ part 'artist.freezed.dart';
 @freezed
 abstract class Artist with _$Artist {
   const factory Artist({
+    required int id,
     required String name,
     required UnmodifiableListView<int> songIds,
   }) = _Artist;

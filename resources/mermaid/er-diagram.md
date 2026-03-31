@@ -4,9 +4,7 @@ erDiagram
     SONG{
         int song_id PK
         string song_title
-        string artist
-        string album
-        string album_artist
+        int album_id FK
         string genre
         int year
         int bitrate
@@ -28,8 +26,29 @@ erDiagram
         int position
         bool current_song
     }
-    PLAYLIST_TRACK }o--|| SONG : "made of"
-    PLAYLIST ||--o{ PLAYLIST_TRACK : "has"
+    SONG_ARTIST{
+        int song_id PK, FK
+        int artist_id PK, FK
+    }
+    ALBUM{
+        int album_id PK
+        string album_title
+    }
+    ARTIST{
+        int artist_id PK
+        string name
+    }
+    ALBUM_ARTIST{
+        int song_id PK, FK
+        int artist_id PK, FK
+    }
+    PLAYLIST_TRACK }o--|| SONG : "is"
+    PLAYLIST ||--o{ PLAYLIST_TRACK : "contains"
     QUEUED_SONG o|--|| SONG : "is"
+    SONG |{--|| ALBUM : "in"
+    SONG ||--|{ SONG_ARTIST : "made by"
+    ALBUM ||--|{ ALBUM_ARTIST : "made by"
+    SONG_ARTIST o{--|| ARTIST: "is"
+    ALBUM_ARTIST o{--|| ARTIST: "is"
 ```
 ```
