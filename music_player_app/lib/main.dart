@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import 'presentation/screens/home_dashboard.dart'; // Import the new file!
+import 'package:music_player_app/presentation/screens/artists_screen.dart';
+import 'package:music_player_app/presentation/screens/playlist_screen.dart';
+import 'package:music_player_app/presentation/screens/search_screen.dart';
+import 'package:music_player_app/presentation/screens/home_screen.dart';
 
 void main() {
   runApp(
@@ -22,9 +25,9 @@ class _MusicDashboardState extends State<MusicDashboard> {
 
   final List<Widget> _pages = [
     const HomeDashboard(),
-    const Center(child: Text('Search Screen', style: TextStyle(fontSize: 24))),   // Index 1
-    const Center(child: Text('Artist Screen', style: TextStyle(fontSize: 24))),   // Index 2
-    const Center(child: Text('Playlists Screen', style: TextStyle(fontSize: 24))),// Index 3
+    const SearchScreen(),
+    const ArtistsScreen(),
+    const PlaylistScreen(),
   ];
   
   void _onItemTapped(int index) {
@@ -37,7 +40,7 @@ class _MusicDashboardState extends State<MusicDashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Name pending'),
+        
       ),
       body: _pages[_selectedIndex], 
       
@@ -48,7 +51,7 @@ class _MusicDashboardState extends State<MusicDashboard> {
         selectedItemColor: Colors.deepPurple,
         unselectedItemColor: Colors.grey,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.album), label: 'Albums'),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Search'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Artist'),
           BottomNavigationBarItem(icon: Icon(Icons.queue_music), label: 'Playlists'),

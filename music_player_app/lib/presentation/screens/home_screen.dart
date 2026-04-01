@@ -14,10 +14,8 @@ class HomeDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // SingleChildScrollView allows vertical scrolling if the phone screen is short
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
-      // Column stacks its children vertically from top to bottom
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -25,7 +23,7 @@ class HomeDashboard extends StatelessWidget {
           // --- 1. LAST PLAYED ---
           const Text('Last Played', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10), // Adds a little vertical breathing room
-          // Card creates a raised, rounded container
+          // Rounded container
           Card(
             color: Colors.deepPurple.shade50,
             elevation: 0,
