@@ -39,7 +39,7 @@ erDiagram
         string name
     }
     ALBUM_ARTIST{
-        int song_id PK, FK
+        int album_id PK, FK
         int artist_id PK, FK
     }
     PLAYLIST_TRACK }o--|| SONG : "is"
