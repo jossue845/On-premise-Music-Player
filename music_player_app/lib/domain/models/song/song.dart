@@ -10,7 +10,7 @@ abstract class Song with _$Song {
   const factory Song({
     required int id,
     required String title,
-    required UnmodifiableListView<String> artist,
+    required UnmodifiableListView<String> artists,
     required String album,
     String? genre,
     int? year,

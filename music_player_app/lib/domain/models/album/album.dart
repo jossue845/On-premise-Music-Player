@@ -10,9 +10,8 @@ abstract class Album with _$Album {
   const factory Album({
     required int id,
     required String title,
-    required UnmodifiableListView<String> albumArtist,
-    String? date,
+    required UnmodifiableListView<String> albumArtists,
+    int? year,
     String? imageId,
-    required UnmodifiableListView<int> songIds,
   }) = _Album;
 }
