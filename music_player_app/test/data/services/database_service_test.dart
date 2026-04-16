@@ -10,22 +10,28 @@ void main() {
     setUp(() async {
       sqfliteFfiInit();
       database = DatabaseService(databaseFactory: databaseFactoryFfi);
-      await database.deleteDatabase();
+      await deleteAllRows(database);
       await database.open();
     });
 
-    test("database opens normally", () async {
-      await expectLater(database.open(), completes);
-    });
-
-    test("check conflicts on song, artist and album insert", () async {
+    test("", () async {
       await insertSong(database);
-      await insertSong(database);
+      await database.insertSong(
+        title: "Song Title",
+        path: "/path/",
+        albumTitle: "Album Title 1",
+        songArtistNames: ["Artist 2"],
+        albumArtistNames: ["Artist 2"],
+      );
 
-      final songs = await database.getSongs().getOrThrow();
-      final albums = await database.getAlbums().getOrThrow();
+      var artists = await database.getArtists().getOrThrow();
+
+      var songs = await database
+          .getAlbums(artistId: artists[0].id)
+          .getOrThrow();
       print("Songs: $songs");
-      print("Albums: $albums");
+      songs = await database.getAlbums(artistId: artists[1].id).getOrThrow();
+      print("Songs: $songs");
     });
   });
 }
@@ -40,7 +46,18 @@ Future<void> insertSong(DatabaseService database) async {
     path: "/path/",
     albumTitle: "Album Title",
     songArtistNames: ["Artist 1", "Artist 2"],
-    albumArtistNames: ["Artist 1"],
+    albumArtistNames: ["Artist 1", "Artist 2"],
   );
-  print(result.exceptionOrNull());
+  if (result.isError()) {
+    print(result.exceptionOrNull());
+  }
+}
+
+Future<void> deleteAllRows(DatabaseService database) async {
+  if (!database.isOpen()) {
+    await database.open();
+  }
+  for (final song in await database.getSongs().getOrThrow()) {
+    await database.deleteSong(song.id);
+  }
 }

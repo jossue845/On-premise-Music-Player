@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
 
-import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:music_player_app/domain/models/album/album.dart';
 import 'package:music_player_app/domain/models/artist/artist.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
@@ -123,21 +122,22 @@ class DatabaseService {
     return _database != null;
   }
 
-  Future<void> deleteDatabase() async {
-    if (_database == null) {
-      await open();
-    }
-    databaseFactory.deleteDatabase(_database!.path);
-  }
-
-  Future<Result<List<Song>>> getSongs() async {
+  Future<Result<List<Song>>> getSongs({int? artistId}) async {
     final Map<int, Song> songs = {};
 
     try {
+      final List<Map<String, Object?>> entries;
       // one different entry for each song, song_artist pair
-      final entries = await _database!.rawQuery('''
+      if (artistId != null) {
+        entries = await _database!.rawQuery('''
+          SELECT * FROM $_songTableName NATURAL JOIN $_albumTableName NATURAL JOIN $_songArtistTableName NATURAL JOIN $_artistTableName WHERE $_songIdColumnName IN
+          (SELECT $_songIdColumnName FROM $_songArtistTableName WHERE $_artistIdColumnName = $artistId);
+        ''');
+      } else {
+        entries = await _database!.rawQuery('''
           SELECT * FROM $_songTableName NATURAL JOIN $_albumTableName NATURAL JOIN $_songArtistTableName NATURAL JOIN $_artistTableName;
         ''');
+      }
 
       for (final entry in entries) {
         final songId = entry[_songIdColumnName] as int;
@@ -177,19 +177,31 @@ class DatabaseService {
     }
   }
 
-  Future<Result<List<Album>>> getAlbums() async {
+  Future<Result<List<Album>>> getAlbums({int? artistId}) async {
     final Map<int, Album> albums = {};
     late List<Map<String, Object?>> albumArtistsEntries;
     late List<Map<String, Object?>> albumInfoEntries;
 
     try {
       await _database!.transaction((txn) async {
-        albumArtistsEntries = await txn.rawQuery('''
-          SELECT * FROM $_albumTableName NATURAL JOIN $_albumArtistTableName NATURAL JOIN $_artistTableName
+        if (artistId != null) {
+          albumArtistsEntries = await txn.rawQuery('''
+          SELECT * FROM $_albumTableName NATURAL JOIN $_albumArtistTableName NATURAL JOIN $_artistTableName WHERE $_albumIdColumnName IN
+          (SELECT $_albumIdColumnName FROM $_albumArtistTableName WHERE $_artistIdColumnName = $artistId);
             ''');
-        albumInfoEntries = await txn.rawQuery('''
-          SELECT DISTINCT $_albumIdColumnName, $_imageIdColumnName, $_yearColumnName FROM $_songTableName
+          albumInfoEntries = await txn.rawQuery('''
+          SELECT DISTINCT $_albumIdColumnName, $_imageIdColumnName, $_yearColumnName FROM $_songTableName WHERE $_albumIdColumnName IN
+          (SELECT $_albumIdColumnName FROM $_albumArtistTableName WHERE $_artistIdColumnName = $artistId);
+
         ''');
+        } else {
+          albumArtistsEntries = await txn.rawQuery('''
+          SELECT * FROM $_albumTableName NATURAL JOIN $_albumArtistTableName NATURAL JOIN $_artistTableName;
+            ''');
+          albumInfoEntries = await txn.rawQuery('''
+          SELECT DISTINCT $_albumIdColumnName, $_imageIdColumnName, $_yearColumnName FROM $_songTableName;
+        ''');
+        }
       });
 
       // create albums with required parameters
@@ -412,7 +424,10 @@ class DatabaseService {
           ).getOrThrow();
 
           for (final artist in albumArtistIds) {
-            await _insertAlbumArist(txn, albumId, artist);
+            final result = await _insertAlbumArist(txn, albumId, artist);
+            if (result.isError()) {
+              throw Exception(result.exceptionOrNull());
+            }
           }
         }
 
@@ -430,9 +445,28 @@ class DatabaseService {
         ).getOrThrow();
 
         for (final artist in songArtistIds) {
-          await _insertSongArist(txn, songId, artist);
+          final result = await _insertSongArist(txn, songId, artist);
+          if (result.isError()) {
+            throw Exception(result.exceptionOrNull());
+          }
         }
       });
+      return Success(unit);
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+
+  Future<Result<void>> deleteSong(int songId) async {
+    try {
+      final rowsDeleted = await _database!.delete(
+        _songTableName,
+        where: "$_songIdColumnName = ?",
+        whereArgs: [songId],
+      );
+      if (rowsDeleted == 0) {
+        return Failure(Exception("No song found with id $songId"));
+      }
       return Success(unit);
     } on Exception catch (e) {
       return Failure(e);
