@@ -14,25 +14,7 @@ void main() {
       await database.open();
     });
 
-    test("", () async {
-      await insertSong(database);
-      await database.insertSong(
-        title: "Song Title",
-        path: "/path/",
-        albumTitle: "Album Title 1",
-        songArtistNames: ["Artist 2"],
-        albumArtistNames: ["Artist 2"],
-      );
-
-      var artists = await database.getArtists().getOrThrow();
-
-      var songs = await database
-          .getAlbums(artistId: artists[0].id)
-          .getOrThrow();
-      print("Songs: $songs");
-      songs = await database.getAlbums(artistId: artists[1].id).getOrThrow();
-      print("Songs: $songs");
-    });
+    test("", () async {});
   });
 }
 

@@ -7,46 +7,11 @@ class SongRepository {
 
   final DatabaseService _database;
 
+  /// Returns all the songs.
   Future<Result<List<Song>>> getSongs() async {
     if (!_database.isOpen()) {
       await _database.open();
     }
     return _database.getSongs();
-  }
-
-  Future<Result<void>> insertSong({
-    required String title,
-    String? genre,
-    int? year,
-    int? bitrate,
-    int? trackNumber,
-    required String path,
-    String? imageId,
-    required String albumTitle,
-    required List<String> songArtistNames,
-    required List<String> albumArtistNames,
-  }) async {
-    if (!_database.isOpen()) {
-      await _database.open();
-    }
-    return _database.insertSong(
-      title: title,
-      path: path,
-      albumTitle: albumTitle,
-      songArtistNames: songArtistNames,
-      albumArtistNames: albumArtistNames,
-      genre: genre,
-      year: year,
-      bitrate: bitrate,
-      trackNumber: trackNumber,
-      imageId: imageId,
-    );
-  }
-
-  Future<Result<void>> deleteSong(int songId) async {
-    if (!_database.isOpen()) {
-      await _database.open();
-    }
-    return _database.deleteSong(songId);
   }
 }

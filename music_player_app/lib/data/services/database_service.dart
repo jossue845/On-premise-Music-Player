@@ -46,6 +46,9 @@ class DatabaseService {
 
   DatabaseService({required this.databaseFactory});
 
+  /// Opens the database.
+  ///
+  /// Creates the database if it doesn't exist.
   Future<void> open() async {
     _database = await databaseFactory.openDatabase(
       join(await databaseFactory.getDatabasesPath(), 'app_database.db'),
@@ -61,7 +64,7 @@ class DatabaseService {
             CREATE TABLE $_albumArtistTableName($_albumIdColumnName INTEGER, $_artistIdColumnName INTEGER, PRIMARY KEY($_albumIdColumnName, $_artistIdColumnName),
               FOREIGN KEY($_albumIdColumnName) REFERENCES $_albumTableName($_albumIdColumnName) ON UPDATE CASCADE ON DELETE CASCADE,
               FOREIGN KEY($_artistIdColumnName) REFERENCES $_artistTableName($_artistIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT);
-            CREATE TABLE $_songTableName($_songIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT, $_songTitleColumnName TEXT NOT NULL , $_albumIdColumnName INTEGER,
+            CREATE TABLE $_songTableName($_songIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT, $_songTitleColumnName TEXT NOT NULL , $_albumIdColumnName INTEGER NOT NULL,
               $_genreColumnName TEXT, $_yearColumnName INTEGER, $_bitrateColumnName INTEGER, $_trackNumberColumnName INTEGER, $_pathColumnName TEXT NOT NULL,
               $_imageIdColumnName TEXT, FOREIGN KEY($_albumIdColumnName) REFERENCES $_albumTableName($_albumIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT);
             CREATE TABLE $_songArtistTableName($_songIdColumnName INTEGER, $_artistIdColumnName INTEGER, PRIMARY KEY($_songIdColumnName, $_artistIdColumnName),
@@ -118,16 +121,23 @@ class DatabaseService {
     );
   }
 
+  /// Whether the database is open.
   bool isOpen() {
     return _database != null;
   }
 
+  /// Returns the songs in the database associated to an album and at least one song artist.
+  ///
+  /// Is's required for an inserted song to have those attributes, therefore no song is expected to be ignored.
+  ///
+  /// Returns the songs made by the artist identified by [artistId] when it is not null.
   Future<Result<List<Song>>> getSongs({int? artistId}) async {
     final Map<int, Song> songs = {};
 
     try {
       final List<Map<String, Object?>> entries;
-      // one different entry for each song, song_artist pair
+
+      // Get the songs, with a different entry for each song, song_artist pair.
       if (artistId != null) {
         entries = await _database!.rawQuery('''
           SELECT * FROM $_songTableName NATURAL JOIN $_albumTableName NATURAL JOIN $_songArtistTableName NATURAL JOIN $_artistTableName WHERE $_songIdColumnName IN
@@ -142,27 +152,24 @@ class DatabaseService {
       for (final entry in entries) {
         final songId = entry[_songIdColumnName] as int;
 
-        // create song if id not present
+        // Create and add song if it's id is not present in the map.
         if (!songs.containsKey(songId)) {
-          songs.putIfAbsent(
-            songId,
-            () => Song(
-              id: songId,
-              title: entry[_songTitleColumnName] as String,
-              artists: UnmodifiableListView([
-                entry[_artistNameColumnName] as String,
-              ]),
-              album: entry[_albumTitleColumnName] as String,
-              genre: entry[_genreColumnName] as String?,
-              year: entry[_yearColumnName] as int?,
-              bitrate: entry[_bitrateColumnName] as int?,
-              trackNumber: entry[_trackNumberColumnName] as int?,
-              path: entry[_pathColumnName] as String,
-              imageId: entry[_imageIdColumnName] as String?,
-            ),
+          songs[songId] = Song(
+            id: songId,
+            title: entry[_songTitleColumnName] as String,
+            artists: UnmodifiableListView([
+              entry[_artistNameColumnName] as String,
+            ]),
+            album: entry[_albumTitleColumnName] as String,
+            genre: entry[_genreColumnName] as String?,
+            year: entry[_yearColumnName] as int?,
+            bitrate: entry[_bitrateColumnName] as int?,
+            trackNumber: entry[_trackNumberColumnName] as int?,
+            path: entry[_pathColumnName] as String,
+            imageId: entry[_imageIdColumnName] as String?,
           );
         } else {
-          // simply add the artist to the list if the song is already created
+          // Add the artist to the list of song artists if the song is already created.
           final artists = List.of(songs[songId]!.artists);
           artists.add(entry[_artistNameColumnName] as String);
           songs[songId] = songs[songId]!.copyWith(
@@ -177,12 +184,18 @@ class DatabaseService {
     }
   }
 
+  /// Returns the albums in the database associated to at least one album artist.
+  ///
+  /// Is's required for an inserted album to have that attribute, therefore no album is expected to be ignored.
+  ///
+  /// Returns the albums made by the artist identified by [artistId] when it is not null.
   Future<Result<List<Album>>> getAlbums({int? artistId}) async {
     final Map<int, Album> albums = {};
     late List<Map<String, Object?>> albumArtistsEntries;
     late List<Map<String, Object?>> albumInfoEntries;
 
     try {
+      // Get the albums and the associated metadata.
       await _database!.transaction((txn) async {
         if (artistId != null) {
           albumArtistsEntries = await txn.rawQuery('''
@@ -204,22 +217,20 @@ class DatabaseService {
         }
       });
 
-      // create albums with required parameters
       for (final entry in albumArtistsEntries) {
         final albumId = entry[_albumIdColumnName] as int;
 
+        // Create and add album if it's id is not present in the map.
         if (!albums.containsKey(albumId)) {
-          albums.putIfAbsent(
-            albumId,
-            () => Album(
-              id: albumId,
-              title: entry[_albumTitleColumnName] as String,
-              albumArtists: UnmodifiableListView([
-                entry[_artistNameColumnName] as String,
-              ]),
-            ),
+          albums[albumId] = Album(
+            id: albumId,
+            title: entry[_albumTitleColumnName] as String,
+            albumArtists: UnmodifiableListView([
+              entry[_artistNameColumnName] as String,
+            ]),
           );
         } else {
+          // Add the artist to the list of album artists if the song is already created.
           final artists = List.of(albums[albumId]!.albumArtists);
           artists.add(entry[_artistNameColumnName] as String);
           albums[albumId] = albums[albumId]!.copyWith(
@@ -228,7 +239,7 @@ class DatabaseService {
         }
       }
 
-      // add image and year
+      // Add image and year to the albums.
       for (final entry in albumInfoEntries) {
         final albumId = entry[_albumIdColumnName] as int;
         if (albums.containsKey(albumId)) {
@@ -245,6 +256,7 @@ class DatabaseService {
     }
   }
 
+  /// Returns all the artists in the database.
   Future<Result<List<Artist>>> getArtists() async {
     try {
       final entries = await _database!.rawQuery('''
@@ -264,6 +276,9 @@ class DatabaseService {
     }
   }
 
+  /// Inserts a row in the song table with the specified metadata.
+  ///
+  /// Uses the specified database [executor] to perform the insert.
   Future<Result<int>> _insertSong({
     required DatabaseExecutor executor,
     required String title,
@@ -292,6 +307,9 @@ class DatabaseService {
     }
   }
 
+  /// Inserts a row in the album table with the specified [title].
+  ///
+  /// Uses the specified database [executor] to perform the insert.
   Future<Result<int>> _insertAlbum({
     required DatabaseExecutor executor,
     required String title,
@@ -306,6 +324,9 @@ class DatabaseService {
     }
   }
 
+  /// Inserts a row in the artist table with the specified [artistName].
+  ///
+  /// Uses the specified database [executor] to perform the insert.
   Future<Result<int>> _insertArtist(
     DatabaseExecutor executor,
     String artistName,
@@ -331,6 +352,9 @@ class DatabaseService {
     }
   }
 
+  /// Inserts a row in the song artist table with the specified [songId] and [artistId].
+  ///
+  /// Uses the specified database [executor] to perform the insert.
   Future<Result<void>> _insertSongArist(
     DatabaseExecutor executor,
     int songId,
@@ -347,6 +371,9 @@ class DatabaseService {
     }
   }
 
+  /// Inserts a row in the album artist table with the specified [albumId] and [artistId].
+  ///
+  /// Uses the specified database [executor] to perform the insert.
   Future<Result<void>> _insertAlbumArist(
     DatabaseExecutor executor,
     int albumId,
@@ -363,6 +390,13 @@ class DatabaseService {
     }
   }
 
+  /// Inserts a song and all of the entities related to it into the database.
+  ///
+  /// The following tables are affected:
+  /// song, song artist
+  /// album, artist, album artist if they are not already present
+  ///
+  /// The entire operation uses a single transaction to keep it atomic.
   Future<Result<void>> insertSong({
     required String title,
     String? genre,
@@ -383,7 +417,7 @@ class DatabaseService {
         final int songId;
         final Map<int, List<int>> potentialAlbums = {};
 
-        // Insert artists and get the ids
+        // Insert artists and save their ids.
         for (final artist in songArtistNames) {
           songArtistIds.add(await _insertArtist(txn, artist).getOrThrow());
         }
@@ -391,22 +425,22 @@ class DatabaseService {
           albumArtistIds.add(await _insertArtist(txn, artist).getOrThrow());
         }
 
-        // Get albums titled $albumTitle and map them to their artists
+        // Get albums titled $albumTitle, with one entry per album, album artist pair.
         final albumQueryResult = await txn.rawQuery(
           "SELECT * FROM $_albumTableName NATURAL JOIN $_albumArtistTableName WHERE $_albumTitleColumnName = '$albumTitle';",
         );
+        // Map the album artists to the album ids.
         for (final element in albumQueryResult) {
           final potentialAlbumId = element[_albumIdColumnName] as int;
-          if (!potentialAlbums.containsKey(potentialAlbumId)) {
-            potentialAlbums.putIfAbsent(potentialAlbumId, () => []);
-          }
+          potentialAlbums.putIfAbsent(potentialAlbumId, () => []);
           potentialAlbums[potentialAlbumId]!.add(
             element[_artistIdColumnName] as int,
           );
         }
 
-        // Find the correct album, meaning the one with the same album artists
+        // Check if the album of the song was already inserted.
         for (final album in potentialAlbums.keys) {
+          // Check if the album artists are the same.
           if (potentialAlbums[album]!.length == albumArtistIds.length &&
               albumArtistIds.toSet().containsAll(
                 potentialAlbums[album]!.toSet(),
@@ -416,7 +450,7 @@ class DatabaseService {
           }
         }
 
-        // If the album was not present, create it and insert album artists
+        // If the album was not present, create it and insert the album artists.
         if (albumId == -1) {
           albumId = await _insertAlbum(
             executor: txn,
@@ -431,7 +465,7 @@ class DatabaseService {
           }
         }
 
-        // Insert song and song artists
+        // Insert song and song artists.
         songId = await _insertSong(
           executor: txn,
           title: title,
@@ -457,6 +491,9 @@ class DatabaseService {
     }
   }
 
+  /// Deletes the song identified by [songId] from the database.
+  ///
+  /// The related metadata is handled by triggers and foreign key actions.
   Future<Result<void>> deleteSong(int songId) async {
     try {
       final rowsDeleted = await _database!.delete(

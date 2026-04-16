@@ -9,6 +9,7 @@ class SongRepository {
 
   final DatabaseService _database;
 
+  /// Returns all the artists.
   Future<Result<List<Artist>>> getArtists() async {
     if (!_database.isOpen()) {
       await _database.open();
@@ -16,6 +17,7 @@ class SongRepository {
     return _database.getArtists();
   }
 
+  /// Returns all the songs that have [artistId] as artist.
   Future<Result<List<Song>>> getSongs(int artistId) async {
     if (!_database.isOpen()) {
       await _database.open();
@@ -23,6 +25,7 @@ class SongRepository {
     return _database.getSongs(artistId: artistId);
   }
 
+  /// Returns all the albums that have [artistId] as album artist.
   Future<Result<List<Album>>> getAlbums(int artistId) async {
     if (!_database.isOpen()) {
       await _database.open();
