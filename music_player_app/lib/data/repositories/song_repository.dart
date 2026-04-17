@@ -14,4 +14,29 @@ class SongRepository {
     }
     return _database.getSongs();
   }
+
+  Future<Result<Song>> editTags({
+    required Song oldSong,
+    String? newTitle,
+    String? newGenre,
+    int? newYear,
+    int? newTrackNumber,
+    String? newAlbumTitle,
+    List<String>? newSongArtistNames,
+    List<String>? newAlbumArtistNames,
+  }) async {
+    if (!_database.isOpen()) {
+      await _database.open();
+    }
+    return _database.updateTags(
+      oldSong: oldSong,
+      newTitle: newTitle,
+      newGenre: newGenre,
+      newYear: newYear,
+      newTrackNumber: newTrackNumber,
+      newAlbumTitle: newAlbumTitle,
+      newSongArtistNames: newSongArtistNames,
+      newAlbumArtistNames: newAlbumArtistNames,
+    );
+  }
 }

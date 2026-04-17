@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:math';
 
 import 'package:music_player_app/domain/models/album/album.dart';
 import 'package:music_player_app/domain/models/artist/artist.dart';
@@ -77,6 +78,13 @@ class DatabaseService {
               FOREIGN KEY($_songIdColumnName) REFERENCES $_songTableName($_songIdColumnName) ON UPDATE CASCADE ON DELETE CASCADE);
             CREATE TRIGGER delete_album_if_songs_are_deleted
               AFTER DELETE ON $_songTableName
+              FOR EACH ROW
+              WHEN NOT EXISTS (SELECT 1 FROM $_songTableName WHERE $_albumIdColumnName = OLD.$_albumIdColumnName LIMIT 1)
+              BEGIN
+                DELETE FROM $_albumTableName WHERE $_albumIdColumnName = OLD.$_albumIdColumnName;
+              END;
+            CREATE TRIGGER delete_album_if_songs_no_longer_reference_it
+              AFTER UPDATE ON $_songTableName
               FOR EACH ROW
               WHEN NOT EXISTS (SELECT 1 FROM $_songTableName WHERE $_albumIdColumnName = OLD.$_albumIdColumnName LIMIT 1)
               BEGIN
@@ -167,6 +175,7 @@ class DatabaseService {
               entry[_artistNameColumnName] as String,
             ]),
             album: entry[_albumTitleColumnName] as String,
+            albumId: entry[_albumIdColumnName] as int,
             genre: entry[_genreColumnName] as String?,
             year: entry[_yearColumnName] as int?,
             bitrate: entry[_bitrateColumnName] as int?,
@@ -285,6 +294,8 @@ class DatabaseService {
   /// Inserts a row in the song table with the specified metadata.
   ///
   /// Uses the specified database [executor] to perform the insert.
+  ///
+  /// Returns the id of the inserted song.
   Future<Result<int>> _insertSong({
     required DatabaseExecutor executor,
     required String title,
@@ -316,6 +327,8 @@ class DatabaseService {
   /// Inserts a row in the album table with the specified [title].
   ///
   /// Uses the specified database [executor] to perform the insert.
+  ///
+  /// Returns the id of the inserted album.
   Future<Result<int>> _insertAlbum({
     required DatabaseExecutor executor,
     required String title,
@@ -330,10 +343,12 @@ class DatabaseService {
     }
   }
 
-  /// Inserts a row in the artist table with the specified [artistName].
+  /// Inserts a row in the artist table with the specified [artistName] if it wasn't already present.
   ///
   /// Uses the specified database [executor] to perform the insert.
-  Future<Result<int>> _insertArtist(
+  ///
+  /// Returns the id of the inserted, or already present, artist.
+  Future<Result<int>> _insertArtistIfAbsent(
     DatabaseExecutor executor,
     String artistName,
   ) async {
@@ -361,7 +376,7 @@ class DatabaseService {
   /// Inserts a row in the song artist table with the specified [songId] and [artistId].
   ///
   /// Uses the specified database [executor] to perform the insert.
-  Future<Result<void>> _insertSongArist(
+  Future<Result<void>> _insertSongArtist(
     DatabaseExecutor executor,
     int songId,
     int artistId,
@@ -380,7 +395,7 @@ class DatabaseService {
   /// Inserts a row in the album artist table with the specified [albumId] and [artistId].
   ///
   /// Uses the specified database [executor] to perform the insert.
-  Future<Result<void>> _insertAlbumArist(
+  Future<Result<void>> _insertAlbumArtist(
     DatabaseExecutor executor,
     int albumId,
     int artistId,
@@ -396,13 +411,73 @@ class DatabaseService {
     }
   }
 
+  /// Inserts a row in the album table with the specified [albumTitle] if it wasn't already present.
+  ///
+  /// Checks album equality using [albumTitle] and [albumArtistIds].
+  ///
+  /// Uses the specified database [executor] to perform the insert.
+  ///
+  /// Returns the id of the inserted, or already present, album.
+  Future<Result<int>> _insertAlbumIfAbsent(
+    DatabaseExecutor executor,
+    String albumTitle,
+    List<int> albumArtistIds,
+  ) async {
+    try {
+      int albumId = -1;
+      final Map<int, List<int>> potentialAlbums = {};
+
+      // Get albums titled $albumTitle, with one entry per album, album artist pair.
+      final albumQueryResult = await executor.rawQuery(
+        "SELECT * FROM $_albumTableName NATURAL JOIN $_albumArtistTableName WHERE $_albumTitleColumnName = '$albumTitle';",
+      );
+
+      // Map the album artists to the album ids.
+      for (final element in albumQueryResult) {
+        final potentialAlbumId = element[_albumIdColumnName] as int;
+        potentialAlbums.putIfAbsent(potentialAlbumId, () => []);
+        potentialAlbums[potentialAlbumId]!.add(
+          element[_artistIdColumnName] as int,
+        );
+      }
+
+      // Check if the album was already inserted.
+      for (final album in potentialAlbums.keys) {
+        // Check if the album artists are the same.
+        if (potentialAlbums[album]!.length == albumArtistIds.length &&
+            albumArtistIds.toSet().containsAll(
+              potentialAlbums[album]!.toSet(),
+            )) {
+          albumId = album;
+          break;
+        }
+      }
+
+      // If the album was not present, create it and insert the album artists.
+      if (albumId == -1) {
+        albumId = await _insertAlbum(
+          executor: executor,
+          title: albumTitle,
+        ).getOrThrow();
+
+        for (final artist in albumArtistIds) {
+          final result = await _insertAlbumArtist(executor, albumId, artist);
+          if (result.isError()) {
+            throw Exception(result.exceptionOrNull());
+          }
+        }
+      }
+      return Success(albumId);
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+
   /// Inserts a song and all of the entities related to it into the database.
   ///
   /// The following tables are affected:
   /// song, song artist
   /// album, artist, album artist if they are not already present
-  ///
-  /// The entire operation uses a single transaction to keep it atomic.
   Future<Result<void>> insertSong({
     required String title,
     String? genre,
@@ -415,61 +490,47 @@ class DatabaseService {
     required List<String> songArtistNames,
     required List<String> albumArtistNames,
   }) async {
+    if (songArtistNames.isEmpty ||
+        albumArtistNames.isEmpty ||
+        songArtistNames.where((a) => a.isEmpty).isNotEmpty ||
+        albumArtistNames.where((a) => a.isEmpty).isNotEmpty) {
+      return Failure(
+        Exception(
+          "songArtistNames and albumArtistNames cannot be empty or contain empty strings",
+        ),
+      );
+    }
+    if (title.isEmpty || path.isEmpty || albumTitle.isEmpty) {
+      return Failure(
+        Exception("title, path and albumTitle cannot be empty strings"),
+      );
+    }
+
     try {
       await _database!.transaction((txn) async {
         final List<int> songArtistIds = [];
         final List<int> albumArtistIds = [];
-        int albumId = -1;
+        final int albumId;
         final int songId;
-        final Map<int, List<int>> potentialAlbums = {};
 
         // Insert artists and save their ids.
         for (final artist in songArtistNames) {
-          songArtistIds.add(await _insertArtist(txn, artist).getOrThrow());
+          songArtistIds.add(
+            await _insertArtistIfAbsent(txn, artist).getOrThrow(),
+          );
         }
         for (final artist in albumArtistNames) {
-          albumArtistIds.add(await _insertArtist(txn, artist).getOrThrow());
-        }
-
-        // Get albums titled $albumTitle, with one entry per album, album artist pair.
-        final albumQueryResult = await txn.rawQuery(
-          "SELECT * FROM $_albumTableName NATURAL JOIN $_albumArtistTableName WHERE $_albumTitleColumnName = '$albumTitle';",
-        );
-        // Map the album artists to the album ids.
-        for (final element in albumQueryResult) {
-          final potentialAlbumId = element[_albumIdColumnName] as int;
-          potentialAlbums.putIfAbsent(potentialAlbumId, () => []);
-          potentialAlbums[potentialAlbumId]!.add(
-            element[_artistIdColumnName] as int,
+          albumArtistIds.add(
+            await _insertArtistIfAbsent(txn, artist).getOrThrow(),
           );
         }
 
-        // Check if the album of the song was already inserted.
-        for (final album in potentialAlbums.keys) {
-          // Check if the album artists are the same.
-          if (potentialAlbums[album]!.length == albumArtistIds.length &&
-              albumArtistIds.toSet().containsAll(
-                potentialAlbums[album]!.toSet(),
-              )) {
-            albumId = album;
-            break;
-          }
-        }
-
-        // If the album was not present, create it and insert the album artists.
-        if (albumId == -1) {
-          albumId = await _insertAlbum(
-            executor: txn,
-            title: albumTitle,
-          ).getOrThrow();
-
-          for (final artist in albumArtistIds) {
-            final result = await _insertAlbumArist(txn, albumId, artist);
-            if (result.isError()) {
-              throw Exception(result.exceptionOrNull());
-            }
-          }
-        }
+        // Insert album and get its id.
+        albumId = await _insertAlbumIfAbsent(
+          txn,
+          albumTitle,
+          albumArtistIds,
+        ).getOrThrow();
 
         // Insert song and song artists.
         songId = await _insertSong(
@@ -485,7 +546,7 @@ class DatabaseService {
         ).getOrThrow();
 
         for (final artist in songArtistIds) {
-          final result = await _insertSongArist(txn, songId, artist);
+          final result = await _insertSongArtist(txn, songId, artist);
           if (result.isError()) {
             throw Exception(result.exceptionOrNull());
           }
@@ -511,6 +572,161 @@ class DatabaseService {
         return Failure(Exception("No song found with id $songId"));
       }
       return Success(unit);
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+
+  /// Updates [oldSong] with the specified metadata.
+  ///
+  /// Returns a new [Song] with the updated metadata.
+  Future<Result<Song>> updateTags({
+    required Song oldSong,
+    String? newTitle,
+    String? newGenre,
+    int? newYear,
+    int? newTrackNumber,
+    String? newAlbumTitle,
+    List<String>? newSongArtistNames,
+    List<String>? newAlbumArtistNames,
+  }) async {
+    Song newSong = oldSong;
+    try {
+      await _database!.transaction((txn) async {
+        final List<int> songArtistIds = [];
+        final List<int> albumArtistIds = [];
+
+        // Update song artists.
+        if (newSongArtistNames != null &&
+            newSongArtistNames.isNotEmpty &&
+            newSongArtistNames.where((a) => a.isEmpty).isEmpty) {
+          // Delete old song artists.
+          await txn.delete(
+            _songArtistTableName,
+            where: "$_songIdColumnName = ?",
+            whereArgs: [oldSong.id],
+          );
+
+          // Insert artists and save their ids.
+          for (final artist in newSongArtistNames) {
+            songArtistIds.add(
+              await _insertArtistIfAbsent(txn, artist).getOrThrow(),
+            );
+          }
+
+          // Insert song artists.
+          for (final artistId in songArtistIds) {
+            final result = await _insertSongArtist(txn, oldSong.id, artistId);
+            if (result.isError()) {
+              throw Exception(result.exceptionOrNull());
+            }
+          }
+        }
+
+        if (newAlbumTitle != null && newAlbumTitle.isNotEmpty) {
+          // Get album artist ids.
+          final albumArtistEntries = await txn.query(
+            _albumArtistTableName,
+            where: "$_albumIdColumnName = ?",
+            whereArgs: [oldSong.albumId],
+          );
+
+          final albumId = await _insertAlbumIfAbsent(
+            txn,
+            newAlbumTitle,
+            albumArtistEntries
+                .map((e) => e[_artistIdColumnName] as int)
+                .toList(),
+          ).getOrThrow();
+
+          // Update song tuple with the new albumId.
+          txn.update(
+            _songTableName,
+            Map.fromEntries([MapEntry(_albumIdColumnName, albumId)]),
+            where: "$_albumIdColumnName = ?",
+            whereArgs: [oldSong.albumId],
+          );
+
+          newSong = newSong.copyWith(albumId: albumId);
+        }
+
+        // Update album artists.
+        if (newAlbumArtistNames != null &&
+            newAlbumArtistNames.isNotEmpty &&
+            newAlbumArtistNames.where((a) => a.isEmpty).isEmpty) {
+          // Delete old album artists.
+          await txn.delete(
+            _albumArtistTableName,
+            where: "$_albumIdColumnName = ?",
+            whereArgs: [newSong.albumId],
+          );
+
+          // Insert artists and save their ids.
+          for (final artist in newAlbumArtistNames) {
+            albumArtistIds.add(
+              await _insertArtistIfAbsent(txn, artist).getOrThrow(),
+            );
+          }
+
+          // Insert album artists.
+          for (final artistId in albumArtistIds) {
+            final result = await _insertAlbumArtist(
+              txn,
+              newSong.albumId,
+              artistId,
+            );
+            if (result.isError()) {
+              throw Exception(result.exceptionOrNull());
+            }
+          }
+        }
+
+        // Update title.
+        if (newTitle != null && newTitle.isNotEmpty) {
+          await txn.update(
+            _songTableName,
+            Map.fromEntries([MapEntry(_songTitleColumnName, newTitle)]),
+            where: "$_songIdColumnName = ?",
+            whereArgs: [oldSong.id],
+          );
+          newSong = newSong.copyWith(title: newTitle);
+        }
+
+        // Update genre.
+        if (newGenre != null && newGenre.isNotEmpty) {
+          await txn.update(
+            _songTableName,
+            Map.fromEntries([MapEntry(_genreColumnName, newGenre)]),
+            where: "$_songIdColumnName = ?",
+            whereArgs: [oldSong.id],
+          );
+          newSong = newSong.copyWith(genre: newGenre);
+        }
+
+        // Update year.
+        if (newYear != null) {
+          await txn.update(
+            _songTableName,
+            Map.fromEntries([MapEntry(_yearColumnName, newYear)]),
+            where: "$_songIdColumnName = ?",
+            whereArgs: [oldSong.id],
+          );
+          newSong = newSong.copyWith(year: newYear);
+        }
+
+        // Update track number.
+        if (newTrackNumber != null) {
+          await txn.update(
+            _songTableName,
+            Map.fromEntries([MapEntry(_trackNumberColumnName, newTrackNumber)]),
+            where: "$_songIdColumnName = ?",
+            whereArgs: [oldSong.id],
+          );
+          newSong = newSong.copyWith(trackNumber: newTrackNumber);
+        }
+      });
+
+      return Success(newSong);
     } on Exception catch (e) {
       return Failure(e);
     }

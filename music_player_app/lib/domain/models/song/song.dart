@@ -12,6 +12,7 @@ abstract class Song with _$Song {
     required String title,
     required UnmodifiableListView<String> artists,
     required String album,
+    required int albumId,
     String? genre,
     int? year,
     int? bitrate,

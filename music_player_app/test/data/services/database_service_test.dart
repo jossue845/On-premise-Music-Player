@@ -13,6 +13,27 @@ void main() {
       await deleteAllRows(database);
       await database.open();
     });
+
+    test("", () async {
+      await insertSong(database);
+
+      var songs = await database.getSongs().getOrThrow();
+      print("Songs: $songs");
+
+      await database.updateTags(
+        oldSong: songs[0],
+        newTitle: "Song 1",
+        newGenre: "JPop",
+        newYear: 2026,
+        newTrackNumber: 1,
+        newAlbumTitle: "JPop Album",
+        newSongArtistNames: ["Yorushika"],
+        newAlbumArtistNames: ["Yorushika"],
+      );
+
+      songs = await database.getSongs().getOrThrow();
+      print("Songs: $songs");
+    });
   });
 }
 
