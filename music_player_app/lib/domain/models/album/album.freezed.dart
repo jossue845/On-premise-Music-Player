@@ -14,7 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$Album implements DiagnosticableTreeMixin {
 
- int get id; String get title; UnmodifiableListView<String> get albumArtists; int? get year; String? get imageId;
+ int get id; String get title; UnmodifiableListView<String> get albumArtists; int? get year; String? get imagePath;
 /// Create a copy of Album
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -26,21 +26,21 @@ $AlbumCopyWith<Album> get copyWith => _$AlbumCopyWithImpl<Album>(this as Album, 
 void debugFillProperties(DiagnosticPropertiesBuilder properties) {
   properties
     ..add(DiagnosticsProperty('type', 'Album'))
-    ..add(DiagnosticsProperty('id', id))..add(DiagnosticsProperty('title', title))..add(DiagnosticsProperty('albumArtists', albumArtists))..add(DiagnosticsProperty('year', year))..add(DiagnosticsProperty('imageId', imageId));
+    ..add(DiagnosticsProperty('id', id))..add(DiagnosticsProperty('title', title))..add(DiagnosticsProperty('albumArtists', albumArtists))..add(DiagnosticsProperty('year', year))..add(DiagnosticsProperty('imagePath', imagePath));
 }
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Album&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&const DeepCollectionEquality().equals(other.albumArtists, albumArtists)&&(identical(other.year, year) || other.year == year)&&(identical(other.imageId, imageId) || other.imageId == imageId));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Album&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&const DeepCollectionEquality().equals(other.albumArtists, albumArtists)&&(identical(other.year, year) || other.year == year)&&(identical(other.imagePath, imagePath) || other.imagePath == imagePath));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,id,title,const DeepCollectionEquality().hash(albumArtists),year,imageId);
+int get hashCode => Object.hash(runtimeType,id,title,const DeepCollectionEquality().hash(albumArtists),year,imagePath);
 
 @override
 String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
-  return 'Album(id: $id, title: $title, albumArtists: $albumArtists, year: $year, imageId: $imageId)';
+  return 'Album(id: $id, title: $title, albumArtists: $albumArtists, year: $year, imagePath: $imagePath)';
 }
 
 
@@ -51,7 +51,7 @@ abstract mixin class $AlbumCopyWith<$Res>  {
   factory $AlbumCopyWith(Album value, $Res Function(Album) _then) = _$AlbumCopyWithImpl;
 @useResult
 $Res call({
- int id, String title, UnmodifiableListView<String> albumArtists, int? year, String? imageId
+ int id, String title, UnmodifiableListView<String> albumArtists, int? year, String? imagePath
 });
 
 
@@ -68,13 +68,13 @@ class _$AlbumCopyWithImpl<$Res>
 
 /// Create a copy of Album
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? title = null,Object? albumArtists = null,Object? year = freezed,Object? imageId = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? title = null,Object? albumArtists = null,Object? year = freezed,Object? imagePath = freezed,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
 as String,albumArtists: null == albumArtists ? _self.albumArtists : albumArtists // ignore: cast_nullable_to_non_nullable
 as UnmodifiableListView<String>,year: freezed == year ? _self.year : year // ignore: cast_nullable_to_non_nullable
-as int?,imageId: freezed == imageId ? _self.imageId : imageId // ignore: cast_nullable_to_non_nullable
+as int?,imagePath: freezed == imagePath ? _self.imagePath : imagePath // ignore: cast_nullable_to_non_nullable
 as String?,
   ));
 }
@@ -160,10 +160,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String title,  UnmodifiableListView<String> albumArtists,  int? year,  String? imageId)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String title,  UnmodifiableListView<String> albumArtists,  int? year,  String? imagePath)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Album() when $default != null:
-return $default(_that.id,_that.title,_that.albumArtists,_that.year,_that.imageId);case _:
+return $default(_that.id,_that.title,_that.albumArtists,_that.year,_that.imagePath);case _:
   return orElse();
 
 }
@@ -181,10 +181,10 @@ return $default(_that.id,_that.title,_that.albumArtists,_that.year,_that.imageId
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String title,  UnmodifiableListView<String> albumArtists,  int? year,  String? imageId)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String title,  UnmodifiableListView<String> albumArtists,  int? year,  String? imagePath)  $default,) {final _that = this;
 switch (_that) {
 case _Album():
-return $default(_that.id,_that.title,_that.albumArtists,_that.year,_that.imageId);case _:
+return $default(_that.id,_that.title,_that.albumArtists,_that.year,_that.imagePath);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -201,10 +201,10 @@ return $default(_that.id,_that.title,_that.albumArtists,_that.year,_that.imageId
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String title,  UnmodifiableListView<String> albumArtists,  int? year,  String? imageId)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String title,  UnmodifiableListView<String> albumArtists,  int? year,  String? imagePath)?  $default,) {final _that = this;
 switch (_that) {
 case _Album() when $default != null:
-return $default(_that.id,_that.title,_that.albumArtists,_that.year,_that.imageId);case _:
+return $default(_that.id,_that.title,_that.albumArtists,_that.year,_that.imagePath);case _:
   return null;
 
 }
@@ -216,14 +216,14 @@ return $default(_that.id,_that.title,_that.albumArtists,_that.year,_that.imageId
 
 
 class _Album with DiagnosticableTreeMixin implements Album {
-  const _Album({required this.id, required this.title, required this.albumArtists, this.year, this.imageId});
+  const _Album({required this.id, required this.title, required this.albumArtists, this.year, this.imagePath});
   
 
 @override final  int id;
 @override final  String title;
 @override final  UnmodifiableListView<String> albumArtists;
 @override final  int? year;
-@override final  String? imageId;
+@override final  String? imagePath;
 
 /// Create a copy of Album
 /// with the given fields replaced by the non-null parameter values.
@@ -236,21 +236,21 @@ _$AlbumCopyWith<_Album> get copyWith => __$AlbumCopyWithImpl<_Album>(this, _$ide
 void debugFillProperties(DiagnosticPropertiesBuilder properties) {
   properties
     ..add(DiagnosticsProperty('type', 'Album'))
-    ..add(DiagnosticsProperty('id', id))..add(DiagnosticsProperty('title', title))..add(DiagnosticsProperty('albumArtists', albumArtists))..add(DiagnosticsProperty('year', year))..add(DiagnosticsProperty('imageId', imageId));
+    ..add(DiagnosticsProperty('id', id))..add(DiagnosticsProperty('title', title))..add(DiagnosticsProperty('albumArtists', albumArtists))..add(DiagnosticsProperty('year', year))..add(DiagnosticsProperty('imagePath', imagePath));
 }
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Album&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&const DeepCollectionEquality().equals(other.albumArtists, albumArtists)&&(identical(other.year, year) || other.year == year)&&(identical(other.imageId, imageId) || other.imageId == imageId));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Album&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&const DeepCollectionEquality().equals(other.albumArtists, albumArtists)&&(identical(other.year, year) || other.year == year)&&(identical(other.imagePath, imagePath) || other.imagePath == imagePath));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,id,title,const DeepCollectionEquality().hash(albumArtists),year,imageId);
+int get hashCode => Object.hash(runtimeType,id,title,const DeepCollectionEquality().hash(albumArtists),year,imagePath);
 
 @override
 String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
-  return 'Album(id: $id, title: $title, albumArtists: $albumArtists, year: $year, imageId: $imageId)';
+  return 'Album(id: $id, title: $title, albumArtists: $albumArtists, year: $year, imagePath: $imagePath)';
 }
 
 
@@ -261,7 +261,7 @@ abstract mixin class _$AlbumCopyWith<$Res> implements $AlbumCopyWith<$Res> {
   factory _$AlbumCopyWith(_Album value, $Res Function(_Album) _then) = __$AlbumCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String title, UnmodifiableListView<String> albumArtists, int? year, String? imageId
+ int id, String title, UnmodifiableListView<String> albumArtists, int? year, String? imagePath
 });
 
 
@@ -278,13 +278,13 @@ class __$AlbumCopyWithImpl<$Res>
 
 /// Create a copy of Album
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? title = null,Object? albumArtists = null,Object? year = freezed,Object? imageId = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? title = null,Object? albumArtists = null,Object? year = freezed,Object? imagePath = freezed,}) {
   return _then(_Album(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
 as String,albumArtists: null == albumArtists ? _self.albumArtists : albumArtists // ignore: cast_nullable_to_non_nullable
 as UnmodifiableListView<String>,year: freezed == year ? _self.year : year // ignore: cast_nullable_to_non_nullable
-as int?,imageId: freezed == imageId ? _self.imageId : imageId // ignore: cast_nullable_to_non_nullable
+as int?,imagePath: freezed == imagePath ? _self.imagePath : imagePath // ignore: cast_nullable_to_non_nullable
 as String?,
   ));
 }

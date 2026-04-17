@@ -18,6 +18,6 @@ abstract class Song with _$Song {
     int? bitrate,
     int? trackNumber,
     required String path,
-    String? imageId,
+    String? imagePath,
   }) = _Song;
 }

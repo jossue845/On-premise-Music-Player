@@ -12,6 +12,6 @@ abstract class Album with _$Album {
     required String title,
     required UnmodifiableListView<String> albumArtists,
     int? year,
-    String? imageId,
+    String? imagePath,
   }) = _Album;
 }

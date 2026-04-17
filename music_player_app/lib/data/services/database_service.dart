@@ -18,7 +18,7 @@ class DatabaseService {
   static const String _bitrateColumnName = "bitrate";
   static const String _trackNumberColumnName = "track_number";
   static const String _pathColumnName = "path";
-  static const String _imageIdColumnName = "image_id";
+  static const String _imagePathColumnName = "image_path";
 
   static const String _playlistTableName = "playlist";
   static const String _playlistIdColumnName = "playlist_id";
@@ -67,7 +67,7 @@ class DatabaseService {
               FOREIGN KEY($_artistIdColumnName) REFERENCES $_artistTableName($_artistIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT);
             CREATE TABLE $_songTableName($_songIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT, $_songTitleColumnName TEXT NOT NULL , $_albumIdColumnName INTEGER NOT NULL,
               $_genreColumnName TEXT, $_yearColumnName INTEGER, $_bitrateColumnName INTEGER, $_trackNumberColumnName INTEGER, $_pathColumnName TEXT NOT NULL,
-              $_imageIdColumnName TEXT, FOREIGN KEY($_albumIdColumnName) REFERENCES $_albumTableName($_albumIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT);
+              $_imagePathColumnName TEXT, FOREIGN KEY($_albumIdColumnName) REFERENCES $_albumTableName($_albumIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT);
             CREATE TABLE $_songArtistTableName($_songIdColumnName INTEGER, $_artistIdColumnName INTEGER, PRIMARY KEY($_songIdColumnName, $_artistIdColumnName),
               FOREIGN KEY($_songIdColumnName) REFERENCES $_songTableName($_songIdColumnName) ON UPDATE CASCADE ON DELETE CASCADE,
               FOREIGN KEY($_artistIdColumnName) REFERENCES $_artistTableName($_artistIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT);
@@ -181,7 +181,7 @@ class DatabaseService {
             bitrate: entry[_bitrateColumnName] as int?,
             trackNumber: entry[_trackNumberColumnName] as int?,
             path: entry[_pathColumnName] as String,
-            imageId: entry[_imageIdColumnName] as String?,
+            imagePath: entry[_imagePathColumnName] as String?,
           );
         } else {
           // Add the artist to the list of song artists if the song is already created.
@@ -218,7 +218,7 @@ class DatabaseService {
           (SELECT $_albumIdColumnName FROM $_albumArtistTableName WHERE $_artistIdColumnName = $artistId);
             ''');
           albumInfoEntries = await txn.rawQuery('''
-          SELECT DISTINCT $_albumIdColumnName, $_imageIdColumnName, $_yearColumnName FROM $_songTableName WHERE $_albumIdColumnName IN
+          SELECT DISTINCT $_albumIdColumnName, $_imagePathColumnName, $_yearColumnName FROM $_songTableName WHERE $_albumIdColumnName IN
           (SELECT $_albumIdColumnName FROM $_albumArtistTableName WHERE $_artistIdColumnName = $artistId);
 
         ''');
@@ -227,7 +227,7 @@ class DatabaseService {
           SELECT * FROM $_albumTableName NATURAL JOIN $_albumArtistTableName NATURAL JOIN $_artistTableName;
             ''');
           albumInfoEntries = await txn.rawQuery('''
-          SELECT DISTINCT $_albumIdColumnName, $_imageIdColumnName, $_yearColumnName FROM $_songTableName;
+          SELECT DISTINCT $_albumIdColumnName, $_imagePathColumnName, $_yearColumnName FROM $_songTableName;
         ''');
         }
       });
@@ -260,7 +260,7 @@ class DatabaseService {
         if (albums.containsKey(albumId)) {
           albums[albumId] = albums[albumId]!.copyWith(
             year: entry[_yearColumnName] as int?,
-            imageId: entry[_imageIdColumnName] as String?,
+            imagePath: entry[_imagePathColumnName] as String?,
           );
         }
       }
@@ -305,7 +305,7 @@ class DatabaseService {
     int? bitrate,
     int? trackNumber,
     required String path,
-    String? imageId,
+    String? imagePath,
   }) async {
     try {
       final id = await executor.insert(_songTableName, {
@@ -316,7 +316,7 @@ class DatabaseService {
         _bitrateColumnName: bitrate,
         _trackNumberColumnName: trackNumber,
         _pathColumnName: path,
-        _imageIdColumnName: imageId,
+        _imagePathColumnName: imagePath,
       });
       return Success(id);
     } on Exception catch (e) {
@@ -485,7 +485,7 @@ class DatabaseService {
     int? bitrate,
     int? trackNumber,
     required String path,
-    String? imageId,
+    String? imagePath,
     required String albumTitle,
     required List<String> songArtistNames,
     required List<String> albumArtistNames,
@@ -542,7 +542,7 @@ class DatabaseService {
           year: year,
           bitrate: bitrate,
           trackNumber: trackNumber,
-          imageId: imageId,
+          imagePath: imagePath,
         ).getOrThrow();
 
         for (final artist in songArtistIds) {
