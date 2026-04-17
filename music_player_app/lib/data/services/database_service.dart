@@ -3,6 +3,7 @@ import 'dart:collection';
 
 import 'package:music_player_app/domain/models/album/album.dart';
 import 'package:music_player_app/domain/models/artist/artist.dart';
+import 'package:music_player_app/domain/models/playlist/playlist.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
 import 'package:path/path.dart';
 import 'package:result_dart/result_dart.dart';
@@ -270,6 +271,28 @@ class DatabaseService {
     }
   }
 
+  Future<Result<List<Playlist>>> getPlaylists() async {
+    try {
+      final playlistEntries = await _database!.rawQuery('''
+        SELECT $_playlistIdColumnName, $_playlistTitleColumnName, (SELECT $_imagePathColumnName FROM $_songTableName NATURAL JOIN $_playlistTrackTableName PT
+          WHERE PT.$_playlistIdColumnName = P.$_playlistIdColumnName LIMIT 1) as $_imagePathColumnName
+        FROM $_playlistTableName P;
+      ''');
+      final playlists = playlistEntries
+          .map(
+            (element) => Playlist(
+              id: element[_playlistIdColumnName] as int,
+              title: element[_playlistTitleColumnName] as String,
+              imageId: element[_imagePathColumnName] as String?,
+            ),
+          )
+          .toList();
+      return Success(playlists);
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+
   /// Returns all the artists in the database.
   Future<Result<List<Artist>>> getArtists() async {
     try {
@@ -477,7 +500,7 @@ class DatabaseService {
   /// The following tables are affected:
   /// song, song artist
   /// album, artist, album artist if they are not already present
-  Future<Result<void>> insertSong({
+  Future<Result<int>> insertSong({
     required String title,
     String? genre,
     int? year,
@@ -506,11 +529,11 @@ class DatabaseService {
     }
 
     try {
+      late int songId;
       await _database!.transaction((txn) async {
         final List<int> songArtistIds = [];
         final List<int> albumArtistIds = [];
         final int albumId;
-        final int songId;
 
         // Insert artists and save their ids.
         for (final artist in songArtistNames) {
@@ -551,7 +574,7 @@ class DatabaseService {
           }
         }
       });
-      return Success(unit);
+      return Success(songId);
     } on Exception catch (e) {
       return Failure(e);
     }
@@ -726,6 +749,65 @@ class DatabaseService {
       });
 
       return Success(newSong);
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+
+  Future<Result<int>> insertPlaylist(String playlistTitle) async {
+    try {
+      final playlistId = await _database!.insert(_playlistTableName, {
+        _playlistTitleColumnName: playlistTitle,
+      });
+      return Success(playlistId);
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+
+  Future<Result<void>> insertPlaylistTrack(int playlistId, int songId) async {
+    try {
+      await _database!.insert(_playlistTrackTableName, {
+        _playlistIdColumnName: playlistId,
+        _songIdColumnName: songId,
+      });
+      return Success(unit);
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+
+  Future<Result<void>> deletePlaylist(int playlistId) async {
+    try {
+      final rowsDeleted = await _database!.delete(
+        _playlistTableName,
+        where: "$_playlistIdColumnName = ?",
+        whereArgs: [playlistId],
+      );
+      if (rowsDeleted == 0) {
+        return Failure(Exception("No playlist found with id $playlistId"));
+      }
+      return Success(unit);
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+
+  Future<Result<void>> deletePlaylistTrack(int playlistId, int songId) async {
+    try {
+      final rowsDeleted = await _database!.delete(
+        _playlistTrackTableName,
+        where: "$_playlistIdColumnName = ? AND $_songIdColumnName = ?",
+        whereArgs: [playlistId, songId],
+      );
+      if (rowsDeleted == 0) {
+        return Failure(
+          Exception(
+            "No track with id $songId found in the playlist with id $playlistId",
+          ),
+        );
+      }
+      return Success(unit);
     } on Exception catch (e) {
       return Failure(e);
     }
