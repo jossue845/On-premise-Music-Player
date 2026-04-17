@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:collection';
-import 'dart:math';
 
 import 'package:music_player_app/domain/models/album/album.dart';
 import 'package:music_player_app/domain/models/artist/artist.dart';
@@ -74,7 +73,7 @@ class DatabaseService {
             CREATE TABLE $_playlistTrackTableName($_playlistIdColumnName INTEGER, $_songIdColumnName INTEGER, PRIMARY KEY($_playlistIdColumnName, $_songIdColumnName),
               FOREIGN KEY($_playlistIdColumnName) REFERENCES $_playlistTableName($_playlistIdColumnName) ON UPDATE CASCADE ON DELETE CASCADE,
               FOREIGN KEY($_songIdColumnName) REFERENCES $_songTableName($_songIdColumnName) ON UPDATE CASCADE ON DELETE CASCADE);
-            CREATE TABLE $_queuedSongTableName($_songIdColumnName INTEGER PRIMARY KEY, $_playlistTitleColumnName TEXT NOT NULL,
+            CREATE TABLE $_queuedSongTableName($_songIdColumnName INTEGER PRIMARY KEY, $_positionColumnName INTEGER NOT NULL, $_currentSongColumnName INTEGER NOT NULL,
               FOREIGN KEY($_songIdColumnName) REFERENCES $_songTableName($_songIdColumnName) ON UPDATE CASCADE ON DELETE CASCADE);
             CREATE TRIGGER delete_album_if_songs_are_deleted
               AFTER DELETE ON $_songTableName
