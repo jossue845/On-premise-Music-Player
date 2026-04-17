@@ -1,5 +1,3 @@
-import 'dart:collection';
-
 import 'package:flutter/foundation.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -10,6 +8,6 @@ abstract class Playlist with _$Playlist {
   const factory Playlist({
     required int id,
     required String title,
-    required UnmodifiableListView<int> songIds,
+    String? imageId,
   }) = _Playlist;
 }

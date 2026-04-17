@@ -14,7 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$Playlist implements DiagnosticableTreeMixin {
 
- int get id; String get title; UnmodifiableListView<int> get songIds;
+ int get id; String get title; String? get imageId;
 /// Create a copy of Playlist
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -26,21 +26,21 @@ $PlaylistCopyWith<Playlist> get copyWith => _$PlaylistCopyWithImpl<Playlist>(thi
 void debugFillProperties(DiagnosticPropertiesBuilder properties) {
   properties
     ..add(DiagnosticsProperty('type', 'Playlist'))
-    ..add(DiagnosticsProperty('id', id))..add(DiagnosticsProperty('title', title))..add(DiagnosticsProperty('songIds', songIds));
+    ..add(DiagnosticsProperty('id', id))..add(DiagnosticsProperty('title', title))..add(DiagnosticsProperty('imageId', imageId));
 }
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Playlist&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&const DeepCollectionEquality().equals(other.songIds, songIds));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Playlist&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.imageId, imageId) || other.imageId == imageId));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,id,title,const DeepCollectionEquality().hash(songIds));
+int get hashCode => Object.hash(runtimeType,id,title,imageId);
 
 @override
 String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
-  return 'Playlist(id: $id, title: $title, songIds: $songIds)';
+  return 'Playlist(id: $id, title: $title, imageId: $imageId)';
 }
 
 
@@ -51,7 +51,7 @@ abstract mixin class $PlaylistCopyWith<$Res>  {
   factory $PlaylistCopyWith(Playlist value, $Res Function(Playlist) _then) = _$PlaylistCopyWithImpl;
 @useResult
 $Res call({
- int id, String title, UnmodifiableListView<int> songIds
+ int id, String title, String? imageId
 });
 
 
@@ -68,12 +68,12 @@ class _$PlaylistCopyWithImpl<$Res>
 
 /// Create a copy of Playlist
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? title = null,Object? songIds = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? title = null,Object? imageId = freezed,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
-as String,songIds: null == songIds ? _self.songIds : songIds // ignore: cast_nullable_to_non_nullable
-as UnmodifiableListView<int>,
+as String,imageId: freezed == imageId ? _self.imageId : imageId // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 
@@ -158,10 +158,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String title,  UnmodifiableListView<int> songIds)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String title,  String? imageId)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Playlist() when $default != null:
-return $default(_that.id,_that.title,_that.songIds);case _:
+return $default(_that.id,_that.title,_that.imageId);case _:
   return orElse();
 
 }
@@ -179,10 +179,10 @@ return $default(_that.id,_that.title,_that.songIds);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String title,  UnmodifiableListView<int> songIds)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String title,  String? imageId)  $default,) {final _that = this;
 switch (_that) {
 case _Playlist():
-return $default(_that.id,_that.title,_that.songIds);case _:
+return $default(_that.id,_that.title,_that.imageId);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -199,10 +199,10 @@ return $default(_that.id,_that.title,_that.songIds);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String title,  UnmodifiableListView<int> songIds)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String title,  String? imageId)?  $default,) {final _that = this;
 switch (_that) {
 case _Playlist() when $default != null:
-return $default(_that.id,_that.title,_that.songIds);case _:
+return $default(_that.id,_that.title,_that.imageId);case _:
   return null;
 
 }
@@ -214,12 +214,12 @@ return $default(_that.id,_that.title,_that.songIds);case _:
 
 
 class _Playlist with DiagnosticableTreeMixin implements Playlist {
-  const _Playlist({required this.id, required this.title, required this.songIds});
+  const _Playlist({required this.id, required this.title, this.imageId});
   
 
 @override final  int id;
 @override final  String title;
-@override final  UnmodifiableListView<int> songIds;
+@override final  String? imageId;
 
 /// Create a copy of Playlist
 /// with the given fields replaced by the non-null parameter values.
@@ -232,21 +232,21 @@ _$PlaylistCopyWith<_Playlist> get copyWith => __$PlaylistCopyWithImpl<_Playlist>
 void debugFillProperties(DiagnosticPropertiesBuilder properties) {
   properties
     ..add(DiagnosticsProperty('type', 'Playlist'))
-    ..add(DiagnosticsProperty('id', id))..add(DiagnosticsProperty('title', title))..add(DiagnosticsProperty('songIds', songIds));
+    ..add(DiagnosticsProperty('id', id))..add(DiagnosticsProperty('title', title))..add(DiagnosticsProperty('imageId', imageId));
 }
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Playlist&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&const DeepCollectionEquality().equals(other.songIds, songIds));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Playlist&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.imageId, imageId) || other.imageId == imageId));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,id,title,const DeepCollectionEquality().hash(songIds));
+int get hashCode => Object.hash(runtimeType,id,title,imageId);
 
 @override
 String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
-  return 'Playlist(id: $id, title: $title, songIds: $songIds)';
+  return 'Playlist(id: $id, title: $title, imageId: $imageId)';
 }
 
 
@@ -257,7 +257,7 @@ abstract mixin class _$PlaylistCopyWith<$Res> implements $PlaylistCopyWith<$Res>
   factory _$PlaylistCopyWith(_Playlist value, $Res Function(_Playlist) _then) = __$PlaylistCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String title, UnmodifiableListView<int> songIds
+ int id, String title, String? imageId
 });
 
 
@@ -274,12 +274,12 @@ class __$PlaylistCopyWithImpl<$Res>
 
 /// Create a copy of Playlist
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? title = null,Object? songIds = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? title = null,Object? imageId = freezed,}) {
   return _then(_Playlist(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
-as String,songIds: null == songIds ? _self.songIds : songIds // ignore: cast_nullable_to_non_nullable
-as UnmodifiableListView<int>,
+as String,imageId: freezed == imageId ? _self.imageId : imageId // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 
