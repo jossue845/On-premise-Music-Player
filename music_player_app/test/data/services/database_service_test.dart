@@ -13,8 +13,6 @@ void main() {
       await deleteAllRows(database);
       await database.open();
     });
-
-    test("", () async {});
   });
 }
 

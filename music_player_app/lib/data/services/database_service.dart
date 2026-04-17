@@ -131,7 +131,9 @@ class DatabaseService {
   /// Is's required for an inserted song to have those attributes, therefore no song is expected to be ignored.
   ///
   /// Returns the songs made by the artist identified by [artistId] when it is not null.
-  Future<Result<List<Song>>> getSongs({int? artistId}) async {
+  ///
+  /// Returns the songs in the album identified by [albumId] when it is not null.
+  Future<Result<List<Song>>> getSongs({int? artistId, int? albumId}) async {
     final Map<int, Song> songs = {};
 
     try {
@@ -142,6 +144,10 @@ class DatabaseService {
         entries = await _database!.rawQuery('''
           SELECT * FROM $_songTableName NATURAL JOIN $_albumTableName NATURAL JOIN $_songArtistTableName NATURAL JOIN $_artistTableName WHERE $_songIdColumnName IN
           (SELECT $_songIdColumnName FROM $_songArtistTableName WHERE $_artistIdColumnName = $artistId);
+        ''');
+      } else if (albumId != null) {
+        entries = await _database!.rawQuery('''
+          SELECT * FROM $_songTableName NATURAL JOIN $_albumTableName NATURAL JOIN $_songArtistTableName NATURAL JOIN $_artistTableName WHERE $_albumIdColumnName = $albumId;
         ''');
       } else {
         entries = await _database!.rawQuery('''
