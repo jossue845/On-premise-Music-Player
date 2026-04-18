@@ -8,13 +8,26 @@ class SongRepository {
   SongRepository({required DatabaseService database}) : _database = database;
 
   /// Returns all the songs.
-  Future<Result<List<Song>>> getSongs() async {
+  ///
+  /// Returns the songs in the album identified by [albumId] if it is not null.
+  /// Returns the songs from the artist identified by [artistId] if it is not null.
+  /// Returns the songs in the playlist identified by [playlistId] if it is not null.
+  Future<Result<List<Song>>> getSongs({
+    int? albumId,
+    int? artistId,
+    int? playlistId,
+  }) async {
     if (!_database.isOpen()) {
       await _database.open();
     }
-    return _database.getSongs();
+    return _database.getSongs(
+      albumId: albumId,
+      artistId: artistId,
+      playlistId: playlistId,
+    );
   }
 
+  /// Updates [oldSong] with the provided metadata.
   Future<Result<Song>> editTags({
     required Song oldSong,
     String? newTitle,

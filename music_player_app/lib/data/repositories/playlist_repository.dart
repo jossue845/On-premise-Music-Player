@@ -8,6 +8,7 @@ class PlaylistRepository {
   PlaylistRepository({required DatabaseService database})
     : _database = database;
 
+  /// Returns all the playlists.
   Future<Result<List<Playlist>>> getPlaylists() async {
     if (!_database.isOpen()) {
       await _database.open();
@@ -15,6 +16,7 @@ class PlaylistRepository {
     return _database.getPlaylists();
   }
 
+  /// Deletes the playlist identified bt [playlistId].
   Future<Result<void>> deletePlaylist(int playlistId) async {
     if (!_database.isOpen()) {
       await _database.open();
@@ -22,6 +24,7 @@ class PlaylistRepository {
     return _database.deletePlaylist(playlistId);
   }
 
+  /// Adds the song identified by [songId] to the playlist identified by [playlistId].
   Future<Result<void>> addSongToPlaylist(int playlistId, int songId) async {
     if (!_database.isOpen()) {
       await _database.open();
@@ -29,6 +32,7 @@ class PlaylistRepository {
     return _database.insertPlaylistTrack(playlistId, songId);
   }
 
+  /// Removes the song identified by [songId] from the playlist identified by [playlistId].
   Future<Result<void>> removeSongFromPlaylist(
     int playlistId,
     int songId,

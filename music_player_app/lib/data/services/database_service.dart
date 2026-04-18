@@ -141,7 +141,11 @@ class DatabaseService {
   /// Returns the songs made by the artist identified by [artistId] when it is not null.
   ///
   /// Returns the songs in the album identified by [albumId] when it is not null.
-  Future<Result<List<Song>>> getSongs({int? artistId, int? albumId}) async {
+  Future<Result<List<Song>>> getSongs({
+    int? artistId,
+    int? albumId,
+    int? playlistId,
+  }) async {
     final Map<int, Song> songs = {};
 
     try {
@@ -156,6 +160,11 @@ class DatabaseService {
       } else if (albumId != null) {
         entries = await _database!.rawQuery('''
           SELECT * FROM $_songTableName NATURAL JOIN $_albumTableName NATURAL JOIN $_songArtistTableName NATURAL JOIN $_artistTableName WHERE $_albumIdColumnName = $albumId;
+        ''');
+      } else if (playlistId != null) {
+        entries = await _database!.rawQuery('''
+          SELECT * FROM $_songTableName NATURAL JOIN $_albumTableName NATURAL JOIN $_songArtistTableName NATURAL JOIN $_artistTableName
+          WHERE $_songIdColumnName IN (SELECT $_songIdColumnName FROM $_playlistTrackTableName WHERE $_playlistIdColumnName = $playlistId);
         ''');
       } else {
         entries = await _database!.rawQuery('''
@@ -271,6 +280,7 @@ class DatabaseService {
     }
   }
 
+  /// Returns all the playlists in the database.
   Future<Result<List<Playlist>>> getPlaylists() async {
     try {
       final playlistEntries = await _database!.rawQuery('''
@@ -754,6 +764,9 @@ class DatabaseService {
     }
   }
 
+  /// Inserts a playlist titled [playlistTitle] in the database.
+  ///
+  /// Returns the playlist id.
   Future<Result<int>> insertPlaylist(String playlistTitle) async {
     try {
       final playlistId = await _database!.insert(_playlistTableName, {
@@ -765,6 +778,7 @@ class DatabaseService {
     }
   }
 
+  /// Inserts a row in the playlist track table with the specified [playlistId] and [songId].
   Future<Result<void>> insertPlaylistTrack(int playlistId, int songId) async {
     try {
       await _database!.insert(_playlistTrackTableName, {
@@ -777,6 +791,7 @@ class DatabaseService {
     }
   }
 
+  /// Deletes the row from the playlist table identified by the specified [playlistId].
   Future<Result<void>> deletePlaylist(int playlistId) async {
     try {
       final rowsDeleted = await _database!.delete(
@@ -793,6 +808,7 @@ class DatabaseService {
     }
   }
 
+  /// Deletes the row from the playlist track table identified by the specified [playlistId] and [songId].
   Future<Result<void>> deletePlaylistTrack(int playlistId, int songId) async {
     try {
       final rowsDeleted = await _database!.delete(
