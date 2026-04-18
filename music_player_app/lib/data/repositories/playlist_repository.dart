@@ -16,30 +16,33 @@ class PlaylistRepository {
     return _database.getPlaylists();
   }
 
-  /// Deletes the playlist identified bt [playlistId].
-  Future<Result<void>> deletePlaylist(int playlistId) async {
+  /// Deletes the playlists identified bt [playlistIds].
+  Future<Result<void>> deletePlaylists(List<int> playlistIds) async {
     if (!_database.isOpen()) {
       await _database.open();
     }
-    return _database.deletePlaylist(playlistId);
+    return _database.deletePlaylists(playlistIds);
   }
 
-  /// Adds the song identified by [songId] to the playlist identified by [playlistId].
-  Future<Result<void>> addSongToPlaylist(int playlistId, int songId) async {
-    if (!_database.isOpen()) {
-      await _database.open();
-    }
-    return _database.insertPlaylistTrack(playlistId, songId);
-  }
-
-  /// Removes the song identified by [songId] from the playlist identified by [playlistId].
-  Future<Result<void>> removeSongFromPlaylist(
+  /// Adds the songs identified by [songIds] to the playlist identified by [playlistId].
+  Future<Result<void>> addSongsToPlaylist(
     int playlistId,
-    int songId,
+    List<int> songIds,
   ) async {
     if (!_database.isOpen()) {
       await _database.open();
     }
-    return _database.deletePlaylistTrack(playlistId, songId);
+    return _database.insertPlaylistTracks(playlistId, songIds);
+  }
+
+  /// Removes the songs identified by [songIds] from the playlist identified by [playlistId].
+  Future<Result<void>> removeSongsFromPlaylist(
+    int playlistId,
+    List<int> songIds,
+  ) async {
+    if (!_database.isOpen()) {
+      await _database.open();
+    }
+    return _database.deletePlaylistTracks(playlistId, songIds);
   }
 }

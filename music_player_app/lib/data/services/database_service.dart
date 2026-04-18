@@ -493,10 +493,7 @@ class DatabaseService {
         ).getOrThrow();
 
         for (final artist in albumArtistIds) {
-          final result = await _insertAlbumArtist(executor, albumId, artist);
-          if (result.isError()) {
-            throw Exception(result.exceptionOrNull());
-          }
+          (await _insertAlbumArtist(executor, albumId, artist)).getOrThrow();
         }
       }
       return Success(albumId);
@@ -578,10 +575,7 @@ class DatabaseService {
         ).getOrThrow();
 
         for (final artist in songArtistIds) {
-          final result = await _insertSongArtist(txn, songId, artist);
-          if (result.isError()) {
-            throw Exception(result.exceptionOrNull());
-          }
+          (await _insertSongArtist(txn, songId, artist)).getOrThrow();
         }
       });
       return Success(songId);
@@ -590,19 +584,25 @@ class DatabaseService {
     }
   }
 
-  /// Deletes the song identified by [songId] from the database.
+  /// Deletes the songs identified by [songIds] from the database.
   ///
   /// The related metadata is handled by triggers and foreign key actions.
-  Future<Result<void>> deleteSong(int songId) async {
+  Future<Result<void>> deleteSongs(List<int> songIds) async {
     try {
-      final rowsDeleted = await _database!.delete(
-        _songTableName,
-        where: "$_songIdColumnName = ?",
-        whereArgs: [songId],
-      );
-      if (rowsDeleted == 0) {
-        return Failure(Exception("No song found with id $songId"));
-      }
+      await _database!.transaction((txn) async {
+        final batch = txn.batch();
+        for (final songId in songIds) {
+          batch.delete(
+            _songTableName,
+            where: "$_songIdColumnName = ?",
+            whereArgs: [songId],
+          );
+        }
+        final rowsDeleted = await batch.commit();
+        if (rowsDeleted.length != songIds.length) {
+          return Failure(Exception("One or more songs not found"));
+        }
+      });
       return Success(unit);
     } on Exception catch (e) {
       return Failure(e);
@@ -648,10 +648,7 @@ class DatabaseService {
 
           // Insert song artists.
           for (final artistId in songArtistIds) {
-            final result = await _insertSongArtist(txn, oldSong.id, artistId);
-            if (result.isError()) {
-              throw Exception(result.exceptionOrNull());
-            }
+            (await _insertSongArtist(txn, oldSong.id, artistId)).getOrThrow();
           }
         }
 
@@ -702,14 +699,11 @@ class DatabaseService {
 
           // Insert album artists.
           for (final artistId in albumArtistIds) {
-            final result = await _insertAlbumArtist(
+            (await _insertAlbumArtist(
               txn,
               newSong.albumId,
               artistId,
-            );
-            if (result.isError()) {
-              throw Exception(result.exceptionOrNull());
-            }
+            )).getOrThrow();
           }
         }
 
@@ -778,12 +772,21 @@ class DatabaseService {
     }
   }
 
-  /// Inserts a row in the playlist track table with the specified [playlistId] and [songId].
-  Future<Result<void>> insertPlaylistTrack(int playlistId, int songId) async {
+  /// Inserts rows in the playlist track table with the specified [playlistId] and [songIds].
+  Future<Result<void>> insertPlaylistTracks(
+    int playlistId,
+    List<int> songIds,
+  ) async {
     try {
-      await _database!.insert(_playlistTrackTableName, {
-        _playlistIdColumnName: playlistId,
-        _songIdColumnName: songId,
+      await _database!.transaction((txn) async {
+        final batch = txn.batch();
+        for (final songId in songIds) {
+          batch.insert(_playlistTrackTableName, {
+            _playlistIdColumnName: playlistId,
+            _songIdColumnName: songId,
+          });
+        }
+        await batch.commit();
       });
       return Success(unit);
     } on Exception catch (e) {
@@ -791,38 +794,54 @@ class DatabaseService {
     }
   }
 
-  /// Deletes the row from the playlist table identified by the specified [playlistId].
-  Future<Result<void>> deletePlaylist(int playlistId) async {
+  /// Deletes rows from the playlist table identified by [playlistIds].
+  Future<Result<void>> deletePlaylists(List<int> playlistIds) async {
     try {
-      final rowsDeleted = await _database!.delete(
-        _playlistTableName,
-        where: "$_playlistIdColumnName = ?",
-        whereArgs: [playlistId],
-      );
-      if (rowsDeleted == 0) {
-        return Failure(Exception("No playlist found with id $playlistId"));
-      }
+      await _database!.transaction((txn) async {
+        final batch = txn.batch();
+
+        for (final playlistId in playlistIds) {
+          batch.delete(
+            _playlistTableName,
+            where: "$_playlistIdColumnName = ?",
+            whereArgs: [playlistId],
+          );
+        }
+        final rowsDeleted = await batch.commit();
+        if (rowsDeleted.length != playlistIds.length) {
+          return Failure(Exception("One or more playlists was not found"));
+        }
+      });
       return Success(unit);
     } on Exception catch (e) {
       return Failure(e);
     }
   }
 
-  /// Deletes the row from the playlist track table identified by the specified [playlistId] and [songId].
-  Future<Result<void>> deletePlaylistTrack(int playlistId, int songId) async {
+  /// Deletes rows from the playlist track table identified by [playlistId] and [songIds].
+  Future<Result<void>> deletePlaylistTracks(
+    int playlistId,
+    List<int> songIds,
+  ) async {
     try {
-      final rowsDeleted = await _database!.delete(
-        _playlistTrackTableName,
-        where: "$_playlistIdColumnName = ? AND $_songIdColumnName = ?",
-        whereArgs: [playlistId, songId],
-      );
-      if (rowsDeleted == 0) {
-        return Failure(
-          Exception(
-            "No track with id $songId found in the playlist with id $playlistId",
-          ),
-        );
-      }
+      await _database!.transaction((txn) async {
+        final batch = txn.batch();
+        for (final songId in songIds) {
+          batch.delete(
+            _playlistTrackTableName,
+            where: "$_playlistIdColumnName = ? AND $_songIdColumnName = ?",
+            whereArgs: [playlistId, songId],
+          );
+        }
+        final rowsDeleted = await batch.commit();
+        if (rowsDeleted.length != songIds.length) {
+          return Failure(
+            Exception(
+              "One or more tracks were not found in the playlist with id $playlistId",
+            ),
+          );
+        }
+      });
       return Success(unit);
     } on Exception catch (e) {
       return Failure(e);
