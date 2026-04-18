@@ -883,7 +883,7 @@ class DatabaseService {
   Future<Result<void>> saveQueue(SongQueue queue) async {
     try {
       await _database!.transaction((txn) async {
-        (await _deleteQueue(executor: txn)).getOrThrow();
+        (await deleteQueue(executor: txn)).getOrThrow();
         final batch = txn.batch();
         for (final id in queue.songIds) {
           batch.insert(_queuedSongTableName, {
@@ -930,7 +930,7 @@ class DatabaseService {
   */
 
   /// Empties the queue table.
-  Future<Result<void>> _deleteQueue({DatabaseExecutor? executor}) async {
+  Future<Result<void>> deleteQueue({DatabaseExecutor? executor}) async {
     try {
       DatabaseExecutor? db = (executor != null) ? executor : _database;
       await db!.delete(_queuedSongTableName);
