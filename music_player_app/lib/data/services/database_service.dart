@@ -4,6 +4,7 @@ import 'dart:collection';
 import 'package:music_player_app/domain/models/album/album.dart';
 import 'package:music_player_app/domain/models/artist/artist.dart';
 import 'package:music_player_app/domain/models/playlist/playlist.dart';
+import 'package:music_player_app/domain/models/queue/song_queue.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
 import 'package:path/path.dart';
 import 'package:result_dart/result_dart.dart';
@@ -318,6 +319,36 @@ class DatabaseService {
           )
           .toList();
       return Success(list);
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+
+  /// Returns the queue saved in the database.
+  Future<Result<SongQueue>> getQueue() async {
+    try {
+      final List<int> queueList = [];
+      int currentSongIndex = 0;
+
+      // Get queue
+      final queueEntries = await _database!.query(
+        _queuedSongTableName,
+        orderBy: _positionColumnName,
+      );
+
+      // Build id list and check for current song.
+      for (final entry in queueEntries) {
+        queueList.add(entry[_songIdColumnName] as int);
+        if ((entry[_currentSongColumnName] as int) == 1) {
+          currentSongIndex = entry[_positionColumnName] as int;
+        }
+      }
+      return Success(
+        SongQueue(
+          songIds: UnmodifiableListView(queueList),
+          currentSongIndex: currentSongIndex,
+        ),
+      );
     } on Exception catch (e) {
       return Failure(e);
     }
@@ -842,6 +873,67 @@ class DatabaseService {
           );
         }
       });
+      return Success(unit);
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+
+  /// Saves the [queue] to the database, raplacing whatever was saved before it.
+  Future<Result<void>> saveQueue(SongQueue queue) async {
+    try {
+      await _database!.transaction((txn) async {
+        (await _deleteQueue(executor: txn)).getOrThrow();
+        final batch = txn.batch();
+        for (final id in queue.songIds) {
+          batch.insert(_queuedSongTableName, {
+            _songIdColumnName: id,
+            _positionColumnName: queue.songIds.indexOf(id),
+            _currentSongColumnName:
+                (queue.songIds.indexOf(id) == queue.currentSongIndex) ? 1 : 0,
+          });
+        }
+        batch.commit();
+      });
+      return Success(unit);
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+
+  /*
+  Future<Result<void>> addSongsToQueue(List<int> songIds) async {
+    try {
+      await _database!.transaction((txn) async {
+        final queue = await txn.query(
+          _queuedSongTableName,
+          columns: [_songIdColumnName],
+        );
+        final batch = txn.batch();
+
+        for (final id in songIds) {
+          batch.insert(_queuedSongTableName, {
+            _songIdColumnName: id,
+            _positionColumnName: songIds.indexOf(id) + queue.length,
+            _currentSongColumnName: (queue.isEmpty && songIds.indexOf(id) == 0)
+                ? 1
+                : 0,
+          });
+        }
+        batch.commit();
+      });
+      return Success(unit);
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+  */
+
+  /// Empties the queue table.
+  Future<Result<void>> _deleteQueue({DatabaseExecutor? executor}) async {
+    try {
+      DatabaseExecutor? db = (executor != null) ? executor : _database;
+      await db!.delete(_queuedSongTableName);
       return Success(unit);
     } on Exception catch (e) {
       return Failure(e);

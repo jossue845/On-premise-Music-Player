@@ -3,7 +3,7 @@
 // ignore_for_file: type=lint
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
-part of 'queue.dart';
+part of 'song_queue.dart';
 
 // **************************************************************************
 // FreezedGenerator
@@ -12,26 +12,26 @@ part of 'queue.dart';
 // dart format off
 T _$identity<T>(T value) => value;
 /// @nodoc
-mixin _$Queue implements DiagnosticableTreeMixin {
+mixin _$SongQueue implements DiagnosticableTreeMixin {
 
  UnmodifiableListView<int> get songIds; dynamic get currentSongIndex;
-/// Create a copy of Queue
+/// Create a copy of SongQueue
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
 @pragma('vm:prefer-inline')
-$QueueCopyWith<Queue> get copyWith => _$QueueCopyWithImpl<Queue>(this as Queue, _$identity);
+$SongQueueCopyWith<SongQueue> get copyWith => _$SongQueueCopyWithImpl<SongQueue>(this as SongQueue, _$identity);
 
 
 @override
 void debugFillProperties(DiagnosticPropertiesBuilder properties) {
   properties
-    ..add(DiagnosticsProperty('type', 'Queue'))
+    ..add(DiagnosticsProperty('type', 'SongQueue'))
     ..add(DiagnosticsProperty('songIds', songIds))..add(DiagnosticsProperty('currentSongIndex', currentSongIndex));
 }
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Queue&&const DeepCollectionEquality().equals(other.songIds, songIds)&&const DeepCollectionEquality().equals(other.currentSongIndex, currentSongIndex));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SongQueue&&const DeepCollectionEquality().equals(other.songIds, songIds)&&const DeepCollectionEquality().equals(other.currentSongIndex, currentSongIndex));
 }
 
 
@@ -40,15 +40,15 @@ int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(
 
 @override
 String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
-  return 'Queue(songIds: $songIds, currentSongIndex: $currentSongIndex)';
+  return 'SongQueue(songIds: $songIds, currentSongIndex: $currentSongIndex)';
 }
 
 
 }
 
 /// @nodoc
-abstract mixin class $QueueCopyWith<$Res>  {
-  factory $QueueCopyWith(Queue value, $Res Function(Queue) _then) = _$QueueCopyWithImpl;
+abstract mixin class $SongQueueCopyWith<$Res>  {
+  factory $SongQueueCopyWith(SongQueue value, $Res Function(SongQueue) _then) = _$SongQueueCopyWithImpl;
 @useResult
 $Res call({
  UnmodifiableListView<int> songIds, dynamic currentSongIndex
@@ -59,14 +59,14 @@ $Res call({
 
 }
 /// @nodoc
-class _$QueueCopyWithImpl<$Res>
-    implements $QueueCopyWith<$Res> {
-  _$QueueCopyWithImpl(this._self, this._then);
+class _$SongQueueCopyWithImpl<$Res>
+    implements $SongQueueCopyWith<$Res> {
+  _$SongQueueCopyWithImpl(this._self, this._then);
 
-  final Queue _self;
-  final $Res Function(Queue) _then;
+  final SongQueue _self;
+  final $Res Function(SongQueue) _then;
 
-/// Create a copy of Queue
+/// Create a copy of SongQueue
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? songIds = null,Object? currentSongIndex = freezed,}) {
   return _then(_self.copyWith(
@@ -79,8 +79,8 @@ as dynamic,
 }
 
 
-/// Adds pattern-matching-related methods to [Queue].
-extension QueuePatterns on Queue {
+/// Adds pattern-matching-related methods to [SongQueue].
+extension SongQueuePatterns on SongQueue {
 /// A variant of `map` that fallback to returning `orElse`.
 ///
 /// It is equivalent to doing:
@@ -93,10 +93,10 @@ extension QueuePatterns on Queue {
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _Queue value)?  $default,{required TResult orElse(),}){
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _SongQueue value)?  $default,{required TResult orElse(),}){
 final _that = this;
 switch (_that) {
-case _Queue() when $default != null:
+case _SongQueue() when $default != null:
 return $default(_that);case _:
   return orElse();
 
@@ -115,10 +115,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _Queue value)  $default,){
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _SongQueue value)  $default,){
 final _that = this;
 switch (_that) {
-case _Queue():
+case _SongQueue():
 return $default(_that);case _:
   throw StateError('Unexpected subclass');
 
@@ -136,10 +136,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _Queue value)?  $default,){
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _SongQueue value)?  $default,){
 final _that = this;
 switch (_that) {
-case _Queue() when $default != null:
+case _SongQueue() when $default != null:
 return $default(_that);case _:
   return null;
 
@@ -159,7 +159,7 @@ return $default(_that);case _:
 
 @optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( UnmodifiableListView<int> songIds,  dynamic currentSongIndex)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
-case _Queue() when $default != null:
+case _SongQueue() when $default != null:
 return $default(_that.songIds,_that.currentSongIndex);case _:
   return orElse();
 
@@ -180,7 +180,7 @@ return $default(_that.songIds,_that.currentSongIndex);case _:
 
 @optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( UnmodifiableListView<int> songIds,  dynamic currentSongIndex)  $default,) {final _that = this;
 switch (_that) {
-case _Queue():
+case _SongQueue():
 return $default(_that.songIds,_that.currentSongIndex);case _:
   throw StateError('Unexpected subclass');
 
@@ -200,7 +200,7 @@ return $default(_that.songIds,_that.currentSongIndex);case _:
 
 @optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( UnmodifiableListView<int> songIds,  dynamic currentSongIndex)?  $default,) {final _that = this;
 switch (_that) {
-case _Queue() when $default != null:
+case _SongQueue() when $default != null:
 return $default(_that.songIds,_that.currentSongIndex);case _:
   return null;
 
@@ -212,30 +212,30 @@ return $default(_that.songIds,_that.currentSongIndex);case _:
 /// @nodoc
 
 
-class _Queue with DiagnosticableTreeMixin implements Queue {
-  const _Queue({required this.songIds, required this.currentSongIndex});
+class _SongQueue with DiagnosticableTreeMixin implements SongQueue {
+  const _SongQueue({required this.songIds, required this.currentSongIndex});
   
 
 @override final  UnmodifiableListView<int> songIds;
 @override final  dynamic currentSongIndex;
 
-/// Create a copy of Queue
+/// Create a copy of SongQueue
 /// with the given fields replaced by the non-null parameter values.
 @override @JsonKey(includeFromJson: false, includeToJson: false)
 @pragma('vm:prefer-inline')
-_$QueueCopyWith<_Queue> get copyWith => __$QueueCopyWithImpl<_Queue>(this, _$identity);
+_$SongQueueCopyWith<_SongQueue> get copyWith => __$SongQueueCopyWithImpl<_SongQueue>(this, _$identity);
 
 
 @override
 void debugFillProperties(DiagnosticPropertiesBuilder properties) {
   properties
-    ..add(DiagnosticsProperty('type', 'Queue'))
+    ..add(DiagnosticsProperty('type', 'SongQueue'))
     ..add(DiagnosticsProperty('songIds', songIds))..add(DiagnosticsProperty('currentSongIndex', currentSongIndex));
 }
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Queue&&const DeepCollectionEquality().equals(other.songIds, songIds)&&const DeepCollectionEquality().equals(other.currentSongIndex, currentSongIndex));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SongQueue&&const DeepCollectionEquality().equals(other.songIds, songIds)&&const DeepCollectionEquality().equals(other.currentSongIndex, currentSongIndex));
 }
 
 
@@ -244,15 +244,15 @@ int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(
 
 @override
 String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
-  return 'Queue(songIds: $songIds, currentSongIndex: $currentSongIndex)';
+  return 'SongQueue(songIds: $songIds, currentSongIndex: $currentSongIndex)';
 }
 
 
 }
 
 /// @nodoc
-abstract mixin class _$QueueCopyWith<$Res> implements $QueueCopyWith<$Res> {
-  factory _$QueueCopyWith(_Queue value, $Res Function(_Queue) _then) = __$QueueCopyWithImpl;
+abstract mixin class _$SongQueueCopyWith<$Res> implements $SongQueueCopyWith<$Res> {
+  factory _$SongQueueCopyWith(_SongQueue value, $Res Function(_SongQueue) _then) = __$SongQueueCopyWithImpl;
 @override @useResult
 $Res call({
  UnmodifiableListView<int> songIds, dynamic currentSongIndex
@@ -263,17 +263,17 @@ $Res call({
 
 }
 /// @nodoc
-class __$QueueCopyWithImpl<$Res>
-    implements _$QueueCopyWith<$Res> {
-  __$QueueCopyWithImpl(this._self, this._then);
+class __$SongQueueCopyWithImpl<$Res>
+    implements _$SongQueueCopyWith<$Res> {
+  __$SongQueueCopyWithImpl(this._self, this._then);
 
-  final _Queue _self;
-  final $Res Function(_Queue) _then;
+  final _SongQueue _self;
+  final $Res Function(_SongQueue) _then;
 
-/// Create a copy of Queue
+/// Create a copy of SongQueue
 /// with the given fields replaced by the non-null parameter values.
 @override @pragma('vm:prefer-inline') $Res call({Object? songIds = null,Object? currentSongIndex = freezed,}) {
-  return _then(_Queue(
+  return _then(_SongQueue(
 songIds: null == songIds ? _self.songIds : songIds // ignore: cast_nullable_to_non_nullable
 as UnmodifiableListView<int>,currentSongIndex: freezed == currentSongIndex ? _self.currentSongIndex : currentSongIndex // ignore: cast_nullable_to_non_nullable
 as dynamic,
