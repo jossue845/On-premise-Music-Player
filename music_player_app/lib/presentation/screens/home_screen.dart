@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:music_player_app/presentation/screens/player_screen.dart';
 
 void main() {
   runApp(
@@ -28,11 +29,17 @@ class HomeDashboard extends StatelessWidget {
             color: Colors.deepPurple.shade50,
             elevation: 0,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            // ListTile is a pre-built row perfect for text and icons
             child: ListTile(
+              // Then we'll have to change this
               leading: const Icon(Icons.music_note, size: 40, color: Colors.deepPurple),
               title: const Text('Bohemian Rhapsody', style: TextStyle(fontWeight: FontWeight.bold)),
               subtitle: const Text('Queen'),
+              onTap: () {
+                Navigator.push(
+                  context, 
+                  MaterialPageRoute(
+                    builder: (context) => const PlayerScreen()));
+              },
               trailing: IconButton(
                 icon: const Icon(Icons.play_circle_fill, size: 36, color: Colors.deepPurple),
                 onPressed: () {},

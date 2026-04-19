@@ -3,6 +3,7 @@ import 'package:google_nav_bar/google_nav_bar.dart';
 
 // Other screens in this project
 import 'package:music_player_app/presentation/screens/artists_screen.dart';
+import 'package:music_player_app/presentation/screens/player_screen.dart';
 import 'package:music_player_app/presentation/screens/playlist_screen.dart';
 import 'package:music_player_app/presentation/screens/search_screen.dart';
 import 'package:music_player_app/presentation/screens/home_screen.dart';
@@ -32,6 +33,8 @@ class _MusicDashboardState extends State<MusicDashboard> {
     const SearchScreen(),
     const ArtistsScreen(),
     const PlaylistScreen(),
+    const PlayerScreen(),
+    const SettingsScreen(),
   ];
   
   void _onItemTapped(int index) {
@@ -70,10 +73,10 @@ class _MusicDashboardState extends State<MusicDashboard> {
             backgroundColor: Colors.white,
             color : Colors.grey,
             activeColor: Colors.deepPurple,
-            tabBackgroundColor: Colors.deepPurple.withOpacity(0.1), // Selected tab background
-            padding: const EdgeInsets.all(16), // Padding inside the active tab
-            selectedIndex: _selectedIndex, // Links to your state variable
-            onTabChange: _onItemTapped, // Links to your setState function
+            tabBackgroundColor: Colors.deepPurple.withOpacity(0.1),
+            padding: const EdgeInsets.all(16), 
+            selectedIndex: _selectedIndex, 
+            onTabChange: _onItemTapped, 
             tabs: const [
               GButton(
                 icon: Icons.home,
