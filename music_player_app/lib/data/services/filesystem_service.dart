@@ -5,7 +5,17 @@ import 'package:result_dart/result_dart.dart';
 import 'package:file_picker/file_picker.dart';
 
 class FilesystemService {
-  Future<Result<List<String>>> getSongPaths() async {
+  static const List<String> _musicFileExtensions = [
+    "aac",
+    "flac",
+    "m4a",
+    "mp3",
+    "ogg",
+    "opus",
+    "wav",
+  ];
+
+  Future<Result<String>> getDirectoryPath() async {
     try {
       await getStoragePermission();
 
@@ -17,11 +27,37 @@ class FilesystemService {
         throw Exception("No directory selected");
       }
 
-      final directory = Directory(selectedDirectoryPath);
-      final files = directory
-          .listSync(recursive: true)
-          .whereType<File>()
-          .toList();
+      return Success(selectedDirectoryPath);
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+
+  Future<Result<List<String>>> getSongPaths(List<String> directoryPaths) async {
+    try {
+      final List<Directory> directories = [];
+      final List<File> files = [];
+
+      await getStoragePermission();
+
+      for (final path in directoryPaths) {
+        directories.add(Directory(path));
+      }
+
+      for (final directory in directories) {
+        files.addAll(
+          directory.listSync(recursive: true).whereType<File>().toList(),
+        );
+      }
+
+      files.removeWhere((f) {
+        for (final extension in _musicFileExtensions) {
+          if (f.path.endsWith(".$extension")) {
+            return false;
+          }
+        }
+        return true;
+      });
 
       return Success(files.map((f) => f.path).toList());
     } on Exception catch (e) {

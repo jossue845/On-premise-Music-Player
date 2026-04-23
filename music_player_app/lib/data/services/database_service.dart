@@ -48,6 +48,102 @@ class DatabaseService {
 
   DatabaseService({required this.databaseFactory});
 
+  FutureOr<void> _createOrUpdateDb(Database db) async {
+    await db.transaction((txn) async {
+      await txn.execute('''
+         CREATE TABLE IF NOT EXISTS $_playlistTableName($_playlistIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT, $_playlistTitleColumnName TEXT NOT NULL);
+          ''');
+      await txn.execute('''
+         CREATE TABLE IF NOT EXISTS $_albumTableName($_albumIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT, $_albumTitleColumnName TEXT NOT NULL);
+          ''');
+      await txn.execute('''
+         CREATE TABLE IF NOT EXISTS $_artistTableName($_artistIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT, $_artistNameColumnName TEXT NOT NULL UNIQUE);
+          ''');
+      await txn.execute('''
+         CREATE TABLE IF NOT EXISTS $_albumArtistTableName($_albumIdColumnName INTEGER, $_artistIdColumnName INTEGER, PRIMARY KEY($_albumIdColumnName, $_artistIdColumnName),
+           FOREIGN KEY($_albumIdColumnName) REFERENCES $_albumTableName($_albumIdColumnName) ON UPDATE CASCADE ON DELETE CASCADE,
+           FOREIGN KEY($_artistIdColumnName) REFERENCES $_artistTableName($_artistIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT);
+          ''');
+      await txn.execute('''
+         CREATE TABLE IF NOT EXISTS $_songTableName($_songIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT, $_songTitleColumnName TEXT NOT NULL , $_albumIdColumnName INTEGER NOT NULL,
+           $_genreColumnName TEXT, $_yearColumnName INTEGER, $_bitrateColumnName INTEGER, $_trackNumberColumnName INTEGER, $_pathColumnName TEXT NOT NULL UNIQUE,
+           $_imagePathColumnName TEXT, FOREIGN KEY($_albumIdColumnName) REFERENCES $_albumTableName($_albumIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT);
+          ''');
+      await txn.execute('''
+         CREATE TABLE IF NOT EXISTS $_songArtistTableName($_songIdColumnName INTEGER, $_artistIdColumnName INTEGER, PRIMARY KEY($_songIdColumnName, $_artistIdColumnName),
+           FOREIGN KEY($_songIdColumnName) REFERENCES $_songTableName($_songIdColumnName) ON UPDATE CASCADE ON DELETE CASCADE,
+           FOREIGN KEY($_artistIdColumnName) REFERENCES $_artistTableName($_artistIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT);
+          ''');
+      await txn.execute('''
+         CREATE TABLE IF NOT EXISTS $_playlistTrackTableName($_playlistIdColumnName INTEGER, $_songIdColumnName INTEGER, PRIMARY KEY($_playlistIdColumnName, $_songIdColumnName),
+           FOREIGN KEY($_playlistIdColumnName) REFERENCES $_playlistTableName($_playlistIdColumnName) ON UPDATE CASCADE ON DELETE CASCADE,
+           FOREIGN KEY($_songIdColumnName) REFERENCES $_songTableName($_songIdColumnName) ON UPDATE CASCADE ON DELETE CASCADE);
+          ''');
+      await txn.execute('''
+         CREATE TABLE IF NOT EXISTS $_queuedSongTableName($_songIdColumnName INTEGER PRIMARY KEY, $_positionColumnName INTEGER NOT NULL, $_currentSongColumnName INTEGER NOT NULL,
+           FOREIGN KEY($_songIdColumnName) REFERENCES $_songTableName($_songIdColumnName) ON UPDATE CASCADE ON DELETE CASCADE);
+          ''');
+      await txn.execute('''
+         CREATE TRIGGER IF NOT EXISTS delete_album_if_songs_are_deleted
+           AFTER DELETE ON $_songTableName
+           FOR EACH ROW
+           WHEN NOT EXISTS (SELECT 1 FROM $_songTableName WHERE $_albumIdColumnName = OLD.$_albumIdColumnName LIMIT 1)
+           BEGIN
+             DELETE FROM $_albumTableName WHERE $_albumIdColumnName = OLD.$_albumIdColumnName;
+           END;
+          ''');
+      await txn.execute('''
+         CREATE TRIGGER IF NOT EXISTS delete_album_if_songs_no_longer_reference_it
+           AFTER UPDATE ON $_songTableName
+           FOR EACH ROW
+           WHEN NOT EXISTS (SELECT 1 FROM $_songTableName WHERE $_albumIdColumnName = OLD.$_albumIdColumnName LIMIT 1)
+           BEGIN
+             DELETE FROM $_albumTableName WHERE $_albumIdColumnName = OLD.$_albumIdColumnName;
+           END;
+          ''');
+      await txn.execute('''
+         CREATE TRIGGER IF NOT EXISTS delete_artist_if_no_songs_and_albums_after_song_delete
+           AFTER DELETE ON $_songArtistTableName
+           FOR EACH ROW
+           WHEN NOT EXISTS (SELECT 1 FROM $_songArtistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName LIMIT 1) AND
+             NOT EXISTS (SELECT 1 FROM $_albumArtistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName LIMIT 1)
+           BEGIN
+             DELETE FROM $_artistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName;
+           END;
+          ''');
+      await txn.execute('''
+         CREATE TRIGGER IF NOT EXISTS delete_artist_if_no_songs_and_albums_after_album_delete
+           AFTER DELETE ON $_albumArtistTableName
+           FOR EACH ROW
+           WHEN NOT EXISTS (SELECT 1 FROM $_songArtistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName LIMIT 1) AND
+             NOT EXISTS (SELECT 1 FROM $_albumArtistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName LIMIT 1)
+           BEGIN
+             DELETE FROM $_artistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName;
+           END;
+          ''');
+      await txn.execute('''
+         CREATE TRIGGER IF NOT EXISTS delete_artist_if_no_songs_and_albums_after_song_artist_update
+           AFTER UPDATE ON $_songArtistTableName
+           FOR EACH ROW
+           WHEN NOT EXISTS (SELECT 1 FROM $_songArtistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName LIMIT 1) AND
+             NOT EXISTS (SELECT 1 FROM $_albumArtistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName LIMIT 1)
+           BEGIN
+             DELETE FROM $_artistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName;
+           END;
+          ''');
+      await txn.execute('''
+         CREATE TRIGGER IF NOT EXISTS delete_artist_if_no_songs_and_albums_after_album_artist_update
+           AFTER UPDATE ON $_albumArtistTableName
+           FOR EACH ROW
+           WHEN NOT EXISTS (SELECT 1 FROM $_songArtistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName LIMIT 1) AND
+             NOT EXISTS (SELECT 1 FROM $_albumArtistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName LIMIT 1)
+           BEGIN
+             DELETE FROM $_artistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName;
+           END;
+          ''');
+    });
+  }
+
   /// Opens the database.
   ///
   /// Creates the database if it doesn't exist.
@@ -58,74 +154,13 @@ class DatabaseService {
         onConfigure: (db) async {
           await db.execute('PRAGMA foreign_keys = ON');
         },
-        onCreate: (db, version) {
-          return db.execute('''
-            CREATE TABLE $_playlistTableName($_playlistIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT, $_playlistTitleColumnName TEXT NOT NULL);
-            CREATE TABLE $_albumTableName($_albumIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT, $_albumTitleColumnName TEXT NOT NULL);
-            CREATE TABLE $_artistTableName($_artistIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT, $_artistNameColumnName TEXT NOT NULL UNIQUE);
-            CREATE TABLE $_albumArtistTableName($_albumIdColumnName INTEGER, $_artistIdColumnName INTEGER, PRIMARY KEY($_albumIdColumnName, $_artistIdColumnName),
-              FOREIGN KEY($_albumIdColumnName) REFERENCES $_albumTableName($_albumIdColumnName) ON UPDATE CASCADE ON DELETE CASCADE,
-              FOREIGN KEY($_artistIdColumnName) REFERENCES $_artistTableName($_artistIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT);
-            CREATE TABLE $_songTableName($_songIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT, $_songTitleColumnName TEXT NOT NULL , $_albumIdColumnName INTEGER NOT NULL,
-              $_genreColumnName TEXT, $_yearColumnName INTEGER, $_bitrateColumnName INTEGER, $_trackNumberColumnName INTEGER, $_pathColumnName TEXT NOT NULL,
-              $_imagePathColumnName TEXT, FOREIGN KEY($_albumIdColumnName) REFERENCES $_albumTableName($_albumIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT);
-            CREATE TABLE $_songArtistTableName($_songIdColumnName INTEGER, $_artistIdColumnName INTEGER, PRIMARY KEY($_songIdColumnName, $_artistIdColumnName),
-              FOREIGN KEY($_songIdColumnName) REFERENCES $_songTableName($_songIdColumnName) ON UPDATE CASCADE ON DELETE CASCADE,
-              FOREIGN KEY($_artistIdColumnName) REFERENCES $_artistTableName($_artistIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT);
-            CREATE TABLE $_playlistTrackTableName($_playlistIdColumnName INTEGER, $_songIdColumnName INTEGER, PRIMARY KEY($_playlistIdColumnName, $_songIdColumnName),
-              FOREIGN KEY($_playlistIdColumnName) REFERENCES $_playlistTableName($_playlistIdColumnName) ON UPDATE CASCADE ON DELETE CASCADE,
-              FOREIGN KEY($_songIdColumnName) REFERENCES $_songTableName($_songIdColumnName) ON UPDATE CASCADE ON DELETE CASCADE);
-            CREATE TABLE $_queuedSongTableName($_songIdColumnName INTEGER PRIMARY KEY, $_positionColumnName INTEGER NOT NULL, $_currentSongColumnName INTEGER NOT NULL,
-              FOREIGN KEY($_songIdColumnName) REFERENCES $_songTableName($_songIdColumnName) ON UPDATE CASCADE ON DELETE CASCADE);
-            CREATE TRIGGER delete_album_if_songs_are_deleted
-              AFTER DELETE ON $_songTableName
-              FOR EACH ROW
-              WHEN NOT EXISTS (SELECT 1 FROM $_songTableName WHERE $_albumIdColumnName = OLD.$_albumIdColumnName LIMIT 1)
-              BEGIN
-                DELETE FROM $_albumTableName WHERE $_albumIdColumnName = OLD.$_albumIdColumnName;
-              END;
-            CREATE TRIGGER delete_album_if_songs_no_longer_reference_it
-              AFTER UPDATE ON $_songTableName
-              FOR EACH ROW
-              WHEN NOT EXISTS (SELECT 1 FROM $_songTableName WHERE $_albumIdColumnName = OLD.$_albumIdColumnName LIMIT 1)
-              BEGIN
-                DELETE FROM $_albumTableName WHERE $_albumIdColumnName = OLD.$_albumIdColumnName;
-              END;
-            CREATE TRIGGER delete_artist_if_no_songs_and_albums_after_song_delete
-              AFTER DELETE ON $_songArtistTableName
-              FOR EACH ROW
-              WHEN NOT EXISTS (SELECT 1 FROM $_songArtistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName LIMIT 1) AND
-                NOT EXISTS (SELECT 1 FROM $_albumArtistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName LIMIT 1)
-              BEGIN
-                DELETE FROM $_artistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName;
-              END;
-            CREATE TRIGGER delete_artist_if_no_songs_and_albums_after_album_delete
-              AFTER DELETE ON $_albumArtistTableName
-              FOR EACH ROW
-              WHEN NOT EXISTS (SELECT 1 FROM $_songArtistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName LIMIT 1) AND
-                NOT EXISTS (SELECT 1 FROM $_albumArtistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName LIMIT 1)
-              BEGIN
-                DELETE FROM $_artistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName;
-              END;
-            CREATE TRIGGER delete_artist_if_no_songs_and_albums_after_song_artist_update
-              AFTER UPDATE ON $_songArtistTableName
-              FOR EACH ROW
-              WHEN NOT EXISTS (SELECT 1 FROM $_songArtistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName LIMIT 1) AND
-                NOT EXISTS (SELECT 1 FROM $_albumArtistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName LIMIT 1)
-              BEGIN
-                DELETE FROM $_artistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName;
-              END;
-            CREATE TRIGGER delete_artist_if_no_songs_and_albums_after_album_artist_update
-              AFTER UPDATE ON $_albumArtistTableName
-              FOR EACH ROW
-              WHEN NOT EXISTS (SELECT 1 FROM $_songArtistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName LIMIT 1) AND
-                NOT EXISTS (SELECT 1 FROM $_albumArtistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName LIMIT 1)
-              BEGIN
-                DELETE FROM $_artistTableName WHERE $_artistIdColumnName = OLD.$_artistIdColumnName;
-              END;
-            ''');
+        onCreate: (db, version) async {
+          return await _createOrUpdateDb(db);
         },
-        version: 1,
+        onUpgrade: (db, oldVersion, newVersion) async {
+          return await _createOrUpdateDb(db);
+        },
+        version: 4,
       ),
     );
   }
@@ -146,9 +181,9 @@ class DatabaseService {
     int? artistId,
     int? albumId,
     int? playlistId,
+    String? path,
+    String? title,
   }) async {
-    final Map<int, Song> songs = {};
-
     try {
       final List<Map<String, Object?>> entries;
 
@@ -162,6 +197,13 @@ class DatabaseService {
         entries = await _database!.rawQuery('''
           SELECT * FROM $_songTableName NATURAL JOIN $_albumTableName NATURAL JOIN $_songArtistTableName NATURAL JOIN $_artistTableName WHERE $_albumIdColumnName = $albumId;
         ''');
+      } else if (path != null) {
+        entries = await _database!.rawQuery(
+          '''
+          SELECT * FROM $_songTableName NATURAL JOIN $_albumTableName NATURAL JOIN $_songArtistTableName NATURAL JOIN $_artistTableName WHERE $_pathColumnName = ?;
+        ''',
+          [path],
+        );
       } else if (playlistId != null) {
         entries = await _database!.rawQuery('''
           SELECT * FROM $_songTableName NATURAL JOIN $_albumTableName NATURAL JOIN $_songArtistTableName NATURAL JOIN $_artistTableName
@@ -173,40 +215,68 @@ class DatabaseService {
         ''');
       }
 
-      for (final entry in entries) {
-        final songId = entry[_songIdColumnName] as int;
-
-        // Create and add song if it's id is not present in the map.
-        if (!songs.containsKey(songId)) {
-          songs[songId] = Song(
-            id: songId,
-            title: entry[_songTitleColumnName] as String,
-            artists: UnmodifiableListView([
-              entry[_artistNameColumnName] as String,
-            ]),
-            album: entry[_albumTitleColumnName] as String,
-            albumId: entry[_albumIdColumnName] as int,
-            genre: entry[_genreColumnName] as String?,
-            year: entry[_yearColumnName] as int?,
-            bitrate: entry[_bitrateColumnName] as int?,
-            trackNumber: entry[_trackNumberColumnName] as int?,
-            path: entry[_pathColumnName] as String,
-            imagePath: entry[_imagePathColumnName] as String?,
-          );
-        } else {
-          // Add the artist to the list of song artists if the song is already created.
-          final artists = List.of(songs[songId]!.artists);
-          artists.add(entry[_artistNameColumnName] as String);
-          songs[songId] = songs[songId]!.copyWith(
-            artists: UnmodifiableListView(artists),
-          );
-        }
-      }
-
-      return Success(songs.values.toList());
+      return Success(_processSongQuery(entries));
     } on Exception catch (e) {
       return Failure(e);
     }
+  }
+
+  /// Returns the songs with the specified [title], [genre], [year] and [trackNumber].
+  Future<Result<List<Song>>> getSongsWith({
+    String? title,
+    String? genre,
+    int? year,
+    int? trackNumber,
+  }) async {
+    try {
+      final List<Map<String, Object?>> entries;
+
+      entries = await _database!.rawQuery(
+        '''
+          SELECT * FROM $_songTableName NATURAL JOIN $_albumTableName NATURAL JOIN $_songArtistTableName NATURAL JOIN $_artistTableName
+          WHERE $_songTitleColumnName = ? AND $_genreColumnName = ? AND $_yearColumnName = ? AND $_trackNumberColumnName = ?;
+        ''',
+        [title, genre, year, trackNumber],
+      );
+
+      return Success(_processSongQuery(entries));
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+
+  List<Song> _processSongQuery(List<Map<String, Object?>> entries) {
+    final Map<int, Song> songs = {};
+    for (final entry in entries) {
+      final songId = entry[_songIdColumnName] as int;
+
+      // Create and add song if it's id is not present in the map.
+      if (!songs.containsKey(songId)) {
+        songs[songId] = Song(
+          id: songId,
+          title: entry[_songTitleColumnName] as String,
+          artists: UnmodifiableListView([
+            entry[_artistNameColumnName] as String,
+          ]),
+          album: entry[_albumTitleColumnName] as String,
+          albumId: entry[_albumIdColumnName] as int,
+          genre: entry[_genreColumnName] as String?,
+          year: entry[_yearColumnName] as int?,
+          bitrate: entry[_bitrateColumnName] as int?,
+          trackNumber: entry[_trackNumberColumnName] as int?,
+          path: entry[_pathColumnName] as String,
+          imagePath: entry[_imagePathColumnName] as String?,
+        );
+      } else {
+        // Add the artist to the list of song artists if the song is already created.
+        final artists = List.of(songs[songId]!.artists);
+        artists.add(entry[_artistNameColumnName] as String);
+        songs[songId] = songs[songId]!.copyWith(
+          artists: UnmodifiableListView(artists),
+        );
+      }
+    }
+    return songs.values.toList();
   }
 
   /// Returns the albums in the database associated to at least one album artist.
@@ -214,7 +284,7 @@ class DatabaseService {
   /// Is's required for an inserted album to have that attribute, therefore no album is expected to be ignored.
   ///
   /// Returns the albums made by the artist identified by [artistId] when it is not null.
-  Future<Result<List<Album>>> getAlbums({int? artistId}) async {
+  Future<Result<List<Album>>> getAlbums({int? artistId, int? songId}) async {
     final Map<int, Album> albums = {};
     late List<Map<String, Object?>> albumArtistsEntries;
     late List<Map<String, Object?>> albumInfoEntries;
@@ -230,7 +300,15 @@ class DatabaseService {
           albumInfoEntries = await txn.rawQuery('''
           SELECT DISTINCT $_albumIdColumnName, $_imagePathColumnName, $_yearColumnName FROM $_songTableName WHERE $_albumIdColumnName IN
           (SELECT $_albumIdColumnName FROM $_albumArtistTableName WHERE $_artistIdColumnName = $artistId);
-
+        ''');
+        } else if (songId != null) {
+          albumArtistsEntries = await txn.rawQuery('''
+          SELECT * FROM $_albumTableName NATURAL JOIN $_albumArtistTableName NATURAL JOIN $_artistTableName WHERE $_albumIdColumnName IN
+          (SELECT $_albumIdColumnName FROM $_songTableName WHERE $_songIdColumnName = $songId);
+            ''');
+          albumInfoEntries = await txn.rawQuery('''
+          SELECT DISTINCT $_albumIdColumnName, $_imagePathColumnName, $_yearColumnName FROM $_songTableName WHERE $_albumIdColumnName IN
+          (SELECT $_albumIdColumnName FROM $_songTableName WHERE $_songIdColumnName = $songId);
         ''');
         } else {
           albumArtistsEntries = await txn.rawQuery('''
@@ -492,7 +570,8 @@ class DatabaseService {
 
       // Get albums titled $albumTitle, with one entry per album, album artist pair.
       final albumQueryResult = await executor.rawQuery(
-        "SELECT * FROM $_albumTableName NATURAL JOIN $_albumArtistTableName WHERE $_albumTitleColumnName = '$albumTitle';",
+        "SELECT * FROM $_albumTableName NATURAL JOIN $_albumArtistTableName WHERE $_albumTitleColumnName = ?;",
+        [albumTitle],
       );
 
       // Map the album artists to the album ids.
@@ -618,20 +697,37 @@ class DatabaseService {
   /// Deletes the songs identified by [songIds] from the database.
   ///
   /// The related metadata is handled by triggers and foreign key actions.
-  Future<Result<void>> deleteSongs(List<int> songIds) async {
+  Future<Result<void>> deleteSongs({
+    List<int>? songIds,
+    List<String>? songPaths,
+  }) async {
     try {
       await _database!.transaction((txn) async {
         final batch = txn.batch();
-        for (final songId in songIds) {
-          batch.delete(
-            _songTableName,
-            where: "$_songIdColumnName = ?",
-            whereArgs: [songId],
-          );
-        }
-        final rowsDeleted = await batch.commit();
-        if (rowsDeleted.length != songIds.length) {
-          return Failure(Exception("One or more songs not found"));
+        if (songIds != null) {
+          for (final songId in songIds) {
+            batch.delete(
+              _songTableName,
+              where: "$_songIdColumnName = ?",
+              whereArgs: [songId],
+            );
+          }
+          final rowsDeleted = await batch.commit();
+          if (rowsDeleted.length != songIds.length) {
+            return Failure(Exception("One or more songs not found"));
+          }
+        } else if (songPaths != null) {
+          for (final songPath in songPaths) {
+            batch.delete(
+              _songTableName,
+              where: "$_pathColumnName = ?",
+              whereArgs: [songPath],
+            );
+          }
+          final rowsDeleted = await batch.commit();
+          if (rowsDeleted.length != songPaths.length) {
+            return Failure(Exception("One or more songs not found"));
+          }
         }
       });
       return Success(unit);
@@ -652,6 +748,7 @@ class DatabaseService {
     String? newAlbumTitle,
     List<String>? newSongArtistNames,
     List<String>? newAlbumArtistNames,
+    String? newPath,
   }) async {
     Song newSong = oldSong;
     try {
@@ -780,6 +877,17 @@ class DatabaseService {
             whereArgs: [oldSong.id],
           );
           newSong = newSong.copyWith(trackNumber: newTrackNumber);
+        }
+
+        // Update path.
+        if (newPath != null && newPath.isNotEmpty) {
+          await txn.update(
+            _songTableName,
+            Map.fromEntries([MapEntry(_pathColumnName, newPath)]),
+            where: "$_songIdColumnName = ?",
+            whereArgs: [oldSong.id],
+          );
+          newSong = newSong.copyWith(path: newPath);
         }
       });
 
@@ -935,6 +1043,25 @@ class DatabaseService {
       DatabaseExecutor? db = (executor != null) ? executor : _database;
       await db!.delete(_queuedSongTableName);
       return Success(unit);
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+
+  // Future<void> _deleteDatabase() async {
+  //   if (_database == null) {
+  //     await open();
+  //   }
+  //   databaseFactory.deleteDatabase(_database!.path);
+  // }
+
+  Future<Result<List<String>>> getSongPaths() async {
+    try {
+      final list = (await _database!.query(
+        _songTableName,
+        columns: [_pathColumnName],
+      )).map((e) => e[_pathColumnName] as String).toList();
+      return Success(list);
     } on Exception catch (e) {
       return Failure(e);
     }
