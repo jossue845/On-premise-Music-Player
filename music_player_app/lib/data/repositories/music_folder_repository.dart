@@ -1,18 +1,15 @@
 import 'dart:collection';
-import 'dart:io';
 
 import 'package:audiotags/audiotags.dart';
-import 'package:crypto/crypto.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:image/image.dart';
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/services/filesystem_service.dart';
 import 'package:music_player_app/domain/models/album/album.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:music_player_app/utils/image_handler.dart';
 import 'package:result_dart/result_dart.dart';
 
-class MusicFolderRepository {
+class MusicFolderRepository with ImageHandler {
   static const String _musicFolderKeyName = "musicFolder";
 
   final DatabaseService _database;
@@ -65,7 +62,7 @@ class MusicFolderRepository {
         List<String> trackArtists;
         List<String> albumArtists;
         String? imagePath = (pictures.isNotEmpty)
-            ? (await _storePicture(pictures.first)).getOrThrow()
+            ? (await storePicture(pictures.first.bytes, _database)).getOrThrow()
             : null;
 
         if (title == null) {
@@ -111,7 +108,7 @@ class MusicFolderRepository {
           if (dbSong.copyWith(artists: UnmodifiableListView([])) != foundSong ||
               !eq.equals(dbSong.artists, trackArtists) ||
               !eq.equals(dbAlbum.albumArtists, albumArtists)) {
-            await _database.updateTags(
+            (await _database.updateTags(
               oldSong: dbSong,
               newTitle: title,
               newTrackNumber: trackNumber,
@@ -121,7 +118,7 @@ class MusicFolderRepository {
               newSongArtistNames: trackArtists,
               newAlbumArtistNames: albumArtists,
               newPath: imagePath,
-            );
+            )).getOrThrow();
           }
         } else {
           // Check if song was present but with a different path and update the path if it was.
@@ -142,13 +139,13 @@ class MusicFolderRepository {
             }
           }
           if (filteredQueryResult.isNotEmpty) {
-            await _database.updateTags(
+            (await _database.updateTags(
               oldSong: filteredQueryResult.first,
               newPath: filePath,
-            );
+            )).getOrThrow();
           } else {
             // If the song wasn't present, add it.
-            await _database.insertSong(
+            (await _database.insertSong(
               title: title,
               path: filePath,
               albumTitle: album,
@@ -158,7 +155,7 @@ class MusicFolderRepository {
               year: year,
               trackNumber: trackNumber,
               imagePath: imagePath,
-            );
+            )).getOrThrow();
           }
         }
       }
@@ -170,7 +167,9 @@ class MusicFolderRepository {
           pathsOfSongsToBeDeleted.add(song);
         }
       }
-      await _database.deleteSongs(songPaths: pathsOfSongsToBeDeleted);
+      (await _database.deleteSongs(
+        songPaths: pathsOfSongsToBeDeleted,
+      )).getOrThrow();
 
       print(filePaths.length);
 
@@ -191,39 +190,6 @@ class MusicFolderRepository {
       final String dirPath = (await _fs.getDirectoryPath()).getOrThrow();
       (await _database.insertKVPair(_musicFolderKeyName, dirPath)).getOrThrow();
       return Success(unit);
-    } on Exception catch (e) {
-      return Failure(e);
-    }
-  }
-
-  Future<Result<String>> _storePicture(Picture picture) async {
-    try {
-      final Directory tempDir = await getTemporaryDirectory();
-      final digest = sha1.convert(picture.bytes);
-      final filePath =
-          "${tempDir.path}/flutter_music_player/img/${digest.toString()}.jpg";
-      if (!_database.isOpen()) {
-        await _database.open();
-      }
-
-      final bool imageAlreadyPresent = (await _database.isImagePathPresent(
-        filePath,
-      )).getOrThrow();
-
-      if (!imageAlreadyPresent) {
-        File imageFile = await File(filePath).create(recursive: true);
-        if (!JpegDecoder().isValidFile(picture.bytes)) {
-          Image? img = decodeImage(picture.bytes);
-          if (img == null) {
-            throw Exception("Failed to get image");
-          }
-          imageFile.writeAsBytesSync(encodeJpg(img));
-        } else {
-          imageFile.writeAsBytesSync(picture.bytes);
-        }
-      }
-
-      return Success(filePath);
     } on Exception catch (e) {
       return Failure(e);
     }

@@ -188,7 +188,6 @@ class DatabaseService {
     int? albumId,
     int? playlistId,
     String? path,
-    String? title,
   }) async {
     try {
       final List<Map<String, Object?>> entries;
@@ -750,6 +749,7 @@ class DatabaseService {
     List<String>? newSongArtistNames,
     List<String>? newAlbumArtistNames,
     String? newPath,
+    String? newImagePath,
   }) async {
     Song newSong = oldSong;
     try {
@@ -889,6 +889,17 @@ class DatabaseService {
             whereArgs: [oldSong.id],
           );
           newSong = newSong.copyWith(path: newPath);
+        }
+
+        // Update image path.
+        if (newImagePath != null && newImagePath.isNotEmpty) {
+          await txn.update(
+            _songTableName,
+            Map.fromEntries([MapEntry(_imagePathColumnName, newImagePath)]),
+            where: "$_songIdColumnName = ?",
+            whereArgs: [oldSong.id],
+          );
+          newSong = newSong.copyWith(imagePath: newImagePath);
         }
       });
 

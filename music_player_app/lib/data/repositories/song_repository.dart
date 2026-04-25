@@ -1,8 +1,12 @@
+import 'dart:typed_data';
+
+import 'package:audiotags/audiotags.dart';
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
+import 'package:music_player_app/utils/image_handler.dart';
 import 'package:result_dart/result_dart.dart';
 
-class SongRepository {
+class SongRepository with ImageHandler {
   final DatabaseService _database;
 
   SongRepository({required DatabaseService database}) : _database = database;
@@ -37,7 +41,44 @@ class SongRepository {
     String? newAlbumTitle,
     List<String>? newSongArtistNames,
     List<String>? newAlbumArtistNames,
+    Uint8List? pictureBytes,
   }) async {
+    Tag tag = Tag(
+      title: newTitle,
+      trackArtist: newSongArtistNames?.fold(newSongArtistNames.first, (val, e) {
+        return "$val; e";
+      }),
+      album: newAlbumTitle,
+      albumArtist: newAlbumArtistNames?.fold(newAlbumArtistNames.first, (
+        val,
+        e,
+      ) {
+        return "$val; e";
+      }),
+      genre: newGenre,
+      year: newYear,
+      trackNumber: newTrackNumber,
+      pictures: (pictureBytes != null)
+          ? [
+              Picture(
+                bytes: pictureBytes,
+                mimeType: null,
+                pictureType: PictureType.coverFront,
+              ),
+            ]
+          : [],
+    );
+
+    final String? imagePath = (pictureBytes != null)
+        ? (await storePicture(pictureBytes, _database)).getOrThrow()
+        : null;
+
+    try {
+      AudioTags.write(oldSong.path, tag);
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+
     if (!_database.isOpen()) {
       await _database.open();
     }
@@ -50,6 +91,7 @@ class SongRepository {
       newAlbumTitle: newAlbumTitle,
       newSongArtistNames: newSongArtistNames,
       newAlbumArtistNames: newAlbumArtistNames,
+      newImagePath: imagePath,
     );
   }
 }
