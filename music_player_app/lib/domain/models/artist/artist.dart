@@ -1,9 +1,10 @@
-import 'package:flutter/foundation.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:dart_mappable/dart_mappable.dart';
 
-part 'artist.freezed.dart';
+part 'artist.mapper.dart';
 
-@freezed
-abstract class Artist with _$Artist {
-  const factory Artist({required int id, required String name}) = _Artist;
+@MappableClass()
+class Artist with ArtistMappable {
+  final int id;
+  final String name;
+  Artist({required this.id, required this.name});
 }

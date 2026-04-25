@@ -1,33 +1,19 @@
 import 'dart:collection';
 
-import 'package:flutter/foundation.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:dart_mappable/dart_mappable.dart';
 
-part 'song_queue.freezed.dart';
+part 'song_queue.mapper.dart';
 
-@freezed
-abstract class SongQueue with _$SongQueue {
-  const factory SongQueue._int({
+@MappableClass()
+class SongQueue with SongQueueMappable {
+  final UnmodifiableListView<int> songIds;
+  final int currentSongIndex;
+
+  SongQueue({
     required UnmodifiableListView<int> songIds,
-    required currentSongIndex,
-  }) = _SongQueue;
-
-  factory SongQueue({
-    required UnmodifiableListView<int> songIds,
-    required currentSongIndex,
-  }) {
-    int idx;
-    if (currentSongIndex < 0) {
-      idx = 0;
-    } else if (currentSongIndex >= songIds.length) {
-      if (songIds.isEmpty) {
-        idx = 0;
-      } else {
-        idx = songIds.length - 1;
-      }
-    } else {
-      idx = currentSongIndex;
-    }
-    return SongQueue._int(songIds: songIds, currentSongIndex: idx);
-  }
+    required int currentSongIndex,
+  }) : this.songIds = songIds,
+       this.currentSongIndex = currentSongIndex
+           .clamp(0, songIds.length - 1)
+           .toInt();
 }

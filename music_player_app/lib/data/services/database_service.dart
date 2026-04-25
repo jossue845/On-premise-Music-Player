@@ -16,7 +16,6 @@ class DatabaseService {
   static const String _songTitleColumnName = "song_title";
   static const String _genreColumnName = "genre";
   static const String _yearColumnName = "year";
-  static const String _bitrateColumnName = "bitrate";
   static const String _trackNumberColumnName = "track_number";
   static const String _pathColumnName = "path";
   static const String _imagePathColumnName = "image_path";
@@ -43,6 +42,10 @@ class DatabaseService {
   static const String _artistIdColumnName = "artist_id";
   static const String _artistNameColumnName = "artist_name";
 
+  static const String _keyValueStoreTableName = "kv_store";
+  static const String _keyColumnName = "key";
+  static const String _valueColumnName = "value";
+
   Database? _database;
   DatabaseFactory databaseFactory;
 
@@ -66,7 +69,7 @@ class DatabaseService {
           ''');
       await txn.execute('''
          CREATE TABLE IF NOT EXISTS $_songTableName($_songIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT, $_songTitleColumnName TEXT NOT NULL , $_albumIdColumnName INTEGER NOT NULL,
-           $_genreColumnName TEXT, $_yearColumnName INTEGER, $_bitrateColumnName INTEGER, $_trackNumberColumnName INTEGER, $_pathColumnName TEXT NOT NULL UNIQUE,
+           $_genreColumnName TEXT, $_yearColumnName INTEGER, $_trackNumberColumnName INTEGER, $_pathColumnName TEXT NOT NULL UNIQUE,
            $_imagePathColumnName TEXT, FOREIGN KEY($_albumIdColumnName) REFERENCES $_albumTableName($_albumIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT);
           ''');
       await txn.execute('''
@@ -82,6 +85,9 @@ class DatabaseService {
       await txn.execute('''
          CREATE TABLE IF NOT EXISTS $_queuedSongTableName($_songIdColumnName INTEGER PRIMARY KEY, $_positionColumnName INTEGER NOT NULL, $_currentSongColumnName INTEGER NOT NULL,
            FOREIGN KEY($_songIdColumnName) REFERENCES $_songTableName($_songIdColumnName) ON UPDATE CASCADE ON DELETE CASCADE);
+          ''');
+      await txn.execute('''
+         CREATE TABLE IF NOT EXISTS $_keyValueStoreTableName($_keyColumnName TEXT PRIMARY KEY, $_valueColumnName TEXT NOT NULL);
           ''');
       await txn.execute('''
          CREATE TRIGGER IF NOT EXISTS delete_album_if_songs_are_deleted
@@ -160,7 +166,7 @@ class DatabaseService {
         onUpgrade: (db, oldVersion, newVersion) async {
           return await _createOrUpdateDb(db);
         },
-        version: 4,
+        version: 5,
       ),
     );
   }
@@ -262,7 +268,6 @@ class DatabaseService {
           albumId: entry[_albumIdColumnName] as int,
           genre: entry[_genreColumnName] as String?,
           year: entry[_yearColumnName] as int?,
-          bitrate: entry[_bitrateColumnName] as int?,
           trackNumber: entry[_trackNumberColumnName] as int?,
           path: entry[_pathColumnName] as String,
           imagePath: entry[_imagePathColumnName] as String?,
@@ -443,7 +448,6 @@ class DatabaseService {
     required int albumId,
     String? genre,
     int? year,
-    int? bitrate,
     int? trackNumber,
     required String path,
     String? imagePath,
@@ -454,7 +458,6 @@ class DatabaseService {
         _albumIdColumnName: albumId,
         _genreColumnName: genre,
         _yearColumnName: year,
-        _bitrateColumnName: bitrate,
         _trackNumberColumnName: trackNumber,
         _pathColumnName: path,
         _imagePathColumnName: imagePath,
@@ -621,7 +624,6 @@ class DatabaseService {
     required String title,
     String? genre,
     int? year,
-    int? bitrate,
     int? trackNumber,
     required String path,
     String? imagePath,
@@ -679,7 +681,6 @@ class DatabaseService {
           path: path,
           genre: genre,
           year: year,
-          bitrate: bitrate,
           trackNumber: trackNumber,
           imagePath: imagePath,
         ).getOrThrow();
@@ -1062,6 +1063,53 @@ class DatabaseService {
         columns: [_pathColumnName],
       )).map((e) => e[_pathColumnName] as String).toList();
       return Success(list);
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+
+  Future<Result<void>> insertKVPair(String key, String value) async {
+    try {
+      await _database!.insert(_keyValueStoreTableName, {
+        _keyColumnName: key,
+        _valueColumnName: value,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      return Success(unit);
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+
+  Future<Result<String>> getValue(String key) async {
+    try {
+      final queryResult = (await _database!.query(
+        _keyValueStoreTableName,
+        columns: [_valueColumnName],
+        where: "$_keyColumnName = ?",
+        whereArgs: [key],
+      )).map((e) => e[_valueColumnName] as String).toList();
+      if (queryResult.isNotEmpty) {
+        final String value = (queryResult.isNotEmpty) ? queryResult.first : "";
+        return Success(value);
+      } else {
+        return Failure(Exception("No value found for the key $key"));
+      }
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+
+  Future<Result<bool>> isImagePathPresent(String imagePath) async {
+    try {
+      final queryResult = (await _database!.rawQuery(
+        "SELECT 1 FROM $_songTableName WHERE $_imagePathColumnName = ? LIMIT 1",
+        [imagePath],
+      ));
+      if (queryResult.isNotEmpty) {
+        return Success(true);
+      } else {
+        return Success(false);
+      }
     } on Exception catch (e) {
       return Failure(e);
     }

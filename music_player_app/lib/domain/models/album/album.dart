@@ -1,17 +1,22 @@
 import 'dart:collection';
 
-import 'package:flutter/foundation.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:dart_mappable/dart_mappable.dart';
 
-part 'album.freezed.dart';
+part 'album.mapper.dart';
 
-@freezed
-abstract class Album with _$Album {
-  const factory Album({
-    required int id,
-    required String title,
-    required UnmodifiableListView<String> albumArtists,
-    int? year,
-    String? imagePath,
-  }) = _Album;
+@MappableClass()
+class Album with AlbumMappable {
+  final int id;
+  final String title;
+  final UnmodifiableListView<String> albumArtists;
+  final int? year;
+  final String? imagePath;
+
+  Album({
+    required this.id,
+    required this.title,
+    required this.albumArtists,
+    this.year,
+    this.imagePath,
+  });
 }

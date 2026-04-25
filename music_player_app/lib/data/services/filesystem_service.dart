@@ -17,7 +17,9 @@ class FilesystemService {
 
   Future<Result<String>> getDirectoryPath() async {
     try {
-      await getStoragePermission();
+      if (!(await getStoragePermission())) {
+        throw Exception("Storage permission not granted");
+      }
 
       String? selectedDirectoryPath = await FilePicker.getDirectoryPath(
         dialogTitle: "Select the music directory",
@@ -38,7 +40,9 @@ class FilesystemService {
       final List<Directory> directories = [];
       final List<File> files = [];
 
-      await getStoragePermission();
+      if (!(await getStoragePermission())) {
+        throw Exception("Storage permission not granted");
+      }
 
       for (final path in directoryPaths) {
         directories.add(Directory(path));

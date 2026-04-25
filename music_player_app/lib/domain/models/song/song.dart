@@ -1,23 +1,31 @@
 import 'dart:collection';
 
-import 'package:flutter/foundation.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:dart_mappable/dart_mappable.dart';
 
-part 'song.freezed.dart';
+part 'song.mapper.dart';
 
-@freezed
-abstract class Song with _$Song {
-  const factory Song({
-    required int id,
-    required String title,
-    required UnmodifiableListView<String> artists,
-    required String album,
-    required int albumId,
-    String? genre,
-    int? year,
-    int? bitrate,
-    int? trackNumber,
-    required String path,
-    String? imagePath,
-  }) = _Song;
+@MappableClass()
+class Song with SongMappable {
+  final int id;
+  final String title;
+  final UnmodifiableListView<String> artists;
+  final String album;
+  final int albumId;
+  final String? genre;
+  final int? year;
+  final int? trackNumber;
+  final String path;
+  final String? imagePath;
+  Song({
+    required this.id,
+    required this.title,
+    required this.artists,
+    required this.album,
+    required this.albumId,
+    this.genre,
+    this.year,
+    this.trackNumber,
+    required this.path,
+    this.imagePath,
+  });
 }

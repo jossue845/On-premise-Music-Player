@@ -1,13 +1,11 @@
-import 'package:flutter/foundation.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:dart_mappable/dart_mappable.dart';
 
-part 'playlist.freezed.dart';
+part 'playlist.mapper.dart';
 
-@freezed
-abstract class Playlist with _$Playlist {
-  const factory Playlist({
-    required int id,
-    required String title,
-    String? imageId,
-  }) = _Playlist;
+@MappableClass()
+class Playlist with PlaylistMappable {
+  final int id;
+  final String title;
+  final String? imageId;
+  Playlist({required this.id, required this.title, this.imageId});
 }

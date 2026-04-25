@@ -7,10 +7,9 @@ erDiagram
         int album_id FK
         string genre
         int year
-        int bitrate
         int track_number
         string path
-        string image_id
+        string image_path
     }
     PLAYLIST{
         int playlist_id PK
@@ -51,4 +50,5 @@ erDiagram
     SONG_ARTIST o{--|| ARTIST: "is"
     ALBUM_ARTIST o{--|| ARTIST: "is"
 ```
+
 ```
