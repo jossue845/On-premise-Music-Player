@@ -1,15 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:music_player_app/presentation/screens/player_screen.dart';
 
-void main() {
-  runApp(
-    const MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: MusicDashboard(),
-    ),
-  );
-}
-
 class HomeDashboard extends StatelessWidget {
   const HomeDashboard({super.key});
 
@@ -23,22 +14,22 @@ class HomeDashboard extends StatelessWidget {
           
           // --- 1. LAST PLAYED ---
           const Text('Last Played', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 10), // Adds a little vertical breathing room
-          // Rounded container
+          const SizedBox(height: 10), 
           Card(
             color: Colors.deepPurple.shade50,
             elevation: 0,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: ListTile(
-              // Then we'll have to change this
               leading: const Icon(Icons.music_note, size: 40, color: Colors.deepPurple),
               title: const Text('Bohemian Rhapsody', style: TextStyle(fontWeight: FontWeight.bold)),
               subtitle: const Text('Queen'),
               onTap: () {
                 Navigator.push(
-                  context, 
+                  context,
                   MaterialPageRoute(
-                    builder: (context) => const PlayerScreen()));
+                    builder: (context) => const PlayerScreen(),
+                  ),
+                );
               },
               trailing: IconButton(
                 icon: const Icon(Icons.play_circle_fill, size: 36, color: Colors.deepPurple),
@@ -51,11 +42,9 @@ class HomeDashboard extends StatelessWidget {
           // --- 2. DAILY STATS ---
           const Text('Daily Stats', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
-          // Row places widgets side-by-side horizontally
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // We use a custom method below to avoid writing the same card code twice
               _buildStatCard('Time Listened', '2h 14m', Icons.timer),
               const SizedBox(width: 16), 
               _buildStatCard('Tracks', '34', Icons.bar_chart),
@@ -66,7 +55,6 @@ class HomeDashboard extends StatelessWidget {
           // --- 3. MOST REPRODUCED ---
           const Text('Most Reproduced', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
-          // A horizontal ListView requires a fixed height to know how tall to be
           SizedBox(
             height: 140, 
             child: ListView.builder(
@@ -98,9 +86,8 @@ class HomeDashboard extends StatelessWidget {
     );
   }
 
-  // This helper builds the tiny stat cards so our main build method stays clean
+  // Helper builds the tiny stat cards so our main build method stays clean
   Widget _buildStatCard(String title, String value, IconData icon) {
-    // Expanded tells the card to take up equal horizontal space inside the Row
     return Expanded(
       child: Card(
         elevation: 2,
@@ -116,48 +103,6 @@ class HomeDashboard extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class MusicDashboard extends StatefulWidget {
-  const MusicDashboard({super.key});
-
-  @override
-  State<MusicDashboard> createState() => _MusicDashboardState();
-}
-
-class _MusicDashboardState extends State<MusicDashboard> {
-  int _selectedIndex = 0; 
-  
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Name pending'),
-      ),
-      body: Center(
-        child: Text('Index: $_selectedIndex', style: const TextStyle(fontSize: 24)),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        selectedItemColor: Colors.deepPurple,
-        unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.album), label: 'Albums'),
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Search'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Artist'),
-          BottomNavigationBarItem(icon: Icon(Icons.queue_music), label: 'Playlists'),
-        ],
       ),
     );
   }

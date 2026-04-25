@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:music_player_app/presentation/components/player_settings.dart';
+import 'package:music_player_app/presentation/screens/home_screen.dart'; 
+
 
 class PlayerScreen extends StatelessWidget {
   const PlayerScreen({super.key});
+
+  void _backScreen (BuildContext context) {
+    Navigator.pop(context);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +22,7 @@ class PlayerScreen extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  IconButton(onPressed: () {}, icon: const Icon(Icons.arrow_back)),
+                  IconButton(onPressed: () => _backScreen(context), icon: const Icon(Icons.arrow_back)),
                   IconButton(onPressed: () {}, icon: const Icon(Icons.menu)),
                 ],
               ),
