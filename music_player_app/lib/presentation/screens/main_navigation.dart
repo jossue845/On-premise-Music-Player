@@ -57,14 +57,14 @@ class _MusicDashboardState extends State<MusicDashboard> {
       body: _pages[_selectedIndex], 
       
       bottomNavigationBar: Container(
-        color: Colors.white,
+        color: Theme.of(context).bottomNavigationBarTheme.backgroundColor,
         child: Padding (
           padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 20),
           child: GNav(
-            backgroundColor: Colors.white,
-            color: Colors.grey,
-            activeColor: Colors.deepPurple,
-            tabBackgroundColor: Colors.deepPurple.withOpacity(0.1),
+            backgroundColor: Colors.transparent,
+            color: Theme.of(context).bottomNavigationBarTheme.unselectedItemColor,
+            activeColor: Theme.of(context).bottomNavigationBarTheme.selectedItemColor,
+            tabBackgroundColor: (Theme.of(context).bottomNavigationBarTheme.selectedItemColor ?? Colors.deepPurpleAccent).withOpacity(0.1),
             padding: const EdgeInsets.all(16), 
             selectedIndex: _selectedIndex, 
             onTabChange: _onItemTapped, 

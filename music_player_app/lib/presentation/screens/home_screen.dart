@@ -16,7 +16,6 @@ class HomeDashboard extends StatelessWidget {
           const Text('Last Played', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10), 
           Card(
-            color: Colors.deepPurple.shade50,
             elevation: 0,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: ListTile(
@@ -65,7 +64,6 @@ class HomeDashboard extends StatelessWidget {
                   width: 120,
                   margin: const EdgeInsets.only(right: 12),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
