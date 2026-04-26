@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:music_player_app/presentation/screens/playlistdetail_screen.dart'; // Adjust path if needed!
 
 class PlaylistScreen extends StatefulWidget {
   const PlaylistScreen({super.key});
@@ -8,13 +9,14 @@ class PlaylistScreen extends StatefulWidget {
 }
 
 class _PlaylistScreenState extends State<PlaylistScreen> {
-  final List<Map<String, dynamic>> _mockPlaylists = [];
+  final List<Map<String, dynamic>> _mockPlaylists = [
+    // just some random titles to test
+    {'title': 'Late Night Vibes', 'tracks': '24 songs', 'isPinned': false},
+  ];
+
   final TextEditingController _playlistNameController = TextEditingController();
-  
-  // Tracking which playlists are currently selected
   final Set<int> _selectedIndices = {};
 
-  // --- SELECTION LOGIC ---
   void _toggleSelection(int index) {
     setState(() {
       if (_selectedIndices.contains(index)) {
@@ -27,7 +29,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
 
   void _deleteSelected() {
     setState(() {
-      // Sort descending to remove from the bottom up, preventing index shifting errors
       final sortedIndices = _selectedIndices.toList()..sort((a, b) => b.compareTo(a));
       for (final index in sortedIndices) {
         _mockPlaylists.removeAt(index);
@@ -36,23 +37,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     });
   }
 
-  void _pinSelected() {
-    setState(() {
-      for (final index in _selectedIndices) {
-        _mockPlaylists[index]['isPinned'] = !(_mockPlaylists[index]['isPinned'] as bool);
-      }
-      
-      // Sort the list so pinned items automatically jump to the top
-      _mockPlaylists.sort((a, b) {
-        if (a['isPinned'] == b['isPinned']) return 0;
-        return a['isPinned'] ? -1 : 1;
-      });
-      
-      _selectedIndices.clear();
-    });
-  }
-
-  // --- POPUP LOGIC ---
   void _showCreatePlaylistDialog() {
     showDialog(
       context: context,
@@ -82,7 +66,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                     _mockPlaylists.insert(0, {
                       'title': _playlistNameController.text,
                       'tracks': '0 songs', 
-                      'isPinned': false, // Add the pin status to new playlists!
+                      'isPinned': false,
                     });
                   });
                   _playlistNameController.clear(); 
@@ -108,7 +92,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     final bool isSelectionMode = _selectedIndices.isNotEmpty;
 
     return Scaffold(
-      // 3. The Contextual AppBar swaps automatically
       appBar: isSelectionMode
           ? AppBar(
               backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
@@ -118,11 +101,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
               ),
               title: Text('${_selectedIndices.length} Selected'),
               actions: [
-                IconButton(
-                  icon: const Icon(Icons.push_pin),
-                  tooltip: 'Pin/Unpin',
-                  onPressed: _pinSelected,
-                ),
                 IconButton(
                   icon: const Icon(Icons.delete),
                   tooltip: 'Delete',
@@ -149,15 +127,13 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
           itemBuilder: (context, index) {
             final playlist = _mockPlaylists[index];
             final bool isSelected = _selectedIndices.contains(index);
-            final bool isPinned = playlist['isPinned'] as bool;
-            
+            final bool isPinned = playlist['isPinned'] ?? false;
+          
             return Card(
               margin: const EdgeInsets.only(bottom: 12.0),
-              // Highlights the card in cyan if it is selected
               color: isSelected ? Theme.of(context).primaryColor.withOpacity(0.2) : null,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                // Adds a glowing border to selected items
                 side: isSelected 
                   ? BorderSide(color: Theme.of(context).primaryColor, width: 1.5)
                   : BorderSide.none,
@@ -185,7 +161,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
-                    // Shows a small pin icon next to the title if pinned
                     if (isPinned)
                       Icon(Icons.push_pin, size: 16, color: Theme.of(context).primaryColor),
                   ],
@@ -205,13 +180,33 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                       icon: const Icon(Icons.play_circle_fill, size: 36),
                       onPressed: () {},
                     ),
-                // 4. Interaction routing
                 onLongPress: () => _toggleSelection(index),
-                onTap: () {
+                onTap: () async {
                   if (isSelectionMode) {
                     _toggleSelection(index);
                   } else {
-                    // Normal navigation to playlist details goes here
+                    // WAIT the updated pin state from the detail screen
+                    final updatedPinState = await Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PlaylistDetailScreen(
+                          playlistTitle: playlist['title'].toString(),
+                          initialIsPinned: isPinned,
+                        ),
+                      ),
+                    );
+
+                    // If it returns data, update and re-sort
+                    if (updatedPinState != null && updatedPinState != isPinned) {
+                      setState(() {
+                        _mockPlaylists[index]['isPinned'] = updatedPinState;
+                        
+                        _mockPlaylists.sort((a, b) {
+                          if (a['isPinned'] == b['isPinned']) return 0;
+                          return a['isPinned'] ? -1 : 1;
+                        });
+                      });
+                    }
                   }
                 },
               ),

@@ -100,6 +100,20 @@ class AppTheme {
         ),
       ),
 
+      popupMenuTheme: PopupMenuThemeData(
+        color: const Color(0xFF1E1E1E), // Your dark card surface
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        textStyle: const TextStyle(color: Colors.white, fontSize: 14),
+      ),
+
+      colorScheme: const ColorScheme.dark(
+        primary: Colors.cyanAccent,
+        error: Colors.redAccent, // The official color for destructive actions
+        surfaceContainerHighest: Color(0xFF2A2A2A), // Perfect for image placeholders
+      ),
+
     );
   }
 }
