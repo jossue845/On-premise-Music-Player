@@ -13,7 +13,6 @@ class PlayerScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade200, // Crucial for neumorphism to blend
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
@@ -38,7 +37,7 @@ class PlayerScreen extends StatelessWidget {
                       child: Container(
                         height: 300, // Placeholder height for your image
                         width: double.infinity,
-                        color: Colors.grey.shade400, // Placeholder color
+                        color: Theme.of(context).cardTheme.color,// Placeholder color
                         // child: Image.asset("your_image_path.png", fit: BoxFit.cover),
                       ),
                     ),
@@ -53,11 +52,9 @@ class PlayerScreen extends StatelessWidget {
                           children: [
                             const Text(
                               'So Sick',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
                             ),
                             Text(
                               'Neyo',
-                              style: TextStyle(color: Colors.grey.shade700, fontSize: 16),
                             ),
                           ],
                         ),
@@ -79,18 +76,16 @@ class PlayerScreen extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  Text('0:00', style: TextStyle(color: Colors.grey.shade600)),
+                  Text('0:00'),
                   const Icon(Icons.shuffle, color: Colors.grey),
                   const Icon(Icons.repeat, color: Colors.grey),
-                  Text('4:27', style: TextStyle(color: Colors.grey.shade600)),
+                  Text('4:27'),
                 ],
               ),
               Slider(
                 min: 0,
                 max: 100,
                 value: 30, // Example value
-                activeColor: Colors.green, 
-                inactiveColor: Colors.grey.shade300,
                 onChanged: (value) {},
               ),
 

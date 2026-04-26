@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 class AppTheme {
   static ThemeData get darkTheme {
     return ThemeData(
-      // The main background
-      scaffoldBackgroundColor: Colors.blueGrey.shade900,
+      // 1. Scaffold
+      scaffoldBackgroundColor: const Color.fromRGBO(69, 90, 100, 1),
       
-      // Makes default interactive elements deep purple
-      primaryColor: Colors.deepPurpleAccent, 
+      // 2. Primary colors
+      primaryColor: Colors.cyanAccent, 
       
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
@@ -15,40 +15,91 @@ class AppTheme {
         iconTheme: IconThemeData(color: Colors.white),
         titleTextStyle: TextStyle(
           color: Colors.white, 
-          fontSize: 20, 
+          fontSize: 22, 
           fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
         ),
       ),
       
-      // THIS FIXES THE CARDS: Makes them a sleek, slightly lighter dark grey
+      // 3. Surfaces
       cardTheme: CardThemeData(
-        color: Colors.blueGrey.shade900,
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        color: const Color(0xFF1E1E1E), // Just a shade lighter than the background
+        elevation: 8, // Gives a nice subtle shadow
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       
-      // THIS FIXES THE LIST TILES: Automatically styles the text and icons inside them
       listTileTheme: const ListTileThemeData(
-        iconColor: Colors.deepPurpleAccent,
+        iconColor: Colors.cyanAccent,
         textColor: Colors.white,
       ),
       
-      // THIS FIXES THE TEXT: Provides a hierarchy of white and light grey text
+      // 4. Text
       textTheme: TextTheme(
-        bodyLarge: const TextStyle(color: Colors.white), // Main strings
-        bodyMedium: TextStyle(color: Colors.grey.shade300), // Standard secondary text
-        titleLarge: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold), // Headers
-        titleMedium: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold), // Subheaders
-        labelMedium: TextStyle(color: Colors.grey.shade400), // Small numbers/labels
-      ),
-
-      bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: Colors.blueGrey.shade900, // Matches the Scaffold
-        selectedItemColor: Colors.deepPurpleAccent, // The active tab color
-        unselectedItemColor: Colors.grey.shade500, // The inactive tabs
+        bodyLarge: const TextStyle(color: Colors.white, fontSize: 16), 
+        bodyMedium: TextStyle(color: Colors.grey.shade400, fontSize: 14), 
+        titleLarge: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20), 
+        titleMedium: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16), 
+        labelMedium: TextStyle(color: Colors.grey.shade500, fontSize: 12), 
       ),
       
       iconTheme: const IconThemeData(color: Colors.white),
+      
+      // 5. Navigation bar
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: Colors.blueGrey.shade600, 
+        selectedItemColor: Colors.grey.shade200, 
+        unselectedItemColor: Colors.grey.shade200, 
+      ),
+
+      // 6. Player screen
+      sliderTheme: SliderThemeData(
+        activeTrackColor: Colors.cyanAccent,
+        inactiveTrackColor: const Color(0xFF2A2A2A), // Very dark grey for the empty track
+        thumbColor: Colors.cyanAccent,
+        overlayColor: Colors.cyanAccent.withOpacity(0.2), // The glowing halo when dragged
+        trackHeight: 4.0,
+      ),
+
+      // --- TEXT FIELD THEME ---
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: const Color(0xFF1E1E1E), // Dark card surface color
+        hintStyle: TextStyle(color: Colors.grey.shade600),
+        prefixIconColor: Colors.cyanAccent,
+        suffixIconColor: Colors.grey.shade500,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(30.0),
+          borderSide: BorderSide.none,
+        ),
+      ),
+
+      // --- CHIP THEME ---
+      chipTheme: ChipThemeData(
+        backgroundColor: const Color(0xFF1E1E1E), // Unselected dark surface
+        selectedColor: Colors.cyanAccent, // Selected bright cyan
+        showCheckmark: false,
+        labelStyle: const TextStyle(color: Colors.white),
+        secondaryLabelStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide.none,
+        ),
+      ),
+
+      // --- ELEVATED BUTTON THEME ---
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.cyanAccent,
+          foregroundColor: Colors.black, // Text and icon color
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+          textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+        ),
+      ),
+
     );
   }
 }

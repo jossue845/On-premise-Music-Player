@@ -16,10 +16,10 @@ class HomeDashboard extends StatelessWidget {
           const Text('Last Played', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10), 
           Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            // Removed hardcoded shape/elevation/color so it inherits from AppTheme
             child: ListTile(
-              leading: const Icon(Icons.music_note, size: 40, color: Colors.deepPurple),
+              // Removed Colors.deepPurple! The ListTileTheme will now make these cyan automatically
+              leading: const Icon(Icons.music_note, size: 40),
               title: const Text('Bohemian Rhapsody', style: TextStyle(fontWeight: FontWeight.bold)),
               subtitle: const Text('Queen'),
               onTap: () {
@@ -31,7 +31,7 @@ class HomeDashboard extends StatelessWidget {
                 );
               },
               trailing: IconButton(
-                icon: const Icon(Icons.play_circle_fill, size: 36, color: Colors.deepPurple),
+                icon: const Icon(Icons.play_circle_fill, size: 36),
                 onPressed: () {},
               ),
             ),
@@ -44,9 +44,10 @@ class HomeDashboard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildStatCard('Time Listened', '2h 14m', Icons.timer),
+              // Passed 'context' so the helper method can read your global theme
+              _buildStatCard(context, 'Time Listened', '2h 14m', Icons.timer),
               const SizedBox(width: 16), 
-              _buildStatCard('Tracks', '34', Icons.bar_chart),
+              _buildStatCard(context, 'Tracks', '34', Icons.bar_chart),
             ],
           ),
           const SizedBox(height: 24),
@@ -60,19 +61,20 @@ class HomeDashboard extends StatelessWidget {
               scrollDirection: Axis.horizontal,
               itemCount: 5,
               itemBuilder: (context, index) {
-                return Container(
-                  width: 120,
+                // Swapped Container for a Card so it automatically matches your dark theme surfaces!
+                return Card(
                   margin: const EdgeInsets.only(right: 12),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.album, size: 50, color: Colors.grey),
-                      const SizedBox(height: 8),
-                      Text('Song ${index + 1}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    ],
+                  child: SizedBox(
+                    width: 120,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Removed hardcoded Colors.grey
+                        const Icon(Icons.album, size: 50),
+                        const SizedBox(height: 8),
+                        Text('Song ${index + 1}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -84,20 +86,20 @@ class HomeDashboard extends StatelessWidget {
     );
   }
 
-  // Helper builds the tiny stat cards so our main build method stays clean
-  Widget _buildStatCard(String title, String value, IconData icon) {
+  // Updated helper method to require BuildContext
+  Widget _buildStatCard(BuildContext context, String title, String value, IconData icon) {
     return Expanded(
       child: Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             children: [
-              Icon(icon, color: Colors.deepPurple),
+              // Dynamically pulls the glowing Cyan accent from your AppTheme
+              Icon(icon, color: Theme.of(context).primaryColor),
               const SizedBox(height: 8),
               Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              // Pulls the soft grey label style directly from your AppTheme typography
+              Text(title, style: Theme.of(context).textTheme.labelMedium),
             ],
           ),
         ),
