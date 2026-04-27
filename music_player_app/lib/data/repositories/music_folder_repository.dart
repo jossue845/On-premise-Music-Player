@@ -185,6 +185,7 @@ class MusicFolderRepository with ImageHandler {
     return artists.map((a) => a.trim()).toList();
   }
 
+  /// Prompts the user to select the folder they want to scan for music files.
   Future<Result<void>> setMusicFolder() async {
     try {
       final String dirPath = (await _fs.getDirectoryPath()).getOrThrow();

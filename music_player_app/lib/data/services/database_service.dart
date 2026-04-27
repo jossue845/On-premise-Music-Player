@@ -183,6 +183,12 @@ class DatabaseService {
   /// Returns the songs made by the artist identified by [artistId] when it is not null.
   ///
   /// Returns the songs in the album identified by [albumId] when it is not null.
+  ///
+  /// Returns the songs in the playlist identified by [playlistId] when it is not null.
+  ///
+  /// Returns the song with the [path] when it is not null.
+  ///
+  /// Only one of all the attributes should be set.
   Future<Result<List<Song>>> getSongs({
     int? artistId,
     int? albumId,
@@ -250,6 +256,9 @@ class DatabaseService {
     }
   }
 
+  /// Helper for the getSongs* functions.
+  ///
+  /// Creates the [Song] objects from the query result [entries] and returns them as a list.
   List<Song> _processSongQuery(List<Map<String, Object?>> entries) {
     final Map<int, Song> songs = {};
     for (final entry in entries) {
@@ -288,6 +297,10 @@ class DatabaseService {
   /// Is's required for an inserted album to have that attribute, therefore no album is expected to be ignored.
   ///
   /// Returns the albums made by the artist identified by [artistId] when it is not null.
+  ///
+  /// Returns the album that contains the song identified by [songId] when it is not null.
+  ///
+  /// Only one of all the attributes should be set.
   Future<Result<List<Album>>> getAlbums({int? artistId, int? songId}) async {
     final Map<int, Album> albums = {};
     late List<Map<String, Object?>> albumArtistsEntries;
@@ -1067,6 +1080,7 @@ class DatabaseService {
   //   databaseFactory.deleteDatabase(_database!.path);
   // }
 
+  /// Returns the paths of all the songs.
   Future<Result<List<String>>> getSongPaths() async {
     try {
       final list = (await _database!.query(
@@ -1079,6 +1093,7 @@ class DatabaseService {
     }
   }
 
+  /// Inserts a key-value pair in the key-value store.
   Future<Result<void>> insertKVPair(String key, String value) async {
     try {
       await _database!.insert(_keyValueStoreTableName, {
@@ -1091,6 +1106,7 @@ class DatabaseService {
     }
   }
 
+  /// Returns the value associated to the provided [key] in the key-value store.
   Future<Result<String>> getValue(String key) async {
     try {
       final queryResult = (await _database!.query(
@@ -1110,6 +1126,7 @@ class DatabaseService {
     }
   }
 
+  /// Whether the provided [imagePath] is in the database.
   Future<Result<bool>> isImagePathPresent(String imagePath) async {
     try {
       final queryResult = (await _database!.rawQuery(
