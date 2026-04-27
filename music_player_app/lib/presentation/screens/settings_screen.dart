@@ -25,29 +25,19 @@ class SettingsScreen extends StatelessWidget{
             Padding(
               padding: const EdgeInsets.only(left: 25.0, top: 25),
               child : ListTile(
-                title : const Text("Look for new music"),
+                title : const Text("Look for new music"), // Scan songs
                 onTap: _scanMusic,
               ),
             ),
             
-            // Manage folders: include or exclude certain directories
             Padding(
               padding: const EdgeInsets.only(left: 25.0, top: 25),
               child : ListTile(
-                title : const Text("Songs folder"),
+                title : const Text("Songs folder"), // Define where the songs are going to be
                 onTap: () {},
               ),
             ),
-            
-            // Filter short tracks: to ignore audio files under a certain duration
-            Padding(
-              padding: const EdgeInsets.only(left: 25.0, top: 25),
-              child : ListTile(
-                title : const Text("Filter tracks"),
-                onTap: () {},
-              ),
-            ),
-            
+                        
             // Equalizer
             Padding(
               padding: const EdgeInsets.only(left: 25.0, top: 25),
@@ -59,8 +49,8 @@ class SettingsScreen extends StatelessWidget{
                     MaterialPageRoute(
                       builder: (context) => const EqualizerScreen(),
                     ),
-                  ); // <-- THIS is the closing parenthesis and semicolon you were missing!
-                }, // <-- And this closes the onTap function
+                  ); 
+                }, 
               ),
             ),
           ],

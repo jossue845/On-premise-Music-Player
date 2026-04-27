@@ -11,9 +11,7 @@ class AlbumDetailScreen extends StatelessWidget {
     // Mock data for the album tracks
     final List<Map<String, String>> _mockTracks = [
       {'title': 'Track 1', 'duration': '3:15'},
-      {'title': 'Track 2', 'duration': '4:02'},
-      {'title': 'Track 3', 'duration': '2:45'},
-      {'title': 'Track 4', 'duration': '5:10'},
+      // I'd like to show the track name and the duration
     ];
 
     return Scaffold(

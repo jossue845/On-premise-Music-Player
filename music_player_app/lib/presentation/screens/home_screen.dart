@@ -61,19 +61,28 @@ class HomeDashboard extends StatelessWidget {
               scrollDirection: Axis.horizontal,
               itemCount: 5,
               itemBuilder: (context, index) {
-                // Swapped Container for a Card so it automatically matches your dark theme surfaces!
                 return Card(
                   margin: const EdgeInsets.only(right: 12),
-                  child: SizedBox(
-                    width: 120,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // Removed hardcoded Colors.grey
-                        const Icon(Icons.album, size: 50),
-                        const SizedBox(height: 8),
-                        Text('Song ${index + 1}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      ],
+                  clipBehavior: Clip.antiAlias, 
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const PlayerScreen(),
+                        ),
+                      );
+                    },
+                    child: SizedBox(
+                      width: 120,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.album, size: 50),
+                          const SizedBox(height: 8),
+                          Text('Song ${index + 1}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
                     ),
                   ),
                 );
