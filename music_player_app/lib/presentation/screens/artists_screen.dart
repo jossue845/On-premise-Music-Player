@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-
+import 'package:music_player_app/presentation/screens/sartist_screen.dart';
 class ArtistsScreen extends StatelessWidget {
   const ArtistsScreen({super.key});
 
-  // A quick list of mock artists to test our grid layout
   final List<String> _mockArtists = const [
     'The Weeknd', 'Dua Lipa', 'Daft Punk', 'Gorillaz',
     'Arctic Monkeys', 'Tame Impala', 'Rihanna', 'Kendrick Lamar'
@@ -18,7 +17,7 @@ class ArtistsScreen extends StatelessWidget {
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: GridView.builder(
-          itemCount: 30, 
+          itemCount: _mockArtists.length, 
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2, 
             crossAxisSpacing: 16.0, 
@@ -26,44 +25,50 @@ class ArtistsScreen extends StatelessWidget {
             childAspectRatio: 0.85,
           ),
           itemBuilder: (context, index) {
-            // Loops through our mock names for demonstration
-            final artistName = _mockArtists[index % _mockArtists.length];
+            final artistName = _mockArtists[index];
             
             return Card(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Artist Image
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              clipBehavior: Clip.antiAlias, // Keeps the tap ripple perfectly inside the card's corners
+              child: InkWell(
+                onTap: () {
+                  // Routes directly to the Album screen as requested!
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AlbumDetailScreen(
+                        albumName: '$artistName Tracks', // Passes the artist name to the album screen
+                      ),
+                    ),
+                  );
+                },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
                       child: Container(
-                        color: Colors.black, 
-                        child: const Icon(
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest, 
+                        child: Icon(
                           Icons.person,
                           size: 50,
-                          color: Colors.grey, 
+                          color: Theme.of(context).iconTheme.color?.withOpacity(0.5), 
                         ),
-    
                       ),
                     ),
-                  ),
-                  
-                  // Artist Name
-                  Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: Text(
-                      artistName,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                    Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Text(
+                        artistName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1, 
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      textAlign: TextAlign.center,
-                      maxLines: 1, 
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             );
           },
