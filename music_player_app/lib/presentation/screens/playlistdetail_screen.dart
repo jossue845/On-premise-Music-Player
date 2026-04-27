@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:music_player_app/presentation/screens/player_screen.dart'; 
+import 'package:music_player_app/presentation/screens/Sartist_screen.dart';
+import 'package:music_player_app/presentation/screens/Salbum_screen.dart';
+import 'package:music_player_app/presentation/screens/lyrics_screen.dart';
+
 
 class PlaylistDetailScreen extends StatefulWidget {
   final String playlistTitle;
@@ -117,11 +121,20 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                 _mockSongs.removeAt(index);
                               });
                             } else if (choice == 'artist') {
-                              // Logic to go to artist screen
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => ArtistDetailScreen(artistName: song['artist']!)),
+                              );
                             } else if (choice == 'album') {
-                              // Logic to go to album screen
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => AlbumDetailScreen(albumName: '${song['title']} - Album')),
+                              );
                             } else if (choice == 'lyrics') {
-                              // Logic to show lyrics
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => LyricsScreen(songTitle: song['title']!)),
+                              );
                             }
                           },
                           itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[

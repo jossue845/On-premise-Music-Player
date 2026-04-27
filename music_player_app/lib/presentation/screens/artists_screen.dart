@@ -17,43 +17,39 @@ class ArtistsScreen extends StatelessWidget {
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        // GridView.builder creates the "infinite" scrolling effect efficiently
         child: GridView.builder(
-          itemCount: 30, // Change this to _mockArtists.length when using real data!
+          itemCount: 30, 
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2, // Forces exactly 2 columns
-            crossAxisSpacing: 16.0, // Space between the columns
-            mainAxisSpacing: 16.0, // Space between the rows
-            childAspectRatio: 0.85, // Slightly taller than a perfect square to fit the text
+            crossAxisCount: 2, 
+            crossAxisSpacing: 16.0, 
+            mainAxisSpacing: 16.0, 
+            childAspectRatio: 0.85,
           ),
           itemBuilder: (context, index) {
             // Loops through our mock names for demonstration
             final artistName = _mockArtists[index % _mockArtists.length];
             
             return Card(
-              // Inherits the exact color and shadow from your AppTheme automatically!
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // --- 1. The Artist Image ---
+                  // Artist Image
                   Expanded(
                     child: ClipRRect(
-                      // Clips the top corners of the image to match the Card's curve
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                       child: Container(
-                        color: const Color(0xFF2A2A2A), // Dark placeholder background
+                        color: Colors.black, 
                         child: const Icon(
                           Icons.person,
                           size: 50,
-                          color: Colors.grey, // Placeholder icon
+                          color: Colors.grey, 
                         ),
-                        // When you have real images, replace the Icon with:
-                        // Image.network('https://image-url.com/art.jpg', fit: BoxFit.cover),
+    
                       ),
                     ),
                   ),
                   
-                  // --- 2. The Artist Name ---
+                  // Artist Name
                   Padding(
                     padding: const EdgeInsets.all(12.0),
                     child: Text(
@@ -64,7 +60,7 @@ class ArtistsScreen extends StatelessWidget {
                       ),
                       textAlign: TextAlign.center,
                       maxLines: 1, 
-                      overflow: TextOverflow.ellipsis, // Adds "..." if the name is too long
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
