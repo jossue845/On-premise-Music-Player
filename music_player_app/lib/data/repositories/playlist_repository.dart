@@ -16,6 +16,16 @@ class PlaylistRepository {
     return _database.getPlaylists();
   }
 
+  /// Creates a playlist titled [playlistTitle].
+  ///
+  /// Returns the playlist id.
+  Future<Result<int>> createPlaylist(String playlistTitle) async {
+    if (!_database.isOpen()) {
+      await _database.open();
+    }
+    return _database.insertPlaylist(playlistTitle);
+  }
+
   /// Deletes the playlists identified bt [playlistIds].
   Future<Result<void>> deletePlaylists(List<int> playlistIds) async {
     if (!_database.isOpen()) {
