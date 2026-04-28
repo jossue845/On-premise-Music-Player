@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:music_player_app/presentation/screens/player_screen.dart'; 
-import 'package:music_player_app/presentation/screens/Sartist_screen.dart';
-import 'package:music_player_app/presentation/screens/Salbum_screen.dart';
+import 'package:music_player_app/presentation/screens/sartist_screen.dart';
+import 'package:music_player_app/presentation/screens/salbum_screen.dart';
 import 'package:music_player_app/presentation/screens/lyrics_screen.dart';
 
 
