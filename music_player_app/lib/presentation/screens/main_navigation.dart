@@ -3,10 +3,10 @@ import 'package:google_nav_bar/google_nav_bar.dart';
 
 // Other screens in this project
 import 'package:music_player_app/presentation/screens/artists_screen.dart';
-import 'package:music_player_app/presentation/screens/player_screen.dart';
 import 'package:music_player_app/presentation/screens/playlist_screen.dart';
 import 'package:music_player_app/presentation/screens/search_screen.dart';
 import 'package:music_player_app/presentation/screens/home_screen.dart';
+import 'package:music_player_app/presentation/screens/all_songs_screen.dart';
 import 'package:music_player_app/presentation/screens/settings_screen.dart';
 
 class MusicDashboard extends StatefulWidget {
@@ -24,7 +24,7 @@ class _MusicDashboardState extends State<MusicDashboard> {
     const SearchScreen(),
     const ArtistsScreen(),
     const PlaylistScreen(),
-    const PlayerScreen(),
+    const AllSongsScreen(),
     const SettingsScreen(),
   ];
   
@@ -73,6 +73,7 @@ class _MusicDashboardState extends State<MusicDashboard> {
               GButton(icon: Icons.search, text: 'Search'),
               GButton(icon: Icons.person, text: 'Artist'),
               GButton(icon: Icons.queue_music, text: 'Playlists'),
+              GButton(icon: Icons.library_music_rounded, text: 'All songs'),
             ],
           ),
         ),

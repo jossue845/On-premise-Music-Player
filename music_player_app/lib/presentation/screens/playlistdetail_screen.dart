@@ -23,10 +23,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   late bool _isPinned; 
 
   // Our mock list of songs
-  final List<Map<String, String>> _mockSongs = [
-    {'title': 'Blinding Lights', 'artist': 'The Weeknd'},
-    {'title': 'Levitating', 'artist': 'Dua Lipa'},
-  ];
+  final List<Map<String, String>> _mockSongs = [];
 
   @override
   void initState() {

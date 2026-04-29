@@ -46,41 +46,41 @@ class MusicFolderRepository with ImageHandler {
       for (final filePath in filePaths) {
         Tag? tag = await AudioTags.read(filePath);
 
-        if (tag == null) {
-          print("Null tag object from: $filePath");
-          continue;
-        }
-
-        String? title = tag.title;
-        String? trackArtistRaw = tag.trackArtist;
-        String? album = tag.album;
-        String? albumArtistRaw = tag.albumArtist;
-        String? genre = tag.genre;
-        int? year = tag.year;
-        int? trackNumber = tag.trackNumber;
-        List<Picture> pictures = tag.pictures;
+        // --- NEW FORGIVING LOGIC ---
+        // If the tag is null, don't skip! Just extract the filename from the path.
+        String? title = tag?.title ?? filePath.split('/').last.replaceAll('.mp3', '').replaceAll('.flac', '');
+        
+        String? trackArtistRaw = tag?.trackArtist;
+        String? album = tag?.album;
+        String? albumArtistRaw = tag?.albumArtist;
+        String? genre = tag?.genre;
+        int? year = tag?.year;
+        int? trackNumber = tag?.trackNumber;
+        List<Picture> pictures = tag?.pictures ?? [];
         List<String> trackArtists;
         List<String> albumArtists;
+        
         String? imagePath = (pictures.isNotEmpty)
             ? (await storePicture(pictures.first.bytes, _database)).getOrThrow()
             : null;
 
-        if (title == null) {
-          print("Null title in: $filePath");
-          continue;
-        }
+        // We can safely remove the "if (title == null) { continue; }" block 
+        // because we guaranteed a title above using the filename!
 
-        if (trackArtistRaw == null) {
+        if (trackArtistRaw == null || trackArtistRaw.isEmpty) {
           trackArtists = ["Unknown Artist"];
         } else {
           trackArtists = _parseArtists(trackArtistRaw);
         }
-        if (albumArtistRaw == null) {
+        
+        if (albumArtistRaw == null || albumArtistRaw.isEmpty) {
           albumArtists = trackArtists;
         } else {
           albumArtists = _parseArtists(albumArtistRaw);
         }
-        album ??= title;
+        
+        album ??= "Unknown Album"; // Give it a default album name if missing
+        // ---------------------------
 
         List<Song> queryResult = (await _database.getSongs(
           path: filePath,
@@ -188,6 +188,9 @@ class MusicFolderRepository with ImageHandler {
   /// Prompts the user to select the folder they want to scan for music files.
   Future<Result<void>> setMusicFolder() async {
     try {
+      if (!_database.isOpen()) {
+        await _database.open();
+      }
       final String dirPath = (await _fs.getDirectoryPath()).getOrThrow();
       (await _database.insertKVPair(_musicFolderKeyName, dirPath)).getOrThrow();
       return Success(unit);

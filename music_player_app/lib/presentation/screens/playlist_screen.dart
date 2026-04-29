@@ -9,10 +9,7 @@ class PlaylistScreen extends StatefulWidget {
 }
 
 class _PlaylistScreenState extends State<PlaylistScreen> {
-  final List<Map<String, dynamic>> _mockPlaylists = [
-    // just some random titles to test
-    {'title': 'Late Night Vibes', 'tracks': '24 songs', 'isPinned': false},
-  ];
+  final List<Map<String, dynamic>> _mockPlaylists = [ ];
 
   final TextEditingController _playlistNameController = TextEditingController();
   final Set<int> _selectedIndices = {};

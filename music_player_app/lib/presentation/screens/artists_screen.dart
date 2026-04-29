@@ -3,10 +3,7 @@ import 'package:music_player_app/presentation/screens/sartist_screen.dart';
 class ArtistsScreen extends StatelessWidget {
   const ArtistsScreen({super.key});
 
-  final List<String> _mockArtists = const [
-    'The Weeknd', 'Dua Lipa', 'Daft Punk', 'Gorillaz',
-    'Arctic Monkeys', 'Tame Impala', 'Rihanna', 'Kendrick Lamar'
-  ];
+  final List<String> _mockArtists = const [];
 
   @override
   Widget build(BuildContext context) {

@@ -1,8 +1,60 @@
 import 'package:flutter/material.dart';
+import 'package:music_player_app/data/services/database_service.dart';
+import 'package:music_player_app/data/repositories/song_repository.dart';
+import 'package:music_player_app/domain/models/song/song.dart';
 import 'package:music_player_app/presentation/screens/player_screen.dart';
+import 'package:sqflite/sqflite.dart';
 
-class HomeDashboard extends StatelessWidget {
+class HomeDashboard extends StatefulWidget {
   const HomeDashboard({super.key});
+
+  @override
+  State<HomeDashboard> createState() => _HomeDashboardState();
+}
+
+class _HomeDashboardState extends State<HomeDashboard> {
+  late SongRepository _songRepository;
+  List<Song> _allSongs = [];
+  List<Song> _recentSongs = [];
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeSongRepository();
+    _loadSongs();
+  }
+
+  void _initializeSongRepository() {
+    final databaseService = DatabaseService(databaseFactory: databaseFactory);
+    _songRepository = SongRepository(database: databaseService);
+  }
+
+  Future<void> _loadSongs() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      final result = await _songRepository.getSongs();
+      if (result.isSuccess()) {
+        final songs = result.getOrThrow();
+        setState(() {
+          _allSongs = songs;
+          // Take last 5 songs as "recent"
+          _recentSongs = songs.length > 5 
+              ? songs.sublist(songs.length - 5) 
+              : songs;
+          _isLoading = false;
+        });
+      } else {
+        final error = result.exceptionOrNull();
+        print('Error loading songs: $error');
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      print('Exception loading songs: $e');
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,27 +67,54 @@ class HomeDashboard extends StatelessWidget {
           // --- 1. LAST PLAYED ---
           const Text('Last Played', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10), 
-          Card(
-            // Removed hardcoded shape/elevation/color so it inherits from AppTheme
-            child: ListTile(
-              // Removed Colors.deepPurple! The ListTileTheme will now make these cyan automatically
-              leading: const Icon(Icons.music_note, size: 40),
-              title: const Text('Bohemian Rhapsody', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('Queen'),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PlayerScreen(),
-                  ),
-                );
-              },
-              trailing: IconButton(
-                icon: const Icon(Icons.play_circle_fill, size: 36),
-                onPressed: () {},
-              ),
-            ),
-          ),
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _recentSongs.isNotEmpty
+                  ? Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.music_note, size: 40),
+                        title: Text(
+                          _recentSongs.last.title,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          _recentSongs.last.artists.isNotEmpty 
+                              ? _recentSongs.last.artists.first 
+                              : 'Unknown',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PlayerScreen(song: _recentSongs.last),
+                            ),
+                          );
+                        },
+                        trailing: IconButton(
+                          icon: const Icon(Icons.play_circle_fill, size: 36),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => PlayerScreen(song: _recentSongs.last),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    )
+                  : Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.music_note, size: 40),
+                        title: const Text('No songs found'),
+                        subtitle: const Text('Tap on Settings to scan for music'),
+                        onTap: () {},
+                      ),
+                    ),
           const SizedBox(height: 24), 
 
           // --- 2. DAILY STATS ---
@@ -44,10 +123,9 @@ class HomeDashboard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Passed 'context' so the helper method can read your global theme
               _buildStatCard(context, 'Time Listened', '2h 14m', Icons.timer),
               const SizedBox(width: 16), 
-              _buildStatCard(context, 'Tracks', '34', Icons.bar_chart),
+              _buildStatCard(context, 'Tracks', '${_allSongs.length}', Icons.bar_chart),
             ],
           ),
           const SizedBox(height: 24),
@@ -57,37 +135,63 @@ class HomeDashboard extends StatelessWidget {
           const SizedBox(height: 10),
           SizedBox(
             height: 140, 
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: 5,
-              itemBuilder: (context, index) {
-                return Card(
-                  margin: const EdgeInsets.only(right: 12),
-                  clipBehavior: Clip.antiAlias, 
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const PlayerScreen(),
-                        ),
-                      );
-                    },
-                    child: SizedBox(
-                      width: 120,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.album, size: 50),
-                          const SizedBox(height: 8),
-                          Text('Song ${index + 1}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        ],
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _allSongs.isNotEmpty
+                    ? ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _allSongs.length.clamp(0, 5),
+                        itemBuilder: (context, index) {
+                          final song = _allSongs[index];
+                          return Card(
+                            margin: const EdgeInsets.only(right: 12),
+                            clipBehavior: Clip.antiAlias, 
+                            child: InkWell(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => PlayerScreen(song: song),
+                                  ),
+                                );
+                              },
+                              child: SizedBox(
+                                width: 120,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.album, size: 50),
+                                    const SizedBox(height: 8),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                      child: Text(
+                                        song.title,
+                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                      child: Text(
+                                        song.artists.isNotEmpty 
+                                            ? song.artists.first 
+                                            : 'Unknown',
+                                        style: Theme.of(context).textTheme.bodySmall,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                    : const Center(
+                        child: Text('No songs to display. Scan for music in Settings.'),
                       ),
-                    ),
-                  ),
-                );
-              },
-            ),
           ),
           
         ],

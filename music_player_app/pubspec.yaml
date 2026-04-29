@@ -45,6 +45,7 @@ dependencies:
   freezed: ^2.5.8
   freezed_annotation: ^2.4.4
   dart_mappable: ^4.8.0
+  just_audio: ^0.9.36
 
 dev_dependencies:
   flutter_test:

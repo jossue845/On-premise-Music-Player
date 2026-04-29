@@ -512,7 +512,7 @@ class DatabaseService {
       int id = await executor.insert(_artistTableName, {
         _artistNameColumnName: artistName,
       }, conflictAlgorithm: ConflictAlgorithm.ignore);
-      if (id == 0) {
+      if (id <= 0) {
         final result = await executor.query(
           _artistTableName,
           columns: [_artistIdColumnName],
