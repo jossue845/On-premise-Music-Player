@@ -111,6 +111,7 @@ class MusicFolderRepository with ImageHandler {
             trackNumber: trackNumber,
             path: filePath,
             imagePath: imagePath,
+            favorite: dbSong.favorite,
           );
 
           // Check if song metadata is different and update it if it is.

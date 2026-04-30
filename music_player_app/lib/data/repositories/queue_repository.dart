@@ -2,7 +2,6 @@ import 'dart:collection';
 
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/domain/models/queue/song_queue.dart';
-import 'package:music_player_app/domain/models/song/song.dart';
 import 'package:result_dart/result_dart.dart';
 
 class QueueRepository {

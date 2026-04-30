@@ -19,6 +19,7 @@ class DatabaseService {
   static const String _trackNumberColumnName = "track_number";
   static const String _pathColumnName = "path";
   static const String _imagePathColumnName = "image_path";
+  static const String _favoriteColumnName = "favorite";
 
   static const String _playlistTableName = "playlist";
   static const String _playlistIdColumnName = "playlist_id";
@@ -70,7 +71,7 @@ class DatabaseService {
       await txn.execute('''
          CREATE TABLE IF NOT EXISTS $_songTableName($_songIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT, $_songTitleColumnName TEXT NOT NULL , $_albumIdColumnName INTEGER NOT NULL,
            $_genreColumnName TEXT, $_yearColumnName INTEGER, $_trackNumberColumnName INTEGER, $_pathColumnName TEXT NOT NULL UNIQUE,
-           $_imagePathColumnName TEXT, FOREIGN KEY($_albumIdColumnName) REFERENCES $_albumTableName($_albumIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT);
+           $_imagePathColumnName TEXT,$_favoriteColumnName INTEGER DEFAULT 0 NOT NULL, FOREIGN KEY($_albumIdColumnName) REFERENCES $_albumTableName($_albumIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT);
           ''');
       await txn.execute('''
          CREATE TABLE IF NOT EXISTS $_songArtistTableName($_songIdColumnName INTEGER, $_artistIdColumnName INTEGER, PRIMARY KEY($_songIdColumnName, $_artistIdColumnName),
@@ -279,6 +280,7 @@ class DatabaseService {
           trackNumber: entry[_trackNumberColumnName] as int?,
           path: entry[_pathColumnName] as String,
           imagePath: entry[_imagePathColumnName] as String?,
+          favorite: ((entry[_favoriteColumnName] as int) == 1) ? true : false,
         );
       } else {
         // Add the artist to the list of song artists if the song is already created.
@@ -1138,6 +1140,22 @@ class DatabaseService {
       } else {
         return Success(false);
       }
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+
+  /// Sets the favorite status of the song identified by [songId] to [favorite].
+  Future<Result<void>> setFavoriteStatus(int songId, bool favorite) async {
+    try {
+      final int value = (favorite) ? 1 : 0;
+      await _database!.update(
+        _songTableName,
+        {_favoriteColumnName: value},
+        where: "_songIdColumnName = ?",
+        whereArgs: [songId],
+      );
+      return Success(unit);
     } on Exception catch (e) {
       return Failure(e);
     }

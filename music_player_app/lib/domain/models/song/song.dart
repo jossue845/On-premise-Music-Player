@@ -16,6 +16,7 @@ class Song with SongMappable {
   final int? trackNumber;
   final String path;
   final String? imagePath;
+  final bool favorite;
   Song({
     required this.id,
     required this.title,
@@ -27,5 +28,6 @@ class Song with SongMappable {
     this.trackNumber,
     required this.path,
     this.imagePath,
+    required this.favorite,
   });
 }

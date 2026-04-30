@@ -94,4 +94,12 @@ class SongRepository with ImageHandler {
       newImagePath: imagePath,
     );
   }
+
+  /// Sets the favorite status of the song identified by [songId] to [favorite].
+  Future<Result<void>> setFavoriteStatus(int songId, bool favorite) async {
+    if (!_database.isOpen()) {
+      await _database.open();
+    }
+    return _database.setFavoriteStatus(songId, favorite);
+  }
 }
