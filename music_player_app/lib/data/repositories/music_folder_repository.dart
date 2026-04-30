@@ -48,8 +48,13 @@ class MusicFolderRepository with ImageHandler {
 
         // --- NEW FORGIVING LOGIC ---
         // If the tag is null, don't skip! Just extract the filename from the path.
-        String? title = tag?.title ?? filePath.split('/').last.replaceAll('.mp3', '').replaceAll('.flac', '');
-        
+        String? title =
+            tag?.title ??
+            filePath
+                .split('/')
+                .last
+                .replaceAll(RegExp(r"\.([A-Za-z0-9]+)$"), '');
+
         String? trackArtistRaw = tag?.trackArtist;
         String? album = tag?.album;
         String? albumArtistRaw = tag?.albumArtist;
@@ -59,12 +64,12 @@ class MusicFolderRepository with ImageHandler {
         List<Picture> pictures = tag?.pictures ?? [];
         List<String> trackArtists;
         List<String> albumArtists;
-        
+
         String? imagePath = (pictures.isNotEmpty)
             ? (await storePicture(pictures.first.bytes, _database)).getOrThrow()
             : null;
 
-        // We can safely remove the "if (title == null) { continue; }" block 
+        // We can safely remove the "if (title == null) { continue; }" block
         // because we guaranteed a title above using the filename!
 
         if (trackArtistRaw == null || trackArtistRaw.isEmpty) {
@@ -72,15 +77,19 @@ class MusicFolderRepository with ImageHandler {
         } else {
           trackArtists = _parseArtists(trackArtistRaw);
         }
-        
+
         if (albumArtistRaw == null || albumArtistRaw.isEmpty) {
           albumArtists = trackArtists;
         } else {
           albumArtists = _parseArtists(albumArtistRaw);
         }
-        
-        album ??= "Unknown Album"; // Give it a default album name if missing
-        // ---------------------------
+
+        if (album == null) {
+          album = "Unknown Album"; // Give it a default album name if missing
+          albumArtists = [
+            "Unknown Artist", // Default album artist to group all the albumless songs under a single "Unknown Album".
+          ];
+        }
 
         List<Song> queryResult = (await _database.getSongs(
           path: filePath,
@@ -170,8 +179,6 @@ class MusicFolderRepository with ImageHandler {
       (await _database.deleteSongs(
         songPaths: pathsOfSongsToBeDeleted,
       )).getOrThrow();
-
-      print(filePaths.length);
 
       return Success(unit);
     } on Exception catch (e) {
