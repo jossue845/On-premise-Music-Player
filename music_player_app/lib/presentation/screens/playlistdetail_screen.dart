@@ -12,13 +12,15 @@ import 'package:sqflite/sqflite.dart';
 class PlaylistDetailScreen extends StatefulWidget {
   final String playlistTitle;
   final bool initialIsPinned; 
-  final int? playlistId; // Added this so you can fetch real DB data!
+  final int? playlistId; 
+  final bool isFavoritesPlaylist; // --- NEW FIELD ---
 
   const PlaylistDetailScreen({
     super.key,
     required this.playlistTitle,
     required this.initialIsPinned,
     this.playlistId, 
+    this.isFavoritesPlaylist = false, // Defaults to false for normal playlists
   });
 
   @override
@@ -28,8 +30,6 @@ class PlaylistDetailScreen extends StatefulWidget {
 class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   late bool _isPinned; 
   late SongRepository _songRepository;
-  
-  // Upgraded from Map<String, String> to our official Song model!
   List<Song> _songs = [];
   bool _isLoading = false;
 
@@ -37,11 +37,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   void initState() {
     super.initState();
     _isPinned = widget.initialIsPinned; 
-    
-    // If a playlist ID was passed, fetch the real songs from the database
-    if (widget.playlistId != null) {
-      _loadPlaylistSongs();
-    }
+    _loadPlaylistSongs();
   }
 
   Future<void> _loadPlaylistSongs() async {
@@ -50,12 +46,25 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     _songRepository = SongRepository(database: databaseService);
     
     try {
-      final result = await _songRepository.getSongs(playlistId: widget.playlistId);
-      if (result.isSuccess()) {
-        setState(() {
-          _songs = result.getOrThrow();
-          _isLoading = false;
-        });
+      // If this is the special Favorites playlist, fetch and filter!
+      if (widget.isFavoritesPlaylist) {
+        final result = await _songRepository.getSongs();
+        if (result.isSuccess()) {
+          setState(() {
+            _songs = result.getOrThrow().where((song) => song.favorite).toList();
+            _isLoading = false;
+          });
+        }
+      } 
+      // Otherwise, load a standard playlist from the DB
+      else if (widget.playlistId != null) {
+        final result = await _songRepository.getSongs(playlistId: widget.playlistId);
+        if (result.isSuccess()) {
+          setState(() {
+            _songs = result.getOrThrow();
+            _isLoading = false;
+          });
+        }
       } else {
         setState(() => _isLoading = false);
       }
@@ -63,6 +72,8 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       setState(() => _isLoading = false);
     }
   }
+
+  // ... (Keep your exact same @override Widget build(BuildContext context) method here!)
 
   @override
   Widget build(BuildContext context) {
@@ -236,7 +247,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                       initialIndex: index, // Pass the index!
                                     ),
                                   ),
-                                );
+                                ).then((_) => _loadPlaylistSongs());
                               },
                             ),
                           );

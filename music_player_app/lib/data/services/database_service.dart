@@ -1152,7 +1152,7 @@ class DatabaseService {
       await _database!.update(
         _songTableName,
         {_favoriteColumnName: value},
-        where: "_songIdColumnName = ?",
+        where: "$_songIdColumnName = ?", //missing dollar sign, it previouly was looking for the colum named _sonIdColumName xd
         whereArgs: [songId],
       );
       return Success(unit);

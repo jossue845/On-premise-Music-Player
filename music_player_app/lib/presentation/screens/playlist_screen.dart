@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:music_player_app/presentation/screens/playlistdetail_screen.dart'; // Adjust path if needed!
+import 'package:music_player_app/data/services/database_service.dart';
+import 'package:music_player_app/data/repositories/song_repository.dart';
+import 'package:music_player_app/data/repositories/playlist_repository.dart'; // Make sure you import this!
+import 'package:music_player_app/presentation/screens/playlistdetail_screen.dart';
+import 'package:sqflite/sqflite.dart';
 
 class PlaylistScreen extends StatefulWidget {
   const PlaylistScreen({super.key});
@@ -9,65 +13,79 @@ class PlaylistScreen extends StatefulWidget {
 }
 
 class _PlaylistScreenState extends State<PlaylistScreen> {
-  final List<Map<String, dynamic>> _mockPlaylists = [ ];
+  late SongRepository _songRepository;
+  late PlaylistRepository _playlistRepository;
+  
+  int _favoritesCount = 0;
+  List<dynamic> _customPlaylists = []; // Holds your user-created playlists
+  bool _isLoading = true;
 
   final TextEditingController _playlistNameController = TextEditingController();
-  final Set<int> _selectedIndices = {};
 
-  void _toggleSelection(int index) {
-    setState(() {
-      if (_selectedIndices.contains(index)) {
-        _selectedIndices.remove(index);
-      } else {
-        _selectedIndices.add(index);
-      }
-    });
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
   }
 
-  void _deleteSelected() {
-    setState(() {
-      final sortedIndices = _selectedIndices.toList()..sort((a, b) => b.compareTo(a));
-      for (final index in sortedIndices) {
-        _mockPlaylists.removeAt(index);
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    final databaseService = DatabaseService(databaseFactory: databaseFactory);
+    _songRepository = SongRepository(database: databaseService);
+    _playlistRepository = PlaylistRepository(database: databaseService);
+
+    try {
+      // 1. Load songs to count favorites
+      final songResult = await _songRepository.getSongs();
+      if (songResult.isSuccess()) {
+        final allSongs = songResult.getOrThrow();
+        _favoritesCount = allSongs.where((song) => song.favorite).length;
       }
-      _selectedIndices.clear();
-    });
+
+      // 2. Load the custom playlists from the database
+      final playlistResult = await _playlistRepository.getPlaylists();
+      if (playlistResult.isSuccess()) {
+        _customPlaylists = playlistResult.getOrThrow();
+      }
+
+      setState(() => _isLoading = false);
+    } catch (e) {
+      debugPrint("Error loading playlists: $e");
+      setState(() => _isLoading = false);
+    }
   }
 
+  // --- NEW: Create Playlist Dialog ---
   void _showCreatePlaylistDialog() {
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF1E1E1E), 
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('New Playlist', style: TextStyle(color: Colors.white)),
+          title: const Text('New Playlist'),
           content: TextField(
             controller: _playlistNameController,
-            autofocus: true, 
-            style: const TextStyle(color: Colors.white),
-            decoration: const InputDecoration(hintText: 'Enter playlist name...'),
+            decoration: const InputDecoration(
+              hintText: 'Enter playlist name',
+            ),
+            autofocus: true,
           ),
           actions: [
             TextButton(
               onPressed: () {
-                _playlistNameController.clear(); 
-                Navigator.pop(context); 
+                _playlistNameController.clear();
+                Navigator.pop(context);
               },
-              child: Text('Cancel', style: TextStyle(color: Colors.grey.shade400)),
+              child: const Text('Cancel'),
             ),
-            ElevatedButton(
-              onPressed: () {
-                if (_playlistNameController.text.isNotEmpty) {
-                  setState(() {
-                    _mockPlaylists.insert(0, {
-                      'title': _playlistNameController.text,
-                      'tracks': '0 songs', 
-                      'isPinned': false,
-                    });
-                  });
-                  _playlistNameController.clear(); 
-                  Navigator.pop(context); 
+            TextButton(
+              onPressed: () async {
+                final title = _playlistNameController.text.trim();
+                if (title.isNotEmpty) {
+                  // Save to database
+                  await _playlistRepository.createPlaylist(title);
+                  _playlistNameController.clear();
+                  Navigator.pop(context);
+                  _loadData(); // Refresh the screen
                 }
               },
               child: const Text('Create'),
@@ -78,139 +96,127 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     );
   }
 
-  @override
-  void dispose() {
-    _playlistNameController.dispose();
-    super.dispose();
+  // --- NEW: Delete Playlist ---
+  void _deletePlaylist(int playlistId) async {
+    await _playlistRepository.deletePlaylists([playlistId]);
+    _loadData(); // Refresh the screen
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool isSelectionMode = _selectedIndices.isNotEmpty;
-
     return Scaffold(
-      appBar: isSelectionMode
-          ? AppBar(
-              backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-              leading: IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => setState(() => _selectedIndices.clear()),
-              ),
-              title: Text('${_selectedIndices.length} Selected'),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.delete),
-                  tooltip: 'Delete',
-                  onPressed: _deleteSelected,
-                ),
-              ],
-            )
-          : AppBar(
-              title: const Text('Playlists', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-            
-      floatingActionButton: isSelectionMode ? null : FloatingActionButton.extended(
-        onPressed: _showCreatePlaylistDialog,
-        backgroundColor: Theme.of(context).primaryColor, 
-        foregroundColor: Colors.black, 
-        icon: const Icon(Icons.add),
-        label: const Text('New Playlist', style: TextStyle(fontWeight: FontWeight.bold)),
+      appBar: AppBar(
+        title: const Text('Playlists', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
-      
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: ListView.builder(
-          itemCount: _mockPlaylists.length,
-          itemBuilder: (context, index) {
-            final playlist = _mockPlaylists[index];
-            final bool isSelected = _selectedIndices.contains(index);
-            final bool isPinned = playlist['isPinned'] ?? false;
-          
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12.0),
-              color: isSelected ? Theme.of(context).primaryColor.withOpacity(0.2) : null,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: isSelected 
-                  ? BorderSide(color: Theme.of(context).primaryColor, width: 1.5)
-                  : BorderSide.none,
-              ),
-              child: ListTile(
-                contentPadding: const EdgeInsets.all(8.0),
-                leading: ClipRRect(
-                  borderRadius: BorderRadius.circular(8.0),
-                  child: Container(
-                    width: 60,
-                    height: 60,
-                    color: const Color(0xFF2A2A2A), 
-                    child: Icon(
-                      Icons.queue_music,
-                      color: Theme.of(context).primaryColor, 
-                      size: 30,
+      // --- NEW: The FAB ---
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showCreatePlaylistDialog,
+        tooltip: 'Create Playlist',
+        child: const Icon(Icons.add),
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(16.0),
+              children: [
+                // --- 1. DEFAULT FAVORITES PLAYLIST (Permanent, no delete button) ---
+                Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: ListTile(
+                    leading: Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.favorite, color: Colors.red),
                     ),
+                    title: const Text('Favorites', style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text('$_favoritesCount songs'),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const PlaylistDetailScreen(
+                            playlistTitle: 'Favorites',
+                            initialIsPinned: true,
+                            isFavoritesPlaylist: true, 
+                          ),
+                        ),
+                      ).then((_) => _loadData()); 
+                    },
                   ),
                 ),
-                title: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        playlist['title'].toString(),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
+                
+                const SizedBox(height: 24),
+                
+                // --- 2. CUSTOM PLAYLISTS ---
+                if (_customPlaylists.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4.0, bottom: 8.0),
+                    child: Text(
+                      'My Playlists', 
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)
                     ),
-                    if (isPinned)
-                      Icon(Icons.push_pin, size: 16, color: Theme.of(context).primaryColor),
-                  ],
-                ),
-                subtitle: Padding(
-                  padding: const EdgeInsets.only(top: 4.0),
-                  child: Text(playlist['tracks'].toString()),
-                ),
-                trailing: isSelectionMode 
-                  ? Checkbox(
-                      value: isSelected,
-                      activeColor: Theme.of(context).primaryColor,
-                      checkColor: Colors.black,
-                      onChanged: (_) => _toggleSelection(index),
-                    )
-                  : IconButton(
-                      icon: const Icon(Icons.play_circle_fill, size: 36),
-                      onPressed: () {},
-                    ),
-                onLongPress: () => _toggleSelection(index),
-                onTap: () async {
-                  if (isSelectionMode) {
-                    _toggleSelection(index);
-                  } else {
-                    // WAIT the updated pin state from the detail screen
-                    final updatedPinState = await Navigator.push<bool>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => PlaylistDetailScreen(
-                          playlistTitle: playlist['title'].toString(),
-                          initialIsPinned: isPinned,
+                  ),
+                  ..._customPlaylists.map((playlist) {
+                    // Note: Depending on how the Playlist model was named by your colleague, 
+                    // this might need to be playlist.name instead of playlist.title
+                    final playlistTitle = playlist.title; 
+                    final playlistId = playlist.id;
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8.0),
+                      clipBehavior: Clip.antiAlias,
+                      child: ListTile(
+                        leading: Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(Icons.queue_music, color: Theme.of(context).primaryColor),
                         ),
+                        title: Text(playlistTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        
+                        // Adding the delete option ONLY to custom playlists
+                        trailing: PopupMenuButton<String>(
+                          onSelected: (value) {
+                            if (value == 'delete') _deletePlaylist(playlistId);
+                          },
+                          itemBuilder: (context) => [
+                            PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error, size: 20),
+                                  const SizedBox(width: 12),
+                                  Text('Delete playlist', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PlaylistDetailScreen(
+                                playlistTitle: playlistTitle,
+                                playlistId: playlistId, // Pass the ID so the detail screen fetches its songs
+                                initialIsPinned: false,
+                              ),
+                            ),
+                          ).then((_) => _loadData()); 
+                        },
                       ),
                     );
-
-                    // If it returns data, update and re-sort
-                    if (updatedPinState != null && updatedPinState != isPinned) {
-                      setState(() {
-                        _mockPlaylists[index]['isPinned'] = updatedPinState;
-                        
-                        _mockPlaylists.sort((a, b) {
-                          if (a['isPinned'] == b['isPinned']) return 0;
-                          return a['isPinned'] ? -1 : 1;
-                        });
-                      });
-                    }
-                  }
-                },
-              ),
-            );
-          },
-        ),
-      ),
+                  }),
+                ]
+              ],
+            ),
     );
   }
 }

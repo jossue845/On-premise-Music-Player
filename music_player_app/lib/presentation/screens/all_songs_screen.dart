@@ -120,7 +120,7 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
                                   initialIndex: index, // Moving index
                               ),
                             ),
-                          );
+                          ).then((_) => _initializeRepositoryAndLoad()); // Forces the UI to refresh
                           },
                         ),
                       );
