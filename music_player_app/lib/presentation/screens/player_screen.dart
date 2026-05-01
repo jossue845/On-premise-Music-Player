@@ -26,7 +26,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   double _currentPosition = 0.0;
   double _totalDuration = 1.0; 
   bool _isShuffle = false;
-  bool _isRepeat = false;
+  LoopMode _loopMode = LoopMode.off;
   bool _isFavorite = false;
   
   // Track the currently playing index so the UI updates
@@ -122,8 +122,26 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   void _toggleRepeat() async {
-    setState(() => _isRepeat = !_isRepeat);
-    await _audioPlayer.setLoopMode(_isRepeat ? LoopMode.all : LoopMode.off);
+    LoopMode nextMode;
+    switch (_loopMode) {
+      case LoopMode.off:
+        nextMode = LoopMode.all;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Repeat: All'), duration: Duration(seconds: 1)));
+        break;
+      case LoopMode.all:
+        nextMode = LoopMode.one;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Repeat: Track'), duration: Duration(seconds: 1)));
+        break;
+      case LoopMode.one:
+        nextMode = LoopMode.off;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Repeat: Off'), duration: Duration(seconds: 1)));
+        break;
+  }
+  
+  setState(() {
+      _loopMode = nextMode;
+    });
+    await _audioPlayer.setLoopMode(nextMode);
   }
 
   void _toggleFavorite() {
@@ -247,8 +265,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   GestureDetector(
                     onTap: _toggleRepeat,
                     child: Icon(
-                      Icons.repeat,
-                      color: _isRepeat ? Theme.of(context).primaryColor : Colors.grey,
+                      _loopMode == LoopMode.one ?  Icons.repeat_one: Icons.repartition,
+                      color: _loopMode != LoopMode.off ? Theme.of(context).primaryColor : Colors.grey,
                     ),
                   ),
                   Text(_formatDuration(_totalDuration)),
