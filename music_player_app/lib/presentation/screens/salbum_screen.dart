@@ -1,50 +1,128 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:music_player_app/data/services/database_service.dart';
+import 'package:music_player_app/data/repositories/song_repository.dart';
+import 'package:music_player_app/domain/models/song/song.dart';
 import 'package:music_player_app/presentation/screens/player_screen.dart';
+import 'package:sqflite/sqflite.dart';
 
-class ArtistDetailScreen extends StatelessWidget {
+class ArtistDetailScreen extends StatefulWidget {
   final String artistName;
   
   const ArtistDetailScreen({super.key, required this.artistName});
 
   @override
-  Widget build(BuildContext context) {
-    // Mock data for the artist's songs
-    final List<String> _mockSongs = ['Song 1', 'Song 2', 'Song 3', 'Song 4', 'Song 5', 'Song 6'];
+  State<ArtistDetailScreen> createState() => _ArtistDetailScreenState();
+}
 
+class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
+  late SongRepository _songRepository;
+  List<Song> _songs = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadArtistSongs();
+  }
+
+  Future<void> _loadArtistSongs() async {
+    setState(() => _isLoading = true);
+    final databaseService = DatabaseService(databaseFactory: databaseFactory);
+    _songRepository = SongRepository(database: databaseService);
+    
+    try {
+      // Fetch all songs
+      final result = await _songRepository.getSongs();
+      if (result.isSuccess()) {
+        final allSongs = result.getOrThrow();
+        
+        // Filter the songs locally to only keep the ones that include this artist
+        setState(() {
+          _songs = allSongs.where((song) => song.artists.contains(widget.artistName)).toList();
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      debugPrint("Error loading artist songs: $e");
+      setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(artistName, style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(widget.artistName, style: const TextStyle(fontWeight: FontWeight.bold)),
       ),
-      body: GridView.builder(
-        padding: const EdgeInsets.all(16.0),
-        itemCount: _mockSongs.length,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 16.0,
-          mainAxisSpacing: 16.0,
-          childAspectRatio: 1.2, 
-        ),
-        itemBuilder: (context, index) {
-          return Card(
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => const PlayerScreen()));
-              },
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(
-                    _mockSongs[index], 
-                    textAlign: TextAlign.center, 
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator())
+        : _songs.isEmpty
+          ? Center(child: Text('No songs found for ${widget.artistName}.'))
+          : GridView.builder(
+              padding: const EdgeInsets.all(16.0),
+              itemCount: _songs.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 16.0,
+                mainAxisSpacing: 16.0,
+                childAspectRatio: 0.85, // Adjusted to fit the image and text nicely
               ),
+              itemBuilder: (context, index) {
+                final song = _songs[index];
+
+                return Card(
+                  clipBehavior: Clip.antiAlias, // Ensures the image respects the card's rounded corners
+                  elevation: 2,
+                  child: InkWell(
+                    onTap: () {
+                      // FIXED: Passing the entire artist's discography and the selected index!
+                      Navigator.push(
+                        context, 
+                        MaterialPageRoute(
+                          builder: (context) => PlayerScreen(
+                            playlist: _songs,
+                            initialIndex: index,
+                          )
+                        )
+                      );
+                    },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // --- 1. Album Art ---
+                        Expanded(
+                          child: Container(
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                            child: song.imagePath != null
+                                ? Image.file(File(song.imagePath!), fit: BoxFit.cover)
+                                : Icon(
+                                    Icons.music_note, 
+                                    size: 50, 
+                                    color: Theme.of(context).iconTheme.color?.withOpacity(0.5)
+                                  ),
+                          ),
+                        ),
+                        
+                        // --- 2. Song Title ---
+                        Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Text(
+                            song.title, 
+                            textAlign: TextAlign.center, 
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
-          );
-        },
-      ),
     );
   }
 }

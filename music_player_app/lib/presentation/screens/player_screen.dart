@@ -1,139 +1,136 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:just_audio/just_audio.dart'; // Make sure this is in your pubspec.yaml!
+import 'package:just_audio/just_audio.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
 import 'package:music_player_app/presentation/components/player_settings.dart'; 
 
 class PlayerScreen extends StatefulWidget {
-  final Song? song;
+  // We now require the full playlist and the index of the tapped song
+  final List<Song> playlist;
+  final int initialIndex;
 
-  const PlayerScreen({super.key, this.song});
+  const PlayerScreen({
+    super.key, 
+    required this.playlist, 
+    required this.initialIndex,
+  });
 
   @override
   State<PlayerScreen> createState() => _PlayerScreenState();
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
-  // --- 1. The Audio Engine ---
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   bool _isPlaying = false;
   double _currentPosition = 0.0;
-  double _totalDuration = 1.0; // Default to 1 to prevent Slider math errors
+  double _totalDuration = 1.0; 
   bool _isShuffle = false;
   bool _isRepeat = false;
   bool _isFavorite = false;
+  
+  // Track the currently playing index so the UI updates
+  late int _currentIndex;
 
   @override
   void initState() {
     super.initState();
+    _currentIndex = widget.initialIndex;
     _initPlayer();
   }
 
-  // --- 2. Load the physical file and listen to the engine ---
   Future<void> _initPlayer() async {
-    if (widget.song != null) {
+    if (widget.playlist.isNotEmpty) {
       try {
-        debugPrint("▶️ PLAYER: Attempting to load file at: ${widget.song!.path}");
-        
-        // Using Uri.file safely encodes spaces and special characters
-        final audioUri = Uri.file(widget.song!.path);
-        
-        // Feed the file to just_audio
-        await _audioPlayer.setAudioSource(AudioSource.uri(audioUri));
-        debugPrint("▶️ PLAYER: File loaded successfully!");
+        // 1. Convert our list of 'Song' models into just_audio 'AudioSources'
+        final audioSources = widget.playlist.map((song) {
+          return AudioSource.uri(Uri.file(song.path));
+        }).toList();
 
-        // Listen to the play/pause state
-        _audioPlayer.playerStateStream.listen((state) {
-          if (mounted) {
-            setState(() => _isPlaying = state.playing);
+        // 2. Create a playlist out of those sources
+        final playlistSource = ConcatenatingAudioSource(children: audioSources);
+
+        // 3. Feed the playlist to the player and tell it where to start
+        await _audioPlayer.setAudioSource(
+          playlistSource,
+          initialIndex: widget.initialIndex,
+        );
+
+        // Listen to the current index so we know when a song changes
+        _audioPlayer.currentIndexStream.listen((index) {
+          if (mounted && index != null) {
+            setState(() {
+              _currentIndex = index;
+              _currentPosition = 0.0; // Reset slider
+            });
           }
         });
 
-        // Listen to the playback position to update the slider
+        _audioPlayer.playerStateStream.listen((state) {
+          if (mounted) setState(() => _isPlaying = state.playing);
+        });
+
         _audioPlayer.positionStream.listen((position) {
           if (mounted) {
             setState(() => _currentPosition = position.inMilliseconds.toDouble());
           }
         });
 
-        // Get the total duration of the track
         _audioPlayer.durationStream.listen((duration) {
           if (mounted && duration != null) {
             setState(() => _totalDuration = duration.inMilliseconds.toDouble());
           }
         });
 
-        // Auto-play when the screen opens
-        debugPrint("▶️ PLAYER: Issuing play command...");
         await _audioPlayer.play();
         
       } catch (e) {
-        debugPrint("❌ PLAYER ERROR: Failed to load or play audio: $e");
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error playing audio: $e'), backgroundColor: Colors.red),
-          );
-        }
+        debugPrint("PLAYER ERROR: $e");
       }
     }
   }
 
   @override
   void dispose() {
-    // ALWAYS dispose the player to prevent memory leaks!
     _audioPlayer.dispose();
     super.dispose();
   }
 
-  void _backScreen(BuildContext context) {
-    Navigator.pop(context);
+  void _backScreen(BuildContext context) => Navigator.pop(context);
+
+  void _togglePlayPause() async {
+    _audioPlayer.playing ? await _audioPlayer.pause() : await _audioPlayer.play();
   }
 
-  // --- 3. The Hardware Controls ---
-  void _togglePlayPause() async {
-    try {
-      if (_audioPlayer.playing) {
-        await _audioPlayer.pause();
-      } else {
-        await _audioPlayer.play();
-      }
-    } catch (e) {
-      debugPrint("❌ PLAYER ERROR during toggle: $e");
+  void _skipNext() async {
+    if (_audioPlayer.hasNext) {
+      await _audioPlayer.seekToNext();
     }
   }
 
-  void _toggleShuffle() {
-    setState(() {
-      _isShuffle = !_isShuffle;
-    });
+  void _skipPrevious() async {
+    if (_audioPlayer.hasPrevious) {
+      await _audioPlayer.seekToPrevious();
+    } else {
+      await _audioPlayer.seek(Duration.zero); // Restart song if it's the first one
+    }
   }
 
-  void _toggleRepeat() {
-    setState(() {
-      _isRepeat = !_isRepeat;
-    });
+  void _toggleShuffle() async {
+    setState(() => _isShuffle = !_isShuffle);
+    await _audioPlayer.setShuffleModeEnabled(_isShuffle);
+  }
+
+  void _toggleRepeat() async {
+    setState(() => _isRepeat = !_isRepeat);
+    await _audioPlayer.setLoopMode(_isRepeat ? LoopMode.all : LoopMode.off);
   }
 
   void _toggleFavorite() {
-    setState(() {
-      _isFavorite = !_isFavorite;
-    });
+    setState(() => _isFavorite = !_isFavorite);
+    // TODO: Update favorite status in database
   }
 
-  void _skipNext() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Next: Skipped to next song')),
-    );
-  }
-
-  void _skipPrevious() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Previous: Skipped to previous song')),
-    );
-  }
-
-  // Helper to format milliseconds into 0:00 text
   String _formatDuration(double milliseconds) {
     final duration = Duration(milliseconds: milliseconds.toInt());
     String twoDigits(int n) => n.toString().padLeft(2, '0');
@@ -144,12 +141,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Use song data if provided, otherwise show placeholder
-    final String songTitle = widget.song?.title ?? 'Unknown Song';
-    final String artistName = widget.song?.artists.isNotEmpty == true 
-        ? widget.song!.artists.first 
-        : 'Unknown Artist';
-    final String albumName = widget.song?.album ?? 'Album';
+    // Grab the current song dynamically based on the index!
+    final currentSong = widget.playlist[_currentIndex];
+    
+    final String songTitle = currentSong.title;
+    final String artistName = currentSong.artists.isNotEmpty ? currentSong.artists.first : 'Unknown Artist';
+    final String albumName = currentSong.album;
 
     return Scaffold(
       body: SafeArea(
@@ -165,11 +162,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     icon: const Icon(Icons.arrow_back)
                   ),
                   IconButton(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Menu options coming soon')),
-                      );
-                    }, 
+                    onPressed: () {}, 
                     icon: const Icon(Icons.menu)
                   ),
                 ],
@@ -182,24 +175,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   child: PlayerSettings(
                     child: Column(
                       children: [
-                        // Album artwork
                         ClipRRect(
                           borderRadius: BorderRadius.circular(8),
                           child: Container(
                             height: 300,
                             width: double.infinity,
                             color: Theme.of(context).cardTheme.color,
-                            child: widget.song?.imagePath != null
-                                ? Image.file(
-                                    File(widget.song!.imagePath!),
-                                    fit: BoxFit.cover,
-                                  )
+                            child: currentSong.imagePath != null
+                                ? Image.file(File(currentSong.imagePath!), fit: BoxFit.cover)
                                 : const Icon(Icons.album, size: 100),
                           ),
                         ),
                         const SizedBox(height: 15),
                         
-                        // Song, Artist, and favorite
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -245,7 +233,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
               const SizedBox(height: 30),
 
-              // --- 4. DYNAMIC PROGRESS BAR & TIMESTAMPS ---
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
@@ -272,14 +259,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 max: _totalDuration > 0 ? _totalDuration : 1.0,
                 value: _currentPosition.clamp(0.0, _totalDuration > 0 ? _totalDuration : 1.0),
                 onChanged: (value) {
-                  // Actually seek the audio hardware when the user drags the slider
                   _audioPlayer.seek(Duration(milliseconds: value.toInt()));
                 },
               ),
 
               Row(
                 children: [
-                  // skip previous
                   Expanded(
                     child: GestureDetector(
                       onTap: _skipPrevious,
@@ -288,10 +273,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       ),
                     ),
                   ),
-                  
                   const SizedBox(width: 20),
-                  
-                  // play pause
                   Expanded(
                     flex: 2,
                     child: GestureDetector(
@@ -304,10 +286,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       ),
                     ),
                   ),
-                  
                   const SizedBox(width: 20),
-                  
-                  // skip forward
                   Expanded(
                     child: GestureDetector(
                       onTap: _skipNext,

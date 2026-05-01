@@ -115,9 +115,12 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => PlayerScreen(song: song),
+                                builder: (context) => PlayerScreen(
+                                  playlist: _songs, //Passing the whole list
+                                  initialIndex: index, // Moving index
                               ),
-                            );
+                            ),
+                          );
                           },
                         ),
                       );

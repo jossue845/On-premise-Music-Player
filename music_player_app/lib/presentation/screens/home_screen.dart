@@ -14,7 +14,7 @@ class HomeDashboard extends StatefulWidget {
 
 class _HomeDashboardState extends State<HomeDashboard> {
   late SongRepository _songRepository;
-  List<Song> _allSongs = [];
+  List<Song> _allSongs = []; // FIXED: Changed _Songs to _allSongs
   List<Song> _recentSongs = [];
   bool _isLoading = false;
 
@@ -47,11 +47,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
         });
       } else {
         final error = result.exceptionOrNull();
-        print('Error loading songs: $error');
+        debugPrint('Error loading songs: $error');
         setState(() => _isLoading = false);
       }
     } catch (e) {
-      print('Exception loading songs: $e');
+      debugPrint('Exception loading songs: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -86,21 +86,30 @@ class _HomeDashboardState extends State<HomeDashboard> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        // FIXED: Pass the full playlist and find the correct index for Last Played
                         onTap: () {
+                          final songIndex = _allSongs.indexOf(_recentSongs.last);
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => PlayerScreen(song: _recentSongs.last),
+                              builder: (context) => PlayerScreen(
+                                playlist: _allSongs,
+                                initialIndex: songIndex != -1 ? songIndex : 0,
+                              ),
                             ),
                           );
                         },
                         trailing: IconButton(
                           icon: const Icon(Icons.play_circle_fill, size: 36),
                           onPressed: () {
+                            final songIndex = _allSongs.indexOf(_recentSongs.last);
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => PlayerScreen(song: _recentSongs.last),
+                                builder: (context) => PlayerScreen(
+                                  playlist: _allSongs, 
+                                  initialIndex: songIndex != -1 ? songIndex : 0, 
+                                ),
                               ),
                             );
                           },
@@ -147,11 +156,15 @@ class _HomeDashboardState extends State<HomeDashboard> {
                             margin: const EdgeInsets.only(right: 12),
                             clipBehavior: Clip.antiAlias, 
                             child: InkWell(
+                              // FIXED: Pass the full list and the current builder index
                               onTap: () {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => PlayerScreen(song: song),
+                                    builder: (context) => PlayerScreen(
+                                      playlist: _allSongs,
+                                      initialIndex: index,
+                                    ),
                                   ),
                                 );
                               },
@@ -193,13 +206,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
                         child: Text('No songs to display. Scan for music in Settings.'),
                       ),
           ),
-          
         ],
       ),
     );
   }
 
-  // Updated helper method to require BuildContext
   Widget _buildStatCard(BuildContext context, String title, String value, IconData icon) {
     return Expanded(
       child: Card(
@@ -207,11 +218,9 @@ class _HomeDashboardState extends State<HomeDashboard> {
           padding: const EdgeInsets.all(16.0),
           child: Column(
             children: [
-              // Dynamically pulls the glowing Cyan accent from your AppTheme
               Icon(icon, color: Theme.of(context).primaryColor),
               const SizedBox(height: 8),
               Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              // Pulls the soft grey label style directly from your AppTheme typography
               Text(title, style: Theme.of(context).textTheme.labelMedium),
             ],
           ),
