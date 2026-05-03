@@ -1,11 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:sqflite/sqflite.dart'; 
+import 'package:just_audio_background/just_audio_background.dart';
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
 import 'package:music_player_app/presentation/components/player_settings.dart';
-import 'package:sqflite/sqflite.dart'; 
 
 class PlayerScreen extends StatefulWidget {
   final List<Song> playlist;
@@ -51,7 +52,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Future<void> _initPlayer() async {
     if (_localPlaylist.isNotEmpty) {
       try {
-        final audioSources = _localPlaylist.map((song) => AudioSource.uri(Uri.file(song.path))).toList();
+        final audioSources = _localPlaylist.map((song) {
+          return AudioSource.uri(
+            Uri.file(song.path),
+            tag: MediaItem(
+              id: song.id.toString(),
+              title: song.title,
+              artist: song.artists.isNotEmpty ? song.artists.first : 'Unknown Artist',
+              album: song.album,
+              artUri: song.imagePath != null ? Uri.file(song.imagePath!) : null,
+            ),
+          );
+        }).toList();
         final playlistSource = ConcatenatingAudioSource(children: audioSources);
 
         await _audioPlayer.setAudioSource(playlistSource, initialIndex: widget.initialIndex);
