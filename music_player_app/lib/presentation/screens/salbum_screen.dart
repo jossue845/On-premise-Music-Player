@@ -32,14 +32,19 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
     _songRepository = SongRepository(database: databaseService);
     
     try {
-      // Fetch all songs
       final result = await _songRepository.getSongs();
       if (result.isSuccess()) {
         final allSongs = result.getOrThrow();
         
-        // Filter the songs locally to only keep the ones that include this artist
         setState(() {
-          _songs = allSongs.where((song) => song.artists.contains(widget.artistName)).toList();
+          // FIXED: Safely handles "Unknown Artist" mapping
+          _songs = allSongs.where((song) {
+            if (widget.artistName == 'Unknown Artist' && song.artists.isEmpty) {
+              return true;
+            }
+            return song.artists.contains(widget.artistName);
+          }).toList();
+          
           _isLoading = false;
         });
       } else {
@@ -68,17 +73,16 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                 crossAxisCount: 2,
                 crossAxisSpacing: 16.0,
                 mainAxisSpacing: 16.0,
-                childAspectRatio: 0.85, // Adjusted to fit the image and text nicely
+                childAspectRatio: 0.85, 
               ),
               itemBuilder: (context, index) {
                 final song = _songs[index];
 
                 return Card(
-                  clipBehavior: Clip.antiAlias, // Ensures the image respects the card's rounded corners
+                  clipBehavior: Clip.antiAlias, 
                   elevation: 2,
                   child: InkWell(
                     onTap: () {
-                      // FIXED: Passing the entire artist's discography and the selected index!
                       Navigator.push(
                         context, 
                         MaterialPageRoute(
@@ -92,7 +96,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // --- 1. Album Art ---
                         Expanded(
                           child: Container(
                             color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -105,8 +108,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                                   ),
                           ),
                         ),
-                        
-                        // --- 2. Song Title ---
                         Padding(
                           padding: const EdgeInsets.all(12.0),
                           child: Text(
