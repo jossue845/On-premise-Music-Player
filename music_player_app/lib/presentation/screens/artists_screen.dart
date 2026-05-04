@@ -2,8 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
-// Note: Pointing this to salbum_screen.dart since that's where your ArtistDetailScreen lives!
-import 'package:music_player_app/presentation/screens/salbum_screen.dart'; 
+import 'package:music_player_app/presentation/screens/sartist_screen.dart'; 
 import 'package:sqflite/sqflite.dart';
 
 class ArtistsScreen extends StatefulWidget {

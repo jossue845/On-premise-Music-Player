@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
@@ -5,16 +6,16 @@ import 'package:music_player_app/domain/models/song/song.dart';
 import 'package:music_player_app/presentation/screens/player_screen.dart';
 import 'package:sqflite/sqflite.dart';
 
-class AlbumDetailScreen extends StatefulWidget {
-  final String albumName;
+class ArtistDetailScreen extends StatefulWidget {
+  final String artistName;
   
-  const AlbumDetailScreen({super.key, required this.albumName});
+  const ArtistDetailScreen({super.key, required this.artistName});
 
   @override
-  State<AlbumDetailScreen> createState() => _AlbumDetailScreenState();
+  State<ArtistDetailScreen> createState() => _ArtistDetailScreenState();
 }
 
-class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
+class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
   late SongRepository _songRepository;
   List<Song> _songs = [];
   bool _isLoading = true;
@@ -22,26 +23,27 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _loadAlbumTracks();
+    _loadArtistSongs();
   }
 
-  Future<void> _loadAlbumTracks() async {
+  Future<void> _loadArtistSongs() async {
     setState(() => _isLoading = true);
     final databaseService = DatabaseService(databaseFactory: databaseFactory);
     _songRepository = SongRepository(database: databaseService);
     
     try {
-      // Fetch all songs
       final result = await _songRepository.getSongs();
       if (result.isSuccess()) {
         final allSongs = result.getOrThrow();
         
         setState(() {
-          // Filter to only include songs from this specific album
-          _songs = allSongs.where((song) => song.album == widget.albumName).toList();
-          
-          // Sort them by their official track number so the album plays in order!
-          _songs.sort((a, b) => (a.trackNumber ?? 0).compareTo(b.trackNumber ?? 0));
+          // FIXED: Safely handles "Unknown Artist" mapping
+          _songs = allSongs.where((song) {
+            if (widget.artistName == 'Unknown Artist' && song.artists.isEmpty) {
+              return true;
+            }
+            return song.artists.contains(widget.artistName);
+          }).toList();
           
           _isLoading = false;
         });
@@ -49,7 +51,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         setState(() => _isLoading = false);
       }
     } catch (e) {
-      debugPrint("Error loading album tracks: $e");
+      debugPrint("Error loading artist songs: $e");
       setState(() => _isLoading = false);
     }
   }
@@ -58,41 +60,29 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.albumName, style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(widget.artistName, style: const TextStyle(fontWeight: FontWeight.bold)),
       ),
-      body: _isLoading
+      body: _isLoading 
         ? const Center(child: CircularProgressIndicator())
         : _songs.isEmpty
-          ? Center(child: Text('No tracks found for ${widget.albumName}.'))
-          : ListView.builder(
+          ? Center(child: Text('No songs found for ${widget.artistName}.'))
+          : GridView.builder(
               padding: const EdgeInsets.all(16.0),
               itemCount: _songs.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 16.0,
+                mainAxisSpacing: 16.0,
+                childAspectRatio: 0.85, 
+              ),
               itemBuilder: (context, index) {
                 final song = _songs[index];
 
                 return Card(
-                  margin: const EdgeInsets.only(bottom: 8.0),
-                  child: ListTile(
-                    leading: Text(
-                      // Show the track number if available, otherwise just use the list index
-                      song.trackNumber?.toString() ?? '${index + 1}',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    title: Text(
-                      song.title, 
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    // Pulls the soft grey text style from your global theme for the duration
-                    trailing: Text(
-                      '--:--', // Placeholder until duration is added to the database model
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
+                  clipBehavior: Clip.antiAlias, 
+                  elevation: 2,
+                  child: InkWell(
                     onTap: () {
-                      // FIXED: Passes the entire album tracklist and the tapped index!
                       Navigator.push(
                         context, 
                         MaterialPageRoute(
@@ -103,6 +93,33 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                         )
                       );
                     },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: Container(
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                            child: song.imagePath != null
+                                ? Image.file(File(song.imagePath!), fit: BoxFit.cover)
+                                : Icon(
+                                    Icons.music_note, 
+                                    size: 50, 
+                                    color: Theme.of(context).iconTheme.color?.withOpacity(0.5)
+                                  ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Text(
+                            song.title, 
+                            textAlign: TextAlign.center, 
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },

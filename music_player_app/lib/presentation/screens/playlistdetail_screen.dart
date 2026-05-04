@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart';
+// Screens 
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
@@ -7,7 +9,9 @@ import 'package:music_player_app/presentation/screens/player_screen.dart';
 import 'package:music_player_app/presentation/screens/sartist_screen.dart';
 import 'package:music_player_app/presentation/screens/salbum_screen.dart';
 import 'package:music_player_app/presentation/screens/lyrics_screen.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:music_player_app/presentation/screens/edit_song_screen.dart';
+
+
 
 class PlaylistDetailScreen extends StatefulWidget {
   final String playlistTitle;
@@ -161,10 +165,10 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                 ),
                               ),
                               
-                              // --- 3. Options Menu (Three dots) ---
+                              // --- 3. Options Menu 
                               trailing: PopupMenuButton<String>(
                                 icon: const Icon(Icons.more_vert),
-                                onSelected: (String choice) {
+                                onSelected: (String choice) async {
                                   if (choice == 'remove') {
                                     // TODO: Actually delete from DB if using DB
                                     setState(() {
@@ -192,6 +196,18 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                       )),
                                     );
                                   }
+                                  else if (choice == 'edit') {
+                                    // Navigate to the Edit Song Screen
+                                    final didUpdate = await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => EditSongScreen(song: song)),
+                                    );
+                                    
+                                    // If the song was edited, refresh the playlist
+                                    if (didUpdate == true) {
+                                      _loadPlaylistSongs();
+                                    }
+                                  }
                                 },
                                 itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
                                   PopupMenuItem<String>(
@@ -214,6 +230,18 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                       ],
                                     ),
                                   ),
+
+                                  const PopupMenuItem<String>(
+                                    value: 'edit',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.edit_outlined, size: 20),
+                                        SizedBox(width: 12),
+                                        Text('Edit song info'),
+                                      ],
+                                    ),
+                                  ),
+
                                   const PopupMenuItem<String>(
                                     value: 'album',
                                     child: Row(
