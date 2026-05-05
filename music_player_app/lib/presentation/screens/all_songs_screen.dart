@@ -1,10 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart';
+
+// All linking screens
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
 import 'package:music_player_app/presentation/screens/player_screen.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:music_player_app/presentation/screens/edit_song_screen.dart';
 
 class AllSongsScreen extends StatefulWidget {
   const AllSongsScreen({super.key});
@@ -75,7 +78,6 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
                     ],
                   ),
                 )
-              // Wrap the list in a RefreshIndicator!
               : RefreshIndicator(
                   onRefresh: _initializeRepositoryAndLoad,
                   color: Theme.of(context).primaryColor,
@@ -89,6 +91,35 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
                         margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
                         clipBehavior: Clip.antiAlias,
                         child: ListTile(
+                          trailing: PopupMenuButton<String>(
+                            icon: const Icon(Icons.more_vert),
+                            onSelected: (String choice) async {
+                              if (choice == 'edit') {
+                                // Waiting for the user to return from the Edit Screen
+                                final didUpdate = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => EditSongScreen(song: song)),
+                                );
+                                
+                                // if there were saved changes, refresh the list from the database!
+                                if (didUpdate == true) {
+                                  _initializeRepositoryAndLoad(); 
+                                }
+                              }
+                            },
+                            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                              const PopupMenuItem<String>(
+                                value: 'edit',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.edit_outlined, size: 20),
+                                    SizedBox(width: 12),
+                                    Text('Edit song info'),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                           leading: ClipRRect(
                             borderRadius: BorderRadius.circular(8.0),
                             child: Container(

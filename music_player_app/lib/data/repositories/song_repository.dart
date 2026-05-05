@@ -45,16 +45,10 @@ class SongRepository with ImageHandler {
   }) async {
     Tag tag = Tag(
       title: newTitle,
-      trackArtist: newSongArtistNames?.fold(newSongArtistNames.first, (val, e) {
-        return "$val; e";
-      }),
+      // --- FIXED: Using .join() cleanly creates the string without duplicating the first item ---
+      trackArtist: newSongArtistNames?.join("; "),
       album: newAlbumTitle,
-      albumArtist: newAlbumArtistNames?.fold(newAlbumArtistNames.first, (
-        val,
-        e,
-      ) {
-        return "$val; e";
-      }),
+      albumArtist: newAlbumArtistNames?.join("; "),
       genre: newGenre,
       year: newYear,
       trackNumber: newTrackNumber,
@@ -74,7 +68,7 @@ class SongRepository with ImageHandler {
         : null;
 
     try {
-      AudioTags.write(oldSong.path, tag);
+      await AudioTags.write(oldSong.path, tag);
     } on Exception catch (e) {
       return Failure(e);
     }

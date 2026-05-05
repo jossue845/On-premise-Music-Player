@@ -64,24 +64,32 @@ class _EditSongScreenState extends State<EditSongScreen> {
         .where((e) => e.isNotEmpty)
         .toList();
 
-    // TODO: In the next step, we will call the database to save these changes!
-    // await _songRepository.updateSongDetails(
-    //   songId: widget.song.id,
-    //   newTitle: updatedTitle,
-    //   newArtists: updatedArtists,
-    //   newAlbum: updatedAlbum,
-    // );
-
-    // Simulating a database delay for now
-    await Future.delayed(const Duration(milliseconds: 600));
+    // --- THE REAL DATABASE & TAG WRITER CALL ---
+    final result = await _songRepository.editTags(
+      oldSong: widget.song,
+      newTitle: updatedTitle.isNotEmpty ? updatedTitle : null,
+      newSongArtistNames: updatedArtists.isNotEmpty ? updatedArtists : null,
+      newAlbumTitle: updatedAlbum.isNotEmpty ? updatedAlbum : null,
+    );
 
     if (mounted) {
       setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Song metadata updated!')),
-      );
-      // Pop the screen and return 'true' so the previous screen knows to refresh its data
-      Navigator.pop(context, true); 
+      
+      // Check if the database update was actually successful
+      if (result.isSuccess()) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Song metadata updated!')),
+        );
+        // Pop the screen and return 'true' to trigger the refresh on the previous screen
+        Navigator.pop(context, true); 
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save: ${result.exceptionOrNull()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

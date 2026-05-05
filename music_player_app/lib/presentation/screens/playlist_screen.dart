@@ -96,7 +96,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     );
   }
 
-  // --- NEW: Delete Playlist ---
+  // Delete Playlist
   void _deletePlaylist(int playlistId) async {
     await _playlistRepository.deletePlaylists([playlistId]);
     _loadData(); // Refresh the screen

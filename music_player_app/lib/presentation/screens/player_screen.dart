@@ -2,11 +2,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:sqflite/sqflite.dart'; 
+import 'package:music_player_app/utils/global_player.dart';
 import 'package:just_audio_background/just_audio_background.dart';
+// Linked screens
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
 import 'package:music_player_app/presentation/components/player_settings.dart';
+import 'package:music_player_app/presentation/screens/edit_song_screen.dart';
+ 
 
 class PlayerScreen extends StatefulWidget {
   final List<Song> playlist;
@@ -23,10 +27,10 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  // --- FIXED: Use the global player instead of creating a new one ---
+  final AudioPlayer _audioPlayer = globalAudioPlayer;
   late SongRepository _songRepository;
   
-  // We make a local copy of the playlist so we can instantly update the UI when you like a song
   late List<Song> _localPlaylist;
 
   bool _isPlaying = false;
@@ -42,7 +46,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _currentIndex = widget.initialIndex;
     _localPlaylist = List.from(widget.playlist);
     
-    // Initialize the database connection
     final databaseService = DatabaseService(databaseFactory: databaseFactory);
     _songRepository = SongRepository(database: databaseService);
     
@@ -98,7 +101,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   void dispose() {
-    _audioPlayer.dispose();
+    // --- FIXED: Removed _audioPlayer.dispose() so the music stays playing in the background! ---
     super.dispose();
   }
 
@@ -136,17 +139,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
     await _audioPlayer.setLoopMode(nextMode);
   }
 
-  // --- NEW FAVORITE LOGIC ---
   void _toggleFavorite() async {
     final currentSong = _localPlaylist[_currentIndex];
     final newFavoriteStatus = !currentSong.favorite;
 
-    // 1. Update the local UI instantly
     setState(() {
       _localPlaylist[_currentIndex] = currentSong.copyWith(favorite: newFavoriteStatus);
     });
 
-    // 2. Save the change permanently to SQLite
     try {
       await _songRepository.setFavoriteStatus(currentSong.id, newFavoriteStatus);
     } catch (e) {
@@ -167,7 +167,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final currentSong = _localPlaylist[_currentIndex];
     final String songTitle = currentSong.title;
     final String artistName = currentSong.artists.isNotEmpty ? currentSong.artists.first : 'Unknown Artist';
-    final String albumName = currentSong.album;
+    final String albumName = currentSong.album ?? 'Unknown Album';
 
     return Scaffold(
       body: SafeArea(
@@ -178,8 +178,53 @@ class _PlayerScreenState extends State<PlayerScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  IconButton(onPressed: () => _backScreen(context), icon: const Icon(Icons.arrow_back)),
-                  IconButton(onPressed: () {}, icon: const Icon(Icons.menu)),
+                  IconButton(
+                    onPressed: () => _backScreen(context), 
+                    icon: const Icon(Icons.arrow_back)
+                  ),
+                  
+                  // --- NEW: Functional Menu Button for the Player ---
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert), // Changed to the standard 3-dot menu
+                    onSelected: (String choice) async {
+                      if (choice == 'edit') {
+                        final didUpdate = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EditSongScreen(song: currentSong)
+                          ),
+                        );
+
+                        if (didUpdate == true) {
+                          // Fetch the updated song from the database without stopping the music
+                          final result = await _songRepository.getSongs();
+                          if (result.isSuccess()) {
+                            final allSongs = result.getOrThrow();
+                            
+                            // Find the newly edited song by its ID
+                            final updatedSong = allSongs.firstWhere((s) => s.id == currentSong.id);
+                            
+                            // Update the local playlist and refresh the UI
+                            setState(() {
+                              _localPlaylist[_currentIndex] = updatedSong;
+                            });
+                          }
+                        }
+                      }
+                    },
+                    itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                      const PopupMenuItem<String>(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined, size: 20),
+                            SizedBox(width: 12),
+                            Text('Edit song info'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
               const SizedBox(height: 20),
@@ -215,7 +260,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             GestureDetector(
                               onTap: _toggleFavorite,
                               child: Icon(
-                                // Read the favorite status directly from the song object
                                 currentSong.favorite ? Icons.favorite : Icons.favorite_border,
                                 color: currentSong.favorite ? Colors.red : Colors.grey,
                                 size: 28,
@@ -242,7 +286,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   GestureDetector(
                     onTap: _toggleRepeat,
                     child: Icon(
-                      _loopMode == LoopMode.one ?  Icons.repeat_one: Icons.repartition,
+                      _loopMode == LoopMode.one ?  Icons.repeat_one: Icons.repeat,
                       color: _loopMode != LoopMode.off ? Theme.of(context).primaryColor : Colors.grey,
                     ),
                   ),
