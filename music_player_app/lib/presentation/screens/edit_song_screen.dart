@@ -27,7 +27,7 @@ class _EditSongScreenState extends State<EditSongScreen> {
   void initState() {
     super.initState();
     
-    // 1. Pre-fill the controllers with the current song's data
+    // Pre-fill the controllers with the current song's data
     _titleController = TextEditingController(text: widget.song.title);
     _albumController = TextEditingController(text: widget.song.album);
     
@@ -37,14 +37,13 @@ class _EditSongScreenState extends State<EditSongScreen> {
         : '';
     _artistController = TextEditingController(text: currentArtists);
 
-    // 2. Setup the database connection for when we hit save
+    // Setup the database connection for when we hit save
     final databaseService = DatabaseService(databaseFactory: databaseFactory);
     _songRepository = SongRepository(database: databaseService);
   }
 
   @override
   void dispose() {
-    // Always dispose controllers to prevent memory leaks!
     _titleController.dispose();
     _artistController.dispose();
     _albumController.dispose();
@@ -64,13 +63,12 @@ class _EditSongScreenState extends State<EditSongScreen> {
         .where((e) => e.isNotEmpty)
         .toList();
 
-    // --- THE REAL DATABASE & TAG WRITER CALL ---
     final result = await _songRepository.editTags(
       oldSong: widget.song,
       newTitle: updatedTitle.isNotEmpty ? updatedTitle : null,
       newSongArtistNames: updatedArtists.isNotEmpty ? updatedArtists : null,
       newAlbumTitle: updatedAlbum.isNotEmpty ? updatedAlbum : null,
-      // newAlbumArtistNames: updatedArtists.isNotEmpty ? updatedArtists : null,
+      // newAlbumArtistNames: updatedArtists.isNotEmpty ? updatedArtists : null, //In the future this might enable us to classify by album
     );
 
     if (mounted) {
@@ -118,7 +116,7 @@ class _EditSongScreenState extends State<EditSongScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- 1. Show the Album Art for context ---
+            // Show the Album Art for context
             Center(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
@@ -139,7 +137,7 @@ class _EditSongScreenState extends State<EditSongScreen> {
             
             const SizedBox(height: 30),
 
-            // --- 2. The Input Fields ---
+            // The Input Fields
             _buildTextField(
               controller: _titleController,
               label: 'Song Title',

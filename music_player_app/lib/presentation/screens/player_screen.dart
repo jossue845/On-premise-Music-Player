@@ -27,13 +27,13 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
-  // --- FIXED: Use the global player instead of creating a new one ---
+  // Using global player
   final AudioPlayer _audioPlayer = globalAudioPlayer;
   late SongRepository _songRepository;
-  
   late List<Song> _localPlaylist;
-
+  
   bool _isPlaying = false;
+  // Song position control
   double _currentPosition = 0.0;
   double _totalDuration = 1.0; 
   bool _isShuffle = false;
@@ -101,7 +101,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   void dispose() {
-    // --- FIXED: Removed _audioPlayer.dispose() so the music stays playing in the background! ---
+    // Do not dispose the global player here to allow music to continue playing across screens 
     super.dispose();
   }
 
@@ -167,6 +167,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final currentSong = _localPlaylist[_currentIndex];
     final String songTitle = currentSong.title;
     final String artistName = currentSong.artists.isNotEmpty ? currentSong.artists.first : 'Unknown Artist';
+    // Assinging to "unknown album" if the album is null 
     final String albumName = currentSong.album ?? 'Unknown Album';
 
     return Scaffold(
@@ -183,9 +184,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     icon: const Icon(Icons.arrow_back)
                   ),
                   
-                  // --- NEW: Functional Menu Button for the Player ---
                   PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert), // Changed to the standard 3-dot menu
+                    icon: const Icon(Icons.more_vert),
                     onSelected: (String choice) async {
                       if (choice == 'edit') {
                         final didUpdate = await Navigator.push(

@@ -46,8 +46,7 @@ class MusicFolderRepository with ImageHandler {
       for (final filePath in filePaths) {
         Tag? tag = await AudioTags.read(filePath);
 
-        // --- NEW FORGIVING LOGIC ---
-        // If the tag is null, don't skip! Just extract the filename from the path.
+        // If the tag is null, don't skip, just extract the filename from the path.
         String? title =
             tag?.title ??
             filePath
@@ -69,8 +68,9 @@ class MusicFolderRepository with ImageHandler {
             ? (await storePicture(pictures.first.bytes, _database)).getOrThrow()
             : null;
 
-        // We can safely remove the "if (title == null) { continue; }" block
-        // because we guaranteed a title above using the filename!
+        // It isn't required to check the existance of the title  
+        // because in the worst case it will use the filename as the title
+
 
         if (trackArtistRaw == null || trackArtistRaw.isEmpty) {
           trackArtists = ["Unknown Artist"];
