@@ -70,6 +70,7 @@ class _EditSongScreenState extends State<EditSongScreen> {
       newTitle: updatedTitle.isNotEmpty ? updatedTitle : null,
       newSongArtistNames: updatedArtists.isNotEmpty ? updatedArtists : null,
       newAlbumTitle: updatedAlbum.isNotEmpty ? updatedAlbum : null,
+      // newAlbumArtistNames: updatedArtists.isNotEmpty ? updatedArtists : null,
     );
 
     if (mounted) {
