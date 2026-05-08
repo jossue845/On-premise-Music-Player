@@ -1,4 +1,19 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart';
+
+// Services
+import 'package:music_player_app/domain/models/song/song.dart';
+import 'package:music_player_app/domain/models/artist/artist.dart';
+import 'package:music_player_app/domain/models/album/album.dart';
+import 'package:music_player_app/domain/models/playlist/playlist.dart';
+import 'package:music_player_app/data/services/database_service.dart';
+
+// Screens
+import 'package:music_player_app/presentation/screens/player_screen.dart';
+import 'package:music_player_app/presentation/screens/sartist_screen.dart';
+import 'package:music_player_app/presentation/screens/salbum_screen.dart'; 
+import 'package:music_player_app/presentation/screens/playlistdetail_screen.dart'; 
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -9,21 +24,82 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
-  String _searchResultText = "Enter a search term";
   String _selectedFilter = "All"; // Default filter
   
-  // filter options
   final List<String> _filters = ["All", "Songs", "Artists", "Albums", "Playlists"];
 
-  void _performSearch() {
+  // State variables to hold our search results
+  bool _isLoading = false;
+  bool _hasSearched = false;
+  
+  List<Song> _songResults = [];
+  List<Artist> _artistResults = [];
+  List<Album> _albumResults = [];
+  List<Playlist> _playlistResults = [];
+
+  // This function reaches into the database, grabs everything, and filters it
+  Future<void> _performSearch() async {
+    final query = _searchController.text.trim().toLowerCase();
+    
+    if (query.isEmpty) {
+      setState(() {
+        _songResults.clear();
+        _artistResults.clear();
+        _albumResults.clear();
+        _playlistResults.clear();
+        _hasSearched = false;
+      });
+      return;
+    }
+
     setState(() {
-      if (_searchController.text.isEmpty) {
-        _searchResultText = "Please type something to search.";
-      } else {
-        _searchResultText = "Searching for '${_searchController.text}' in $_selectedFilter";
+      _isLoading = true;
+      _hasSearched = true;
+    });
+
+    final databaseService = DatabaseService(databaseFactory: databaseFactory);
+    if (!databaseService.isOpen()) await databaseService.open();
+
+    // Fetch all data from the database
+    final songsResult = await databaseService.getSongs();
+    final artistsResult = await databaseService.getArtists();
+    final albumsResult = await databaseService.getAlbums();
+    final playlistsResult = await databaseService.getPlaylists();
+
+    setState(() {
+      // Filter Songs
+      if (songsResult.isSuccess()) {
+        _songResults = songsResult.getOrThrow()
+            .where((s) => s.title.toLowerCase().contains(query) || 
+                         (s.artists.isNotEmpty && s.artists.first.toLowerCase().contains(query)))
+            .toList();
       }
+      
+      // Filter Artists
+      if (artistsResult.isSuccess()) {
+        _artistResults = artistsResult.getOrThrow()
+            .where((a) => a.name.toLowerCase().contains(query))
+            .toList();
+      }
+
+      // Filter Albums
+      if (albumsResult.isSuccess()) {
+        _albumResults = albumsResult.getOrThrow()
+            .where((a) => a.title.toLowerCase().contains(query))
+            .toList();
+      }
+
+      // Filter Playlists
+      if (playlistsResult.isSuccess()) {
+        _playlistResults = playlistsResult.getOrThrow()
+            .where((p) => p.title.toLowerCase().contains(query))
+            .toList();
+      }
+
+      _isLoading = false;
     });
   }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -46,9 +122,10 @@ class _SearchScreenState extends State<SearchScreen> {
             children: [
               const SizedBox(height: 10),
               
-              // 3. Polished Search Bar
+              // Search Bar
               TextField(
                 controller: _searchController,
+                textInputAction: TextInputAction.search, // Shows a search icon on the keyboard
                 decoration: InputDecoration(
                   hintText: 'What can I search?...',
                   prefixIcon: const Icon(Icons.search),
@@ -56,16 +133,21 @@ class _SearchScreenState extends State<SearchScreen> {
                     icon: const Icon(Icons.clear),
                     onPressed: () {
                       _searchController.clear();
+                      _performSearch(); // Clear results when text is cleared
                     },
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(30.0),
-                    borderSide: BorderSide.none, // Removes the harsh black line
+                    borderSide: BorderSide.none,
                   ),
                   filled: true,
                   fillColor: Colors.grey.withOpacity(0.1),
                 ),
                 onSubmitted: (_) => _performSearch(),
+                onChanged: (_) {
+                  // Performing search while writting
+                  _performSearch(); 
+                },
               ),
               const SizedBox(height: 20),
               
@@ -85,7 +167,6 @@ class _SearchScreenState extends State<SearchScreen> {
                         selected: _selectedFilter == filter,
                         onSelected: (bool selected) {
                           setState(() {
-                            // Update the selected filter when tapped
                             _selectedFilter = filter;
                           });
                         },
@@ -94,32 +175,122 @@ class _SearchScreenState extends State<SearchScreen> {
                   }).toList(),
                 ),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 20),
               
-              Center(
-                child: ElevatedButton.icon(
-                  onPressed: _performSearch,
-                  icon: const Icon(Icons.search),
-                  label: const Text('Search'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 40),
-              Center(
-                child: Text(
-                  _searchResultText,
-                  style: const TextStyle(fontSize: 18, color: Colors.grey),
-                  textAlign: TextAlign.center,
-                ),
+              // Search Results Area
+              Expanded(
+                child: _isLoading 
+                  ? const Center(child: CircularProgressIndicator())
+                  : !_hasSearched
+                    ? const Center(
+                        child: Text("Enter a search term to find your music", style: TextStyle(color: Colors.grey, fontSize: 16))
+                      )
+                    : _buildSearchResults(),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSearchResults() {
+    // Check if everything is completely empty
+    if (_songResults.isEmpty && _artistResults.isEmpty && _albumResults.isEmpty && _playlistResults.isEmpty) {
+      return Center(
+        child: Text("No results found for '${_searchController.text}'", style: const TextStyle(color: Colors.grey, fontSize: 16)),
+      );
+    }
+
+    return ListView(
+      physics: const BouncingScrollPhysics(),
+      children: [
+        if ((_selectedFilter == "All" || _selectedFilter == "Songs") && _songResults.isNotEmpty)
+          _buildResultSection(
+            title: "Songs",
+            items: _songResults.map((song) => ListTile(
+              leading: _buildArtwork(song.imagePath, Icons.music_note),
+              title: Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text(song.artists.isNotEmpty ? song.artists.first : 'Unknown Artist', maxLines: 1, overflow: TextOverflow.ellipsis),
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (context) => PlayerScreen(playlist: _songResults, initialIndex: _songResults.indexOf(song)),
+                ));
+              },
+            )).toList(),
+          ),
+
+        if ((_selectedFilter == "All" || _selectedFilter == "Artists") && _artistResults.isNotEmpty)
+          _buildResultSection(
+            title: "Artists",
+            items: _artistResults.map((artist) => ListTile(
+              leading: const CircleAvatar(child: Icon(Icons.person)),
+              title: Text(artist.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (context) => ArtistDetailScreen(artistName: artist.name),
+                ));
+              },
+            )).toList(),
+          ),
+
+        if ((_selectedFilter == "All" || _selectedFilter == "Albums") && _albumResults.isNotEmpty)
+          _buildResultSection(
+            title: "Albums",
+            items: _albumResults.map((album) => ListTile(
+              leading: const Icon(Icons.album, size: 40), 
+              title: Text(album.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (context) => AlbumDetailScreen(albumName: album.title),
+                ));
+              },
+            )).toList(),
+          ),
+
+        if ((_selectedFilter == "All" || _selectedFilter == "Playlists") && _playlistResults.isNotEmpty)
+          _buildResultSection(
+            title: "Playlists",
+            items: _playlistResults.map((playlist) => ListTile(
+              leading: const Icon(Icons.queue_music, size: 40),
+              title: Text(playlist.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (context) => PlaylistDetailScreen(playlistTitle: playlist.title, initialIsPinned: false, playlistId: playlist.id),
+                ));
+              },
+            )).toList(),
+          ),
+      ],
+    );
+  }
+
+  //  build sections headers with lists ---
+  Widget _buildResultSection({required String title, required List<Widget> items}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+          child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
+        ),
+        ...items,
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  // --- Helper to draw images safely ---
+  Widget _buildArtwork(String? path, IconData fallbackIcon) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6.0),
+      child: Container(
+        width: 50,
+        height: 50,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        child: path != null
+            ? Image.file(File(path), fit: BoxFit.cover)
+            : Icon(fallbackIcon),
       ),
     );
   }
