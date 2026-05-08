@@ -10,7 +10,7 @@ import 'package:music_player_app/data/repositories/song_repository.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
 import 'package:music_player_app/presentation/components/player_settings.dart';
 import 'package:music_player_app/presentation/screens/edit_song_screen.dart';
- 
+import 'package:music_player_app/presentation/screens/lyrics_screen.dart';
 
 class PlayerScreen extends StatefulWidget {
   final List<Song> playlist;
@@ -307,6 +307,34 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   const SizedBox(width: 20),
                   Expanded(child: GestureDetector(onTap: _skipNext, child: const PlayerSettings(child: Icon(Icons.skip_next)))),
                 ],
+              ),
+              
+              const SizedBox(height: 30),
+              
+              // --- NEW LYRICS BUTTON ---
+              Center(
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).primaryColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  ),
+                  icon: const Icon(Icons.lyrics_outlined),
+                  label: const Text(
+                    'SHOW LYRICS', 
+                    style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5)
+                  ),
+                  onPressed: () {
+                    // Navigate to the Lyrics Screen passing the title!
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LyricsScreen(songTitle: currentSong.title),
+                      ),
+                    );
+                  },
+                ),
               ),
               const SizedBox(height: 20),
             ],

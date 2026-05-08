@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart';
+// Other screens
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
-import 'package:music_player_app/data/repositories/playlist_repository.dart'; // Make sure you import this!
+import 'package:music_player_app/data/repositories/playlist_repository.dart';
 import 'package:music_player_app/presentation/screens/playlistdetail_screen.dart';
-import 'package:sqflite/sqflite.dart';
+
 
 class PlaylistScreen extends StatefulWidget {
   const PlaylistScreen({super.key});
@@ -35,14 +37,14 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     _playlistRepository = PlaylistRepository(database: databaseService);
 
     try {
-      // 1. Load songs to count favorites
+      // Load songs to count favorites
       final songResult = await _songRepository.getSongs();
       if (songResult.isSuccess()) {
         final allSongs = songResult.getOrThrow();
         _favoritesCount = allSongs.where((song) => song.favorite).length;
       }
 
-      // 2. Load the custom playlists from the database
+      // Load the custom playlists from the database
       final playlistResult = await _playlistRepository.getPlaylists();
       if (playlistResult.isSuccess()) {
         _customPlaylists = playlistResult.getOrThrow();
@@ -55,7 +57,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     }
   }
 
-  // --- NEW: Create Playlist Dialog ---
   void _showCreatePlaylistDialog() {
     showDialog(
       context: context,
@@ -108,7 +109,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       appBar: AppBar(
         title: const Text('Playlists', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
-      // --- NEW: The FAB ---
       floatingActionButton: FloatingActionButton(
         onPressed: _showCreatePlaylistDialog,
         tooltip: 'Create Playlist',
@@ -151,7 +151,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 
                 const SizedBox(height: 24),
                 
-                // --- 2. CUSTOM PLAYLISTS ---
+                // --- CUSTOM PLAYLISTS ---
                 if (_customPlaylists.isNotEmpty) ...[
                   Padding(
                     padding: const EdgeInsets.only(left: 4.0, bottom: 8.0),
@@ -161,8 +161,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                     ),
                   ),
                   ..._customPlaylists.map((playlist) {
-                    // Note: Depending on how the Playlist model was named by your colleague, 
-                    // this might need to be playlist.name instead of playlist.title
                     final playlistTitle = playlist.title; 
                     final playlistId = playlist.id;
 
@@ -181,7 +179,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                         ),
                         title: Text(playlistTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
                         
-                        // Adding the delete option ONLY to custom playlists
+                        // Delete option ONLY to custom playlists, wanted to make favorites playlist permanent
                         trailing: PopupMenuButton<String>(
                           onSelected: (value) {
                             if (value == 'delete') _deletePlaylist(playlistId);
