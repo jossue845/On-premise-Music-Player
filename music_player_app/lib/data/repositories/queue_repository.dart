@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:io';
 
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/domain/models/queue/song_queue.dart';
@@ -53,7 +54,8 @@ class QueueRepository {
         ),
       );
     } on Exception catch (e) {
-      return Failure(e);
+      stderr.writeln(e);
+      return Failure(Exception("Failed to shuffle queue."));
     }
   }
 
@@ -66,7 +68,8 @@ class QueueRepository {
         queue.copyWith(songIds: UnmodifiableListView(newSongList)),
       );
     } on Exception catch (e) {
-      return Failure(e);
+      stderr.writeln(e);
+      return Failure(Exception("Failed to add songs to the queue."));
     }
   }
 
@@ -95,7 +98,8 @@ class QueueRepository {
         ),
       );
     } on Exception catch (e) {
-      return Failure(e);
+      stderr.writeln(e);
+      return Failure(Exception("Failed to remove song from queue."));
     }
   }
 }

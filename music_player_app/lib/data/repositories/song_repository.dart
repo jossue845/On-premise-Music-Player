@@ -1,12 +1,13 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:audiotags/audiotags.dart';
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
-import 'package:music_player_app/utils/image_handler.dart';
+import 'package:music_player_app/utils/tag_utils.dart';
 import 'package:result_dart/result_dart.dart';
 
-class SongRepository with ImageHandler {
+class SongRepository {
   final DatabaseService _database;
 
   SongRepository({required DatabaseService database}) : _database = database;
@@ -43,34 +44,63 @@ class SongRepository with ImageHandler {
     List<String>? newAlbumArtistNames,
     Uint8List? pictureBytes,
   }) async {
+    Tag? oldTag = await AudioTags.read(oldSong.path);
+
+    if (oldTag == null) {
+      throw Exception("Error while editing tags");
+    }
+
+    List<Picture> songPics = oldTag.pictures;
+
+    // Replace the old cover picture with the new picture.
+    if (pictureBytes != null) {
+      songPics.removeWhere((p) => p.pictureType == PictureType.coverFront);
+      songPics.add(
+        Picture(
+          bytes: pictureBytes,
+          mimeType: null,
+          pictureType: PictureType.coverFront,
+        ),
+      );
+    }
+
+    // If the new tags are set, use those, othewise use the old ones to preserve them.
     Tag tag = Tag(
-      title: newTitle,
+      title: (newTitle != null) ? newTitle : oldSong.title,
       // --- FIXED: Using .join() cleanly creates the string without duplicating the first item ---
-      trackArtist: newSongArtistNames?.join("; "),
-      album: newAlbumTitle,
-      albumArtist: newAlbumArtistNames?.join("; "),
-      genre: newGenre,
-      year: newYear,
-      trackNumber: newTrackNumber,
-      pictures: (pictureBytes != null)
-          ? [
-              Picture(
-                bytes: pictureBytes,
-                mimeType: null,
-                pictureType: PictureType.coverFront,
-              ),
-            ]
-          : [],
+      trackArtist: (newSongArtistNames != null)
+          ? newSongArtistNames.join("; ")
+          : oldSong.artists.join("; "),
+      album: (newAlbumTitle != null) ? newAlbumTitle : oldSong.album,
+      albumArtist: (newAlbumArtistNames != null)
+          ? newAlbumArtistNames.join("; ")
+          : (oldTag.albumArtist != null)
+          ? TagUtils.parseArtists(oldTag.albumArtist!).join(";")
+          : null,
+      genre: (newGenre != null) ? newGenre : oldSong.genre,
+      year: (newYear != null) ? newYear : oldSong.year,
+      trackNumber: (newTrackNumber != null)
+          ? newTrackNumber
+          : oldSong.trackNumber,
+      // These are tags that the app does't handle, they're here just so that they don't get deleted.
+      pictures: songPics,
+      trackTotal: oldTag.trackTotal,
+      discNumber: oldTag.discNumber,
+      duration: oldTag.duration,
+      discTotal: oldTag.discTotal,
+      bpm: oldTag.bpm,
+      lyrics: oldTag.lyrics,
     );
 
     final String? imagePath = (pictureBytes != null)
-        ? (await storePicture(pictureBytes, _database)).getOrThrow()
+        ? (await TagUtils.storePicture(pictureBytes)).getOrThrow()
         : null;
 
     try {
       await AudioTags.write(oldSong.path, tag);
     } on Exception catch (e) {
-      return Failure(e);
+      stderr.writeln(e);
+      return Failure(Exception("Failed to edit song tags."));
     }
 
     if (!_database.isOpen()) {

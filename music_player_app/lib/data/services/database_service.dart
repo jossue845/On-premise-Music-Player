@@ -816,8 +816,8 @@ class DatabaseService {
           txn.update(
             _songTableName,
             Map.fromEntries([MapEntry(_albumIdColumnName, albumId)]),
-            where: "$_albumIdColumnName = ?",
-            whereArgs: [oldSong.albumId],
+            where: "$_songIdColumnName = ?",
+            whereArgs: [oldSong.id],
           );
 
           newSong = newSong.copyWith(albumId: albumId);
@@ -1152,7 +1152,8 @@ class DatabaseService {
       await _database!.update(
         _songTableName,
         {_favoriteColumnName: value},
-        where: "$_songIdColumnName = ?", //missing dollar sign, it previouly was looking for the colum named _sonIdColumName xd
+        where:
+            "$_songIdColumnName = ?", //missing dollar sign, it previouly was looking for the colum named _sonIdColumName xd
         whereArgs: [songId],
       );
       return Success(unit);

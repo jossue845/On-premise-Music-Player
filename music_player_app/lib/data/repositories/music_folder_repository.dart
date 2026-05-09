@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:io';
 
 import 'package:audiotags/audiotags.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -6,10 +7,10 @@ import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/services/filesystem_service.dart';
 import 'package:music_player_app/domain/models/album/album.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
-import 'package:music_player_app/utils/image_handler.dart';
+import 'package:music_player_app/utils/tag_utils.dart';
 import 'package:result_dart/result_dart.dart';
 
-class MusicFolderRepository with ImageHandler {
+class MusicFolderRepository {
   static const String _musicFolderKeyName = "musicFolder";
 
   final DatabaseService _database;
@@ -30,6 +31,7 @@ class MusicFolderRepository with ImageHandler {
         await _database.open();
       }
 
+      // Get the music directory path and if it wasn't previously set, ask the user to set it.
       try {
         dirPath = (await _database.getValue(_musicFolderKeyName)).getOrThrow();
       } on Exception {
@@ -37,9 +39,9 @@ class MusicFolderRepository with ImageHandler {
         dirPath = (await _database.getValue(_musicFolderKeyName)).getOrThrow();
       }
 
-      final List<String> filePaths = (await _fs.getSongPaths([
+      final List<String> filePaths = (await _fs.getSongPaths(
         dirPath,
-      ])).getOrThrow();
+      )).getOrThrow();
       final DeepCollectionEquality eq = DeepCollectionEquality.unordered();
       final List<String> pathsOfSongsToBeDeleted = [];
 
@@ -65,23 +67,22 @@ class MusicFolderRepository with ImageHandler {
         List<String> albumArtists;
 
         String? imagePath = (pictures.isNotEmpty)
-            ? (await storePicture(pictures.first.bytes, _database)).getOrThrow()
+            ? (await TagUtils.storePicture(pictures.first.bytes)).getOrThrow()
             : null;
 
-        // It isn't required to check the existance of the title  
+        // It isn't required to check the existance of the title
         // because in the worst case it will use the filename as the title
-
 
         if (trackArtistRaw == null || trackArtistRaw.isEmpty) {
           trackArtists = ["Unknown Artist"];
         } else {
-          trackArtists = _parseArtists(trackArtistRaw);
+          trackArtists = TagUtils.parseArtists(trackArtistRaw);
         }
 
         if (albumArtistRaw == null || albumArtistRaw.isEmpty) {
           albumArtists = trackArtists;
         } else {
-          albumArtists = _parseArtists(albumArtistRaw);
+          albumArtists = TagUtils.parseArtists(albumArtistRaw);
         }
 
         if (album == null) {
@@ -183,14 +184,9 @@ class MusicFolderRepository with ImageHandler {
 
       return Success(unit);
     } on Exception catch (e) {
-      return Failure(e);
+      stderr.writeln(e);
+      return Failure(Exception("Failed to scan folder."));
     }
-  }
-
-  /// Parse [artistsString], a string containing multiple artists separated by ";" or "/", and return the artists as a list.
-  List<String> _parseArtists(String artistsString) {
-    List<String> artists = artistsString.split(RegExp(r"[;/]"));
-    return artists.map((a) => a.trim()).toList();
   }
 
   /// Prompts the user to select the folder they want to scan for music files.
@@ -203,7 +199,8 @@ class MusicFolderRepository with ImageHandler {
       (await _database.insertKVPair(_musicFolderKeyName, dirPath)).getOrThrow();
       return Success(unit);
     } on Exception catch (e) {
-      return Failure(e);
+      stderr.writeln(e);
+      return Failure(Exception("Failed to set music folder."));
     }
   }
 }

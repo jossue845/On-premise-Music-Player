@@ -5,7 +5,7 @@ import 'package:result_dart/result_dart.dart';
 import 'package:file_picker/file_picker.dart';
 
 class FilesystemService {
-  static const List<String> _musicFileExtensions = [
+  static const List<String> _allowedMusicFileExtensions = [
     "aac",
     "flac",
     "m4a",
@@ -15,6 +15,9 @@ class FilesystemService {
     "wav",
   ];
 
+  /// Prompts the user to select the directory containing their music files.
+  ///
+  /// Returns the path to the directory.
   Future<Result<String>> getDirectoryPath() async {
     try {
       if (!(await getStoragePermission())) {
@@ -35,27 +38,25 @@ class FilesystemService {
     }
   }
 
-  Future<Result<List<String>>> getSongPaths(List<String> directoryPaths) async {
+  /// Returns the paths to the music files contained in [directoryPath]
+  Future<Result<List<String>>> getSongPaths(String directoryPath) async {
     try {
-      final List<Directory> directories = [];
+      late final Directory directory;
       final List<File> files = [];
 
       if (!(await getStoragePermission())) {
         throw Exception("Storage permission not granted");
       }
 
-      for (final path in directoryPaths) {
-        directories.add(Directory(path));
-      }
+      directory = Directory(directoryPath);
 
-      for (final directory in directories) {
-        files.addAll(
-          directory.listSync(recursive: true).whereType<File>().toList(),
-        );
-      }
+      files.addAll(
+        directory.listSync(recursive: true).whereType<File>().toList(),
+      );
 
+      // Remove files that don't have an allowed extension.
       files.removeWhere((f) {
-        for (final extension in _musicFileExtensions) {
+        for (final extension in _allowedMusicFileExtensions) {
           if (f.path.endsWith(".$extension")) {
             return false;
           }
@@ -69,6 +70,9 @@ class FilesystemService {
     }
   }
 
+  /// Prompts the user to grant the permission to manage storage.
+  ///
+  /// Returns whether the permission is granted.
   Future<bool> getStoragePermission() async {
     if (!Platform.isAndroid) {
       return true;
@@ -77,7 +81,6 @@ class FilesystemService {
       return true;
     }
 
-    final status = await Permission.manageExternalStorage.request();
-    return status.isGranted;
+    return (await Permission.manageExternalStorage.request()).isGranted;
   }
 }
