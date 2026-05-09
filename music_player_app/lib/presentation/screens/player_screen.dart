@@ -55,23 +55,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   Future<void> _initPlayer() async {
     if (_localPlaylist.isEmpty) return;
-
-    // 1. Attach our UI to the global player FIRST so the screen updates instantly
     _setupStreams();
-
-    // 2. Ask the global player what it is currently playing
+    // Ask the global player what it is currently playing
     final targetSong = _localPlaylist[widget.initialIndex];
     final currentTag = _audioPlayer.sequenceState?.currentSource?.tag as MediaItem?;
-    
     // Check if the IDs match
     final isAlreadyPlaying = currentTag?.id == targetSong.id.toString();
 
-    // 3. If it's the exact same song, DO NOT reset the player. Just return early!
+    //If it's the exact same song, DO NOT reset the player.
     if (isAlreadyPlaying) {
       return; 
     }
 
-    // 4. If it's a NEW song, build the new playlist queue and start playback
+    // If it's a new song, build the new playlist queue and start playback
     try {
       final audioSources = _localPlaylist.map((song) {
         return AudioSource.uri(
