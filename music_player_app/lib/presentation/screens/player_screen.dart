@@ -11,6 +11,7 @@ import 'package:music_player_app/domain/models/song/song.dart';
 import 'package:music_player_app/presentation/components/player_settings.dart';
 import 'package:music_player_app/presentation/screens/edit_song_screen.dart';
 import 'package:music_player_app/presentation/screens/lyrics_screen.dart';
+import 'package:music_player_app/presentation/screens/equalizer_screen.dart';
 
 class PlayerScreen extends StatefulWidget {
   final List<Song> playlist;
@@ -27,7 +28,7 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
-  // Using global player
+  // Using global player to prevent ANR crashes and allow background playback
   final AudioPlayer _audioPlayer = globalAudioPlayer;
   late SongRepository _songRepository;
   late List<Song> _localPlaylist;
@@ -53,50 +54,67 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Future<void> _initPlayer() async {
-    if (_localPlaylist.isNotEmpty) {
-      try {
-        final audioSources = _localPlaylist.map((song) {
-          return AudioSource.uri(
-            Uri.file(song.path),
-            tag: MediaItem(
-              id: song.id.toString(),
-              title: song.title,
-              artist: song.artists.isNotEmpty ? song.artists.first : 'Unknown Artist',
-              album: song.album,
-              artUri: song.imagePath != null ? Uri.file(song.imagePath!) : null,
-            ),
-          );
-        }).toList();
-        final playlistSource = ConcatenatingAudioSource(children: audioSources);
+    if (_localPlaylist.isEmpty) return;
 
-        await _audioPlayer.setAudioSource(playlistSource, initialIndex: widget.initialIndex);
+    // 1. Attach our UI to the global player FIRST so the screen updates instantly
+    _setupStreams();
 
-        _audioPlayer.currentIndexStream.listen((index) {
-          if (mounted && index != null) {
-            setState(() {
-              _currentIndex = index;
-              _currentPosition = 0.0; 
-            });
-          }
-        });
+    // 2. Ask the global player what it is currently playing
+    final targetSong = _localPlaylist[widget.initialIndex];
+    final currentTag = _audioPlayer.sequenceState?.currentSource?.tag as MediaItem?;
+    
+    // Check if the IDs match
+    final isAlreadyPlaying = currentTag?.id == targetSong.id.toString();
 
-        _audioPlayer.playerStateStream.listen((state) {
-          if (mounted) setState(() => _isPlaying = state.playing);
-        });
-
-        _audioPlayer.positionStream.listen((position) {
-          if (mounted) setState(() => _currentPosition = position.inMilliseconds.toDouble());
-        });
-
-        _audioPlayer.durationStream.listen((duration) {
-          if (mounted && duration != null) setState(() => _totalDuration = duration.inMilliseconds.toDouble());
-        });
-
-        await _audioPlayer.play();
-      } catch (e) {
-        debugPrint("PLAYER ERROR: $e");
-      }
+    // 3. If it's the exact same song, DO NOT reset the player. Just return early!
+    if (isAlreadyPlaying) {
+      return; 
     }
+
+    // 4. If it's a NEW song, build the new playlist queue and start playback
+    try {
+      final audioSources = _localPlaylist.map((song) {
+        return AudioSource.uri(
+          Uri.file(song.path),
+          tag: MediaItem(
+            id: song.id.toString(),
+            title: song.title,
+            artist: song.artists.isNotEmpty ? song.artists.first : 'Unknown Artist',
+            album: song.album,
+            artUri: song.imagePath != null ? Uri.file(song.imagePath!) : null,
+          ),
+        );
+      }).toList();
+      final playlistSource = ConcatenatingAudioSource(children: audioSources);
+
+      await _audioPlayer.setAudioSource(playlistSource, initialIndex: widget.initialIndex);
+      await _audioPlayer.play();
+    } catch (e) {
+      debugPrint("PLAYER ERROR: $e");
+    }
+  }
+
+  void _setupStreams() {
+    _audioPlayer.currentIndexStream.listen((index) {
+      // Safety check to prevent out-of-bounds crashes
+      if (mounted && index != null && index < _localPlaylist.length) {
+        setState(() {
+          _currentIndex = index;
+        });
+      }
+    });
+
+    _audioPlayer.playerStateStream.listen((state) {
+      if (mounted) setState(() => _isPlaying = state.playing);
+    });
+
+    _audioPlayer.positionStream.listen((position) {
+      if (mounted) setState(() => _currentPosition = position.inMilliseconds.toDouble());
+    });
+
+    _audioPlayer.durationStream.listen((duration) {
+      if (mounted && duration != null) setState(() => _totalDuration = duration.inMilliseconds.toDouble());
+    });
   }
 
   @override
@@ -164,10 +182,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Failsafe in case the index gets out of sync briefly during a shuffle
+    if (_currentIndex >= _localPlaylist.length) return const Scaffold();
+
     final currentSong = _localPlaylist[_currentIndex];
     final String songTitle = currentSong.title;
     final String artistName = currentSong.artists.isNotEmpty ? currentSong.artists.first : 'Unknown Artist';
-    // Assinging to "unknown album" if the album is null 
     final String albumName = currentSong.album ?? 'Unknown Album';
 
     return Scaffold(
@@ -210,6 +230,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             });
                           }
                         }
+                      } else if (choice == 'equalizer') {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const EqualizerScreen(),
+                          ),
+                        );
                       }
                     },
                     itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
@@ -220,6 +247,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             Icon(Icons.edit_outlined, size: 20),
                             SizedBox(width: 12),
                             Text('Edit song info'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem<String>(
+                        value: 'equalizer',
+                        child: Row(
+                          children: [
+                            Icon(Icons.tune_outlined, size: 20),
+                            SizedBox(width: 12),
+                            Text('Equalizer'),
                           ],
                         ),
                       ),
@@ -311,7 +348,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               
               const SizedBox(height: 30),
               
-              // --- NEW LYRICS BUTTON ---
+              // LYRICS BUTTON
               Center(
                 child: TextButton.icon(
                   style: TextButton.styleFrom(
@@ -326,7 +363,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5)
                   ),
                   onPressed: () {
-                    // Navigate to the Lyrics Screen passing the title!
                     Navigator.push(
                       context,
                       MaterialPageRoute(
