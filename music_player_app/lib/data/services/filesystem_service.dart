@@ -41,46 +41,60 @@ class FilesystemService {
   /// Returns the paths to the music files contained in [directoryPath]
   Future<Result<List<String>>> getSongPaths(String directoryPath) async {
     try {
-      late final Directory directory;
-      final List<File> files = [];
-
       if (!(await getStoragePermission())) {
         throw Exception("Storage permission not granted");
       }
 
-      directory = Directory(directoryPath);
+      final directory = Directory(directoryPath);
+      final List<String> paths = [];
 
-      files.addAll(
-        directory.listSync(recursive: true).whereType<File>().toList(),
-      );
-
-      // Remove files that don't have an allowed extension.
-      files.removeWhere((f) {
-        for (final extension in _allowedMusicFileExtensions) {
-          if (f.path.endsWith(".$extension")) {
-            return false;
-          }
+      final stream = directory.list(recursive: true, followLinks: false);
+      await for (final entity in stream.handleError((e) {
+        // swallow individual "permission denied" / broken entries
+        // and keep scanning the rest of the tree
+      })) {
+        if (entity is File && _hasAllowedExtension(entity.path)) {
+          paths.add(entity.path);
         }
-        return true;
-      });
+      }
 
-      return Success(files.map((f) => f.path).toList());
+      return Success(paths);
     } on Exception catch (e) {
       return Failure(e);
     }
   }
 
-  /// Prompts the user to grant the permission to manage storage.
+  bool _hasAllowedExtension(String path) {
+    final lower = path.toLowerCase();
+    return _allowedMusicFileExtensions.any((ext) => lower.endsWith(".$ext"));
+  }
+
+  /// Prompts the user to grant the permission to read audio files.
   ///
   /// Returns whether the permission is granted.
   Future<bool> getStoragePermission() async {
-    if (!Platform.isAndroid) {
-      return true;
-    }
-    if (await Permission.manageExternalStorage.isGranted) {
-      return true;
-    }
+    if (Platform.isAndroid) {
+      // 1. Request All Files Access (Required for Directory.list() to work on modern Android)
+      final manageStatus = await Permission.manageExternalStorage.request();
+      if (manageStatus.isGranted) return true;
 
-    return (await Permission.manageExternalStorage.request()).isGranted;
+      // 2. Fallback for older Android versions
+      final storageStatus = await Permission.storage.request();
+      if (storageStatus.isGranted) return true;
+
+      // 3. Fallback for strict audio permissions
+      final audioStatus = await Permission.audio.request();
+      if (audioStatus.isGranted) return true;
+
+      // If everything fails, send them to settings
+      if (manageStatus.isPermanentlyDenied || storageStatus.isPermanentlyDenied) {
+        print('🔑 Permanently denied — opening settings');
+        await openAppSettings();
+      }
+      
+      return false;
+    }
+    
+    return true; // Default to true for non-Android platforms during dev
   }
 }

@@ -540,10 +540,14 @@ class DatabaseService {
     int artistId,
   ) async {
     try {
-      await executor.insert(_songArtistTableName, {
-        _songIdColumnName: songId,
-        _artistIdColumnName: artistId,
-      });
+      await executor.insert(
+        _songArtistTableName,
+        {
+          _songIdColumnName: songId,
+          _artistIdColumnName: artistId,
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore, // Prevents duplicate artist tag crashes
+      );
       return Success(unit);
     } on Exception catch (e) {
       return Failure(e);
@@ -559,10 +563,14 @@ class DatabaseService {
     int artistId,
   ) async {
     try {
-      await executor.insert(_albumArtistTableName, {
-        _albumIdColumnName: albumId,
-        _artistIdColumnName: artistId,
-      });
+      await executor.insert(
+        _albumArtistTableName,
+        {
+          _albumIdColumnName: albumId,
+          _artistIdColumnName: artistId,
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore, // Prevents duplicate artist tag crashes
+      );
       return Success(unit);
     } on Exception catch (e) {
       return Failure(e);

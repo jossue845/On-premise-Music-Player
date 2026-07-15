@@ -171,7 +171,6 @@ class MusicFolderRepository {
         }
       }
 
-      // Check if there are songs in the db that are no longer present on disk and delete them.
       final dbPaths = (await _database.getSongPaths()).getOrThrow();
       for (final song in dbPaths) {
         if (!filePaths.contains(song)) {
@@ -183,9 +182,10 @@ class MusicFolderRepository {
       )).getOrThrow();
 
       return Success(unit);
-    } on Exception catch (e) {
-      stderr.writeln(e);
-      return Failure(Exception("Failed to scan folder."));
+    } catch (e, stackTrace) {
+      // --- CHANGED: Now catches all errors and prints the full stack trace ---
+      print('🔴 REAL SCAN ERROR: $e\n$stackTrace');
+      return Failure(Exception(e.toString())); // Sends the real error to the screen!
     }
   }
 
@@ -198,9 +198,10 @@ class MusicFolderRepository {
       final String dirPath = (await _fs.getDirectoryPath()).getOrThrow();
       (await _database.insertKVPair(_musicFolderKeyName, dirPath)).getOrThrow();
       return Success(unit);
-    } on Exception catch (e) {
-      stderr.writeln(e);
-      return Failure(Exception("Failed to set music folder."));
+    } catch (e, stackTrace) {
+      // --- CHANGED: Now catches all errors ---
+      print('🔴 REAL SET FOLDER ERROR: $e\n$stackTrace');
+      return Failure(Exception(e.toString())); // Sends the real error to the screen!
     }
   }
 }
