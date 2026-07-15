@@ -5,7 +5,7 @@ import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
 import 'package:music_player_app/data/repositories/playlist_repository.dart';
 import 'package:music_player_app/presentation/screens/playlistdetail_screen.dart';
-
+import 'package:music_player_app/presentation/screens/manage_playlist_songs_screen.dart'; 
 
 class PlaylistScreen extends StatefulWidget {
   const PlaylistScreen({super.key});
@@ -19,7 +19,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   late PlaylistRepository _playlistRepository;
   
   int _favoritesCount = 0;
-  List<dynamic> _customPlaylists = []; // Holds your user-created playlists
+  List<dynamic> _customPlaylists = []; 
   bool _isLoading = true;
 
   final TextEditingController _playlistNameController = TextEditingController();
@@ -37,14 +37,12 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     _playlistRepository = PlaylistRepository(database: databaseService);
 
     try {
-      // Load songs to count favorites
       final songResult = await _songRepository.getSongs();
       if (songResult.isSuccess()) {
         final allSongs = songResult.getOrThrow();
         _favoritesCount = allSongs.where((song) => song.favorite).length;
       }
 
-      // Load the custom playlists from the database
       final playlistResult = await _playlistRepository.getPlaylists();
       if (playlistResult.isSuccess()) {
         _customPlaylists = playlistResult.getOrThrow();
@@ -82,11 +80,10 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
               onPressed: () async {
                 final title = _playlistNameController.text.trim();
                 if (title.isNotEmpty) {
-                  // Save to database
                   await _playlistRepository.createPlaylist(title);
                   _playlistNameController.clear();
                   Navigator.pop(context);
-                  _loadData(); // Refresh the screen
+                  _loadData(); 
                 }
               },
               child: const Text('Create'),
@@ -97,10 +94,28 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     );
   }
 
-  // Delete Playlist
   void _deletePlaylist(int playlistId) async {
     await _playlistRepository.deletePlaylists([playlistId]);
-    _loadData(); // Refresh the screen
+    _loadData(); 
+  }
+
+  // --- NEW: Universal Navigation to Manage Screen ---
+  void _navigateToManageSongs({required String title, int? id, bool isFavorites = false}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ManagePlaylistSongsScreen(
+          playlistTitle: title,
+          playlistId: id,
+          isFavoritesPlaylist: isFavorites,
+        ),
+      ),
+    ).then((changesMade) {
+      // If the user hit save on the manage screen, refresh the playlist counts!
+      if (changesMade == true) {
+        _loadData();
+      }
+    });
   }
 
   @override
@@ -119,7 +134,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
           : ListView(
               padding: const EdgeInsets.all(16.0),
               children: [
-                // --- 1. DEFAULT FAVORITES PLAYLIST (Permanent, no delete button) ---
+                // --- 1. DEFAULT FAVORITES PLAYLIST ---
                 Card(
                   clipBehavior: Clip.antiAlias,
                   child: ListTile(
@@ -134,6 +149,27 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                     ),
                     title: const Text('Favorites', style: TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text('$_favoritesCount songs'),
+                    
+                    // Added PopupMenu for Favorites
+                    trailing: PopupMenuButton<String>(
+                      onSelected: (value) {
+                        if (value == 'manage') {
+                          _navigateToManageSongs(title: 'Favorites', isFavorites: true);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'manage',
+                          child: Row(
+                            children: [
+                              Icon(Icons.checklist, size: 20),
+                              SizedBox(width: 12),
+                              Text('Add / Remove songs'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                     onTap: () {
                       Navigator.push(
                         context,
@@ -179,12 +215,26 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                         ),
                         title: Text(playlistTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
                         
-                        // Delete option ONLY to custom playlists, wanted to make favorites playlist permanent
+                        // Updated to include Manage Songs
                         trailing: PopupMenuButton<String>(
                           onSelected: (value) {
-                            if (value == 'delete') _deletePlaylist(playlistId);
+                            if (value == 'manage') {
+                              _navigateToManageSongs(title: playlistTitle, id: playlistId);
+                            } else if (value == 'delete') {
+                              _deletePlaylist(playlistId);
+                            }
                           },
                           itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'manage',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.checklist, size: 20),
+                                  SizedBox(width: 12),
+                                  Text('Add / Remove songs'),
+                                ],
+                              ),
+                            ),
                             PopupMenuItem(
                               value: 'delete',
                               child: Row(
@@ -203,7 +253,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                             MaterialPageRoute(
                               builder: (context) => PlaylistDetailScreen(
                                 playlistTitle: playlistTitle,
-                                playlistId: playlistId, // Pass the ID so the detail screen fetches its songs
+                                playlistId: playlistId, 
                                 initialIsPinned: false,
                               ),
                             ),
