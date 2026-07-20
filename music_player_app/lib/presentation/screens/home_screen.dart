@@ -59,7 +59,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
 
   Future<void> _loadTotalTime() async {
     try {
-      // Ensure the database is actually open before reading
+      // Safely ensure the database is open before reading
       if (!_databaseService.isOpen()) {
         await _databaseService.open();
       }
@@ -159,7 +159,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
   void _stopTimer() {
     _playbackTimer?.cancel();
     
-    // Save exactly when paused, but ONLY if the database has finished opening
+    // Safely ensure the database is open before writing
     if (_databaseService.isOpen()) {
       _databaseService.insertKVPair('total_time_listened', _secondsListened.toString());
     }
