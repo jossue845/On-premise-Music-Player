@@ -1,5 +1,4 @@
 import 'dart:collection';
-
 import 'package:dart_mappable/dart_mappable.dart';
 
 part 'song.mapper.dart';
@@ -17,6 +16,8 @@ class Song with SongMappable {
   final String path;
   final String? imagePath;
   final bool favorite;
+  final int playCount; // Tracks how many times the song has been played
+
   Song({
     required this.id,
     required this.title,
@@ -29,5 +30,6 @@ class Song with SongMappable {
     required this.path,
     this.imagePath,
     required this.favorite,
+    this.playCount = 0, // Defaults to 0 in new songs
   });
 }

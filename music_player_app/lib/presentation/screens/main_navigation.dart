@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_nav_bar/google_nav_bar.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -40,7 +41,7 @@ class _MusicDashboardState extends State<MusicDashboard> {
   ];
   
   // --- Mini Player State ---
-  Offset _panelPosition = const Offset(20, 200); // Default floating position
+  Offset? _panelPosition; 
   Song? _currentActiveSong;
   bool _isPlaying = false;
   List<Song> _allSongs = [];
@@ -81,6 +82,11 @@ class _MusicDashboardState extends State<MusicDashboard> {
           }
         }
 
+        // If nothing is playing globally, default to the first song in the library
+        if (activeSong == null && songs.isNotEmpty) {
+          activeSong = songs.first;
+        }
+
         if (mounted) {
           setState(() {
             _allSongs = songs;
@@ -92,18 +98,39 @@ class _MusicDashboardState extends State<MusicDashboard> {
   }
 
   void _setupAudioStreams() {
-    _playerStateSubscription = globalAudioPlayer.playerStateStream.listen((state) {
-      if (mounted) setState(() => _isPlaying = state.playing);
-    });
+    int? lastProcessedIndex;
 
+    // Listen to changes in the current playing sequence/index
     _sequenceStateSubscription = globalAudioPlayer.sequenceStateStream.listen((sequence) {
-      if (mounted && sequence?.currentSource != null) {
+      if (sequence?.currentSource != null) {
         final tag = sequence!.currentSource!.tag as MediaItem;
         try {
           final activeSong = _allSongs.firstWhere((s) => s.id.toString() == tag.id);
-          setState(() => _currentActiveSong = activeSong);
+          
+          if (mounted) {
+            setState(() => _currentActiveSong = activeSong);
+          }
+
+          // If the track index changes naturally, it means the previous song finished!
+          if (lastProcessedIndex != null && lastProcessedIndex != sequence.currentIndex) {
+            final previousSource = sequence.sequence[lastProcessedIndex!];
+            final prevTag = previousSource.tag as MediaItem?;
+            if (prevTag != null) {
+              final prevSong = _allSongs.firstWhere((s) => s.id.toString() == prevTag.id);
+              
+              // Increment play count safely in the background
+              final databaseService = DatabaseService(databaseFactory: databaseFactory);
+              final songRepo = SongRepository(database: databaseService);
+              songRepo.incrementPlayCount(prevSong.id);
+            }
+          }
+          lastProcessedIndex = sequence.currentIndex;
         } catch (_) {}
       }
+    });
+
+    _playerStateSubscription = globalAudioPlayer.playerStateStream.listen((state) {
+      if (mounted) setState(() => _isPlaying = state.playing);
     });
   }
 
@@ -135,10 +162,12 @@ class _MusicDashboardState extends State<MusicDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    // Get screen dimensions to constrain the draggable panel
     final screenSize = MediaQuery.of(context).size;
-    final panelWidth = 70.0;
-    final panelHeight = 160.0;
+    const panelWidth = 70.0;
+    const panelHeight = 160.0;
+
+    // --- UPDATED: Pushed up to 250 pixels to clear the tall GNav bar ---
+    _panelPosition ??= Offset(20, screenSize.height - panelHeight - 250);
 
     return Scaffold(
       appBar: AppBar(
@@ -156,31 +185,26 @@ class _MusicDashboardState extends State<MusicDashboard> {
         ),
       ),
       
-      // --- Stack allows the vertical panel to float above the pages ---
       body: Stack(
         children: [
-          // 1. The Main Content
           _pages[_selectedIndex], 
           
-          // 2. The Floating Vertical Mini-Player
           if (_currentActiveSong != null)
             Positioned(
-              left: _panelPosition.dx,
-              top: _panelPosition.dy,
+              left: _panelPosition!.dx,
+              top: _panelPosition!.dy,
               child: GestureDetector(
-                // Update position on drag
                 onPanUpdate: (details) {
                   setState(() {
-                    _panelPosition += details.delta;
+                    _panelPosition = _panelPosition! + details.delta;
                     
-                    // Constrain to screen bounds so it doesn't get lost
+                    // --- UPDATED: Clamp also accounts for the 250px buffer ---
                     _panelPosition = Offset(
-                      _panelPosition.dx.clamp(0.0, screenSize.width - panelWidth),
-                      _panelPosition.dy.clamp(0.0, screenSize.height - panelHeight - 200), // Account for bottom nav
+                      _panelPosition!.dx.clamp(0.0, screenSize.width - panelWidth),
+                      _panelPosition!.dy.clamp(0.0, screenSize.height - panelHeight - 250),
                     );
                   });
                 },
-                // Open PlayerScreen on tap
                 onTap: () {
                   final songIndex = _allSongs.indexOf(_currentActiveSong!);
                   Navigator.push(
@@ -224,7 +248,6 @@ class _MusicDashboardState extends State<MusicDashboard> {
     );
   }
 
-  // --- Vertical Panel UI ---
   Widget _buildVerticalMiniPlayer(double width, double height) {
     return Container(
       width: width,
@@ -240,7 +263,6 @@ class _MusicDashboardState extends State<MusicDashboard> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Album Art
           ClipRRect(
             borderRadius: BorderRadius.circular(25),
             child: Container(
@@ -252,8 +274,6 @@ class _MusicDashboardState extends State<MusicDashboard> {
                   : Icon(Icons.music_note, color: Theme.of(context).primaryColor),
             ),
           ),
-          
-          // Scrolling or Truncated Title
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4.0),
             child: Text(
@@ -264,8 +284,6 @@ class _MusicDashboardState extends State<MusicDashboard> {
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
             ),
           ),
-          
-          // Play / Pause Button
           IconButton(
             icon: Icon(
               _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,

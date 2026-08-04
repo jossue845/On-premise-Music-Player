@@ -32,6 +32,13 @@ class SongRepository {
     );
   }
 
+
+  Future<Result<void>> incrementPlayCount(int songId) async {
+    if (!_database.isOpen()) {
+      await _database.open();
+    }
+    return _database.incrementPlayCount(songId);
+  }
   /// Updates [oldSong] with the provided metadata.
   Future<Result<Song>> editTags({
     required Song oldSong,

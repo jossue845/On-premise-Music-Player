@@ -20,6 +20,7 @@ class DatabaseService {
   static const String _pathColumnName = "path";
   static const String _imagePathColumnName = "image_path";
   static const String _favoriteColumnName = "favorite";
+  static const String _playCountColumnName = "play_count";
 
   static const String _playlistTableName = "playlist";
   static const String _playlistIdColumnName = "playlist_id";
@@ -71,7 +72,7 @@ class DatabaseService {
       await txn.execute('''
          CREATE TABLE IF NOT EXISTS $_songTableName($_songIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT, $_songTitleColumnName TEXT NOT NULL , $_albumIdColumnName INTEGER NOT NULL,
            $_genreColumnName TEXT, $_yearColumnName INTEGER, $_trackNumberColumnName INTEGER, $_pathColumnName TEXT NOT NULL UNIQUE,
-           $_imagePathColumnName TEXT,$_favoriteColumnName INTEGER DEFAULT 0 NOT NULL, FOREIGN KEY($_albumIdColumnName) REFERENCES $_albumTableName($_albumIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT);
+           $_imagePathColumnName TEXT,$_favoriteColumnName INTEGER DEFAULT 0 NOT NULL, $_playCountColumnName INTEGER DEFAULT 0 NOT NULL, FOREIGN KEY($_albumIdColumnName) REFERENCES $_albumTableName($_albumIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT);
           ''');
       await txn.execute('''
          CREATE TABLE IF NOT EXISTS $_songArtistTableName($_songIdColumnName INTEGER, $_artistIdColumnName INTEGER, PRIMARY KEY($_songIdColumnName, $_artistIdColumnName),
@@ -281,6 +282,7 @@ class DatabaseService {
           path: entry[_pathColumnName] as String,
           imagePath: entry[_imagePathColumnName] as String?,
           favorite: ((entry[_favoriteColumnName] as int) == 1) ? true : false,
+          playCount: entry[_playCountColumnName] as int? ?? 0,
         );
       } else {
         // Add the artist to the list of song artists if the song is already created.
@@ -292,6 +294,19 @@ class DatabaseService {
       }
     }
     return songs.values.toList();
+  }
+
+/// Increments the play count of the song identified by [songId].
+  Future<Result<void>> incrementPlayCount(int songId) async {
+    try {
+      await _database!.rawUpdate(
+        'UPDATE $_songTableName SET $_playCountColumnName = $_playCountColumnName + 1 WHERE $_songIdColumnName = ?',
+        [songId]
+      );
+      return Success(unit);
+    } on Exception catch (e) {
+      return Failure(e);
+    }
   }
 
   /// Returns the albums in the database associated to at least one album artist.
