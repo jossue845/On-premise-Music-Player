@@ -6,6 +6,8 @@ import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
 import 'package:music_player_app/utils/tag_utils.dart';
 import 'package:result_dart/result_dart.dart';
+import 'package:music_player_app/data/services/musicbrainz_service.dart';
+import 'package:music_player_app/data/services/cover_art_archive_service.dart';
 
 class SongRepository {
   final DatabaseService _database;
@@ -32,7 +34,52 @@ class SongRepository {
     );
   }
 
+  Future<Result<Song>> fetchAndSaveMissingArtwork(Song song) async {
+    // Skip the network call if the song already has an image.
+    if (song.imagePath != null && song.imagePath!.isNotEmpty) {
+      return Success(song);
+    }
 
+    final mbService = MusicBrainzService();
+    final caaService = CoverArtArchiveService();
+    
+    // Fallback to avoid searching with empty metadata
+    final artistName = song.artists.isNotEmpty ? song.artists.first : '';
+    if (artistName.isEmpty || artistName == 'Unknown Artist' || song.album.isEmpty || song.album == 'Unknown Album') {
+      return Failure(Exception("Missing valid album or artist metadata for search."));
+    }
+
+    try {
+      // 1. Search MusicBrainz for the Album (Release Group) ID
+      final searchResult = await mbService.searchAlbum(song.album, artistName);
+      if (searchResult.isError()) return Failure(searchResult.exceptionOrNull()!);
+
+      final data = searchResult.getOrThrow();
+      final releaseGroups = data['release-groups'] as List?;
+      
+      if (releaseGroups == null || releaseGroups.isEmpty) {
+        return Failure(Exception("No matching album found on MusicBrainz."));
+      }
+
+      // Extract the MusicBrainz ID (MBID) of the highest-ranked search match
+      final mbid = releaseGroups.first['id'] as String;
+
+      // 2. Fetch the Cover Art bytes using the MBID
+      final artResult = await caaService.getFrontCover(mbid);
+      if (artResult.isError()) return Failure(artResult.exceptionOrNull()!);
+
+      final pictureBytes = artResult.getOrThrow();
+
+      // 3. Save the downloaded bytes directly into the MP3 file and SQLite DB
+      return await editTags(
+        oldSong: song,
+        pictureBytes: pictureBytes,
+      );
+    } catch (e) {
+      return Failure(Exception("Failed to fetch artwork: $e"));
+    }
+  }
+  
   Future<Result<void>> incrementPlayCount(int songId) async {
     if (!_database.isOpen()) {
       await _database.open();

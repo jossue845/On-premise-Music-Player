@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/services/filesystem_service.dart';
 import 'package:music_player_app/data/repositories/music_folder_repository.dart';
+import 'package:music_player_app/data/repositories/song_repository.dart';
 import 'package:music_player_app/presentation/screens/equalizer_screen.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -14,6 +15,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _isScanning = false;
+  bool _isFetchingArt = false;
   String _scanStatus = '';
   late MusicFolderRepository _musicFolderRepository;
   late DatabaseService _databaseService;
@@ -106,6 +108,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
     }
   }
+
+  // --- NEW: Automated Artwork Fetching Pipeline ---
+  Future<void> _scanForMissingArtwork() async {
+    setState(() => _isFetchingArt = true);
+    
+    final databaseService = DatabaseService(databaseFactory: databaseFactory);
+    final songRepo = SongRepository(database: databaseService);
+    
+    try {
+      final result = await songRepo.getSongs();
+      if (result.isSuccess()) {
+        final songs = result.getOrThrow();
+        
+        // Loop through all songs and target the ones missing images
+        for (var song in songs) {
+          if (song.imagePath == null || song.imagePath!.isEmpty) {
+            await songRepo.fetchAndSaveMissingArtwork(song);
+          }
+        }
+      }
+    } catch (_) {}
+    
+    if (mounted) {
+      setState(() => _isFetchingArt = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Finished scanning for missing artwork!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
   
   @override
   Widget build(BuildContext context) {
@@ -116,10 +150,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: Center(
         child: Column(
           children: [
-            // We might have a logo...
-
-            // appearance? dark mode? personalizing app's colors?
-
             // Scan for music
             Padding(
               padding: const EdgeInsets.only(left: 25.0, top: 25),
@@ -152,6 +182,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: const Text("Set the folder to scan for music"),
                 onTap: _setSongsFolder,
                 trailing: const Icon(Icons.folder),
+              ),
+            ),
+
+            // --- NEW: Fetch Missing Artwork Trigger ---
+            Padding(
+              padding: const EdgeInsets.only(left: 25.0, top: 25),
+              child: ListTile(
+                title: const Text('Fetch Missing Album Art'),
+                subtitle: const Text('Searches MusicBrainz & Cover Art Archive'),
+                onTap: _isFetchingArt ? null : _scanForMissingArtwork,
+                trailing: _isFetchingArt 
+                    ? const SizedBox(
+                        width: 24, 
+                        height: 24, 
+                        child: CircularProgressIndicator(strokeWidth: 2)
+                      ) 
+                    : const Icon(Icons.image_search),
               ),
             ),
                         
