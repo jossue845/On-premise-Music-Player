@@ -100,9 +100,13 @@ class SongRepository {
   }) async {
     Tag? oldTag = await AudioTags.read(oldSong.path);
 
-    if (oldTag == null) {
-      throw Exception("Error while editing tags");
-    }
+    // If the file has no tags, create a new empty tag structure to hold the data
+    oldTag ??= Tag(
+      title: oldSong.title,
+      trackArtist: oldSong.artists.isNotEmpty ? oldSong.artists.first : 'Unknown',
+      album: oldSong.album.isNotEmpty ? oldSong.album : 'Unknown Album',
+      pictures: []
+    );
 
     List<Picture> songPics = oldTag.pictures;
 
