@@ -17,6 +17,7 @@ class Song with SongMappable {
   final String? imagePath;
   final bool favorite;
   final int playCount; // Tracks how many times the song has been played
+  final String? lyrics;
 
   Song({
     required this.id,
@@ -31,5 +32,25 @@ class Song with SongMappable {
     this.imagePath,
     required this.favorite,
     this.playCount = 0, // Defaults to 0 in new songs
+    this.lyrics,
   });
+
+  Map<String, dynamic> toDbMap() {
+    return {
+      'id': id,
+      'title': title,
+      'artists': artists.join(','), // Flattens List<String> to a single comma-separated String
+      'album': album,
+      'albumId': albumId,
+      'genre': genre,
+      'year': year,
+      'trackNumber': trackNumber,
+      'path': path,
+      'imagePath': imagePath,
+      'favorite': favorite ? 1 : 0, // Flattens boolean to an integer (SQLite does not have a native boolean type)
+      'playCount': playCount,
+      'lyrics': lyrics,
+    };
+  }
 }
+

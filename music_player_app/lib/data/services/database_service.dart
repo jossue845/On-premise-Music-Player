@@ -69,11 +69,25 @@ class DatabaseService {
            FOREIGN KEY($_albumIdColumnName) REFERENCES $_albumTableName($_albumIdColumnName) ON UPDATE CASCADE ON DELETE CASCADE,
            FOREIGN KEY($_artistIdColumnName) REFERENCES $_artistTableName($_artistIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT);
           ''');
+          
+      // --- CORRECTED: Added lyrics TEXT column to the end of the song table schema ---
       await txn.execute('''
-         CREATE TABLE IF NOT EXISTS $_songTableName($_songIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT, $_songTitleColumnName TEXT NOT NULL , $_albumIdColumnName INTEGER NOT NULL,
-           $_genreColumnName TEXT, $_yearColumnName INTEGER, $_trackNumberColumnName INTEGER, $_pathColumnName TEXT NOT NULL UNIQUE,
-           $_imagePathColumnName TEXT,$_favoriteColumnName INTEGER DEFAULT 0 NOT NULL, $_playCountColumnName INTEGER DEFAULT 0 NOT NULL, FOREIGN KEY($_albumIdColumnName) REFERENCES $_albumTableName($_albumIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT);
+         CREATE TABLE IF NOT EXISTS $_songTableName(
+           $_songIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT, 
+           $_songTitleColumnName TEXT NOT NULL, 
+           $_albumIdColumnName INTEGER NOT NULL,
+           $_genreColumnName TEXT, 
+           $_yearColumnName INTEGER, 
+           $_trackNumberColumnName INTEGER, 
+           $_pathColumnName TEXT NOT NULL UNIQUE,
+           $_imagePathColumnName TEXT,
+           $_favoriteColumnName INTEGER DEFAULT 0 NOT NULL, 
+           $_playCountColumnName INTEGER DEFAULT 0 NOT NULL, 
+           lyrics TEXT, 
+           FOREIGN KEY($_albumIdColumnName) REFERENCES $_albumTableName($_albumIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT
+         );
           ''');
+          
       await txn.execute('''
          CREATE TABLE IF NOT EXISTS $_songArtistTableName($_songIdColumnName INTEGER, $_artistIdColumnName INTEGER, PRIMARY KEY($_songIdColumnName, $_artistIdColumnName),
            FOREIGN KEY($_songIdColumnName) REFERENCES $_songTableName($_songIdColumnName) ON UPDATE CASCADE ON DELETE CASCADE,
@@ -166,9 +180,20 @@ class DatabaseService {
           return await _createOrUpdateDb(db);
         },
         onUpgrade: (db, oldVersion, newVersion) async {
+          // Fallback to recreate tables if version changes
+          await db.execute('DROP TABLE IF EXISTS $_playlistTrackTableName');
+          await db.execute('DROP TABLE IF EXISTS $_queuedSongTableName');
+          await db.execute('DROP TABLE IF EXISTS $_songArtistTableName');
+          await db.execute('DROP TABLE IF EXISTS $_albumArtistTableName');
+          await db.execute('DROP TABLE IF EXISTS $_songTableName');
+          await db.execute('DROP TABLE IF EXISTS $_albumTableName');
+          await db.execute('DROP TABLE IF EXISTS $_artistTableName');
+          await db.execute('DROP TABLE IF EXISTS $_playlistTableName');
+          await db.execute('DROP TABLE IF EXISTS $_keyValueStoreTableName');
           return await _createOrUpdateDb(db);
         },
-        version: 5,
+        // --- CORRECTED: Incremented version to 6 to trigger onUpgrade ---
+        version: 6,
       ),
     );
   }
@@ -283,6 +308,7 @@ class DatabaseService {
           imagePath: entry[_imagePathColumnName] as String?,
           favorite: ((entry[_favoriteColumnName] as int) == 1) ? true : false,
           playCount: entry[_playCountColumnName] as int? ?? 0,
+          lyrics: entry['lyrics'] as String?, // --- CORRECTED: Ensure lyrics map back ---
         );
       } else {
         // Add the artist to the list of song artists if the song is already created.
@@ -307,6 +333,30 @@ class DatabaseService {
     } on Exception catch (e) {
       return Failure(e);
     }
+  }
+
+  // --- CORRECTED: Using the correct schema parameter names in the update ---
+  Future<int> updateSong(Song song) async {
+    final db = await _database; 
+    
+    // We must map the properties exactly to the column names used in the table
+    return await db!.update(
+      _songTableName,
+      {
+        _songTitleColumnName: song.title,
+        _albumIdColumnName: song.albumId,
+        _genreColumnName: song.genre,
+        _yearColumnName: song.year,
+        _trackNumberColumnName: song.trackNumber,
+        _pathColumnName: song.path,
+        _imagePathColumnName: song.imagePath,
+        _favoriteColumnName: song.favorite ? 1 : 0,
+        _playCountColumnName: song.playCount,
+        'lyrics': song.lyrics,
+      },
+      where: '$_songIdColumnName = ?',
+      whereArgs: [song.id],
+    );
   }
 
   /// Returns the albums in the database associated to at least one album artist.

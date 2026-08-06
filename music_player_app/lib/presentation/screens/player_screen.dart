@@ -230,6 +230,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
+                            // Fixed: Now correctly navigating to the EqualizerScreen
                             builder: (context) => const EqualizerScreen(),
                           ),
                         );
@@ -359,12 +360,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5)
                   ),
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => LyricsScreen(songTitle: currentSong.title),
-                      ),
-                    );
+                    try {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => LyricsScreen(song: currentSong, songRepository: _songRepository),
+                        ),
+                      );
+                    } catch (e, stackTrace) {
+                      // This will catch and print any synchronous errors thrown during navigation or initial screen build
+                      debugPrint('NAVIGATION CRASH: $e');
+                      debugPrint('STACK TRACE:\n$stackTrace');
+                    }
                   },
                 ),
               ),

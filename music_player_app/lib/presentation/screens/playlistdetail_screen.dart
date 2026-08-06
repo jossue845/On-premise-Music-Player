@@ -223,7 +223,15 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                   } else if (choice == 'album') {
                                     Navigator.push(context, MaterialPageRoute(builder: (context) => AlbumDetailScreen(albumName: song.album)));
                                   } else if (choice == 'lyrics') {
-                                    Navigator.push(context, MaterialPageRoute(builder: (context) => LyricsScreen(songTitle: song.title)));
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => LyricsScreen(
+                                          song: song,
+                                          songRepository: _songRepository,
+                                        ),
+                                      ),
+                                    );
                                   } else if (choice == 'edit') {
                                     final didUpdate = await Navigator.push(context, MaterialPageRoute(builder: (context) => EditSongScreen(song: song)));
                                     if (didUpdate == true) _loadPlaylistSongs();

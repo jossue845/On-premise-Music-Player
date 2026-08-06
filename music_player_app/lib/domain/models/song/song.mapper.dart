@@ -46,6 +46,12 @@ class SongMapper extends ClassMapperBase<Song> {
       Field('imagePath', _$imagePath, opt: true);
   static bool _$favorite(Song v) => v.favorite;
   static const Field<Song, bool> _f$favorite = Field('favorite', _$favorite);
+  static int _$playCount(Song v) => v.playCount;
+  static const Field<Song, int> _f$playCount =
+      Field('playCount', _$playCount, opt: true, def: 0);
+  static String? _$lyrics(Song v) => v.lyrics;
+  static const Field<Song, String> _f$lyrics =
+      Field('lyrics', _$lyrics, opt: true);
 
   @override
   final MappableFields<Song> fields = const {
@@ -60,6 +66,8 @@ class SongMapper extends ClassMapperBase<Song> {
     #path: _f$path,
     #imagePath: _f$imagePath,
     #favorite: _f$favorite,
+    #playCount: _f$playCount,
+    #lyrics: _f$lyrics,
   };
 
   static Song _instantiate(DecodingData data) {
@@ -74,7 +82,9 @@ class SongMapper extends ClassMapperBase<Song> {
         trackNumber: data.dec(_f$trackNumber),
         path: data.dec(_f$path),
         imagePath: data.dec(_f$imagePath),
-        favorite: data.dec(_f$favorite));
+        favorite: data.dec(_f$favorite),
+        playCount: data.dec(_f$playCount),
+        lyrics: data.dec(_f$lyrics));
   }
 
   @override
@@ -134,7 +144,9 @@ abstract class SongCopyWith<$R, $In extends Song, $Out>
       int? trackNumber,
       String? path,
       String? imagePath,
-      bool? favorite});
+      bool? favorite,
+      int? playCount,
+      String? lyrics});
   SongCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
 
@@ -156,7 +168,9 @@ class _SongCopyWithImpl<$R, $Out> extends ClassCopyWithBase<$R, Song, $Out>
           Object? trackNumber = $none,
           String? path,
           Object? imagePath = $none,
-          bool? favorite}) =>
+          bool? favorite,
+          int? playCount,
+          Object? lyrics = $none}) =>
       $apply(FieldCopyWithData({
         if (id != null) #id: id,
         if (title != null) #title: title,
@@ -168,7 +182,9 @@ class _SongCopyWithImpl<$R, $Out> extends ClassCopyWithBase<$R, Song, $Out>
         if (trackNumber != $none) #trackNumber: trackNumber,
         if (path != null) #path: path,
         if (imagePath != $none) #imagePath: imagePath,
-        if (favorite != null) #favorite: favorite
+        if (favorite != null) #favorite: favorite,
+        if (playCount != null) #playCount: playCount,
+        if (lyrics != $none) #lyrics: lyrics
       }));
   @override
   Song $make(CopyWithData data) => Song(
@@ -182,7 +198,9 @@ class _SongCopyWithImpl<$R, $Out> extends ClassCopyWithBase<$R, Song, $Out>
       trackNumber: data.get(#trackNumber, or: $value.trackNumber),
       path: data.get(#path, or: $value.path),
       imagePath: data.get(#imagePath, or: $value.imagePath),
-      favorite: data.get(#favorite, or: $value.favorite));
+      favorite: data.get(#favorite, or: $value.favorite),
+      playCount: data.get(#playCount, or: $value.playCount),
+      lyrics: data.get(#lyrics, or: $value.lyrics));
 
   @override
   SongCopyWith<$R2, Song, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t) =>

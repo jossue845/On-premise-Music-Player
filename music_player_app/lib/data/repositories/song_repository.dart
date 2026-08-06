@@ -8,6 +8,7 @@ import 'package:music_player_app/utils/tag_utils.dart';
 import 'package:result_dart/result_dart.dart';
 import 'package:music_player_app/data/services/musicbrainz_service.dart';
 import 'package:music_player_app/data/services/cover_art_archive_service.dart';
+import 'package:music_player_app/data/services/lrclib_service.dart';
 
 class SongRepository {
   final DatabaseService _database;
@@ -80,6 +81,54 @@ class SongRepository {
     }
   }
   
+Future<Result<String>> fetchAndSaveLyrics(Song song) async {
+    if (song.lyrics != null && song.lyrics!.isNotEmpty) {
+      return Success(song.lyrics!);
+    }
+
+    if (!_database.isOpen()) {
+        await _database.open();
+      }
+    final lrclibService = LrcLibService();
+    final artistName = song.artists.isNotEmpty ? song.artists.first : '';
+
+    if (artistName.isEmpty || artistName == 'Unknown Artist') {
+      return Failure(Exception("Valid artist name required to fetch lyrics."));
+    }
+
+    try {
+      final fetchResult = await lrclibService.getLyrics(
+        song.title, 
+        artistName,
+        albumName: song.album,
+      );
+      
+      if (fetchResult.isError()) return Failure(fetchResult.exceptionOrNull()!);
+
+      final Map<String, dynamic> data = fetchResult.getOrThrow();
+      
+      // Use safe casting to guarantee we handle nulls correctly
+      final String? synced = data['syncedLyrics'] as String?;
+      final String? plain = data['plainLyrics'] as String?;
+      
+      if ((synced == null || synced.trim().isEmpty) && 
+          (plain == null || plain.trim().isEmpty)) {
+        return Failure(Exception("Lyrics not found on LRCLIB."));
+      }
+
+      final String fetchedLyrics = (synced != null && synced.trim().isNotEmpty) 
+          ? synced 
+          : plain!;
+
+      final updatedSong = song.copyWith(lyrics: fetchedLyrics);
+      await _database.updateSong(updatedSong); 
+
+      return Success(fetchedLyrics);
+    } catch (e) {
+      return Failure(Exception("Failed to process lyrics: $e"));
+    }
+  }
+
   Future<Result<void>> incrementPlayCount(int songId) async {
     if (!_database.isOpen()) {
       await _database.open();
