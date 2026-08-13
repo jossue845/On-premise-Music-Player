@@ -53,6 +53,45 @@ class DatabaseService {
 
   DatabaseService({required this.databaseFactory});
 
+  Future<Database> get database async {
+    if (_database != null) return _database!;
+    
+    _database = await initDatabase();
+    return _database!;
+  }
+
+  Future<Database> initDatabase() async {
+  final dbPath = await getDatabasesPath();
+  final path = join(dbPath, 'offpulse_app.db');
+
+  return await openDatabase(
+    path,
+    version: 2, // Incremented database version
+    onCreate: (db, version) async {
+      // Existing tables creation...
+      await _createScrobblesTable(db);
+    },
+    onUpgrade: (db, oldVersion, newVersion) async {
+      if (oldVersion < 2) {
+        await _createScrobblesTable(db);
+      }
+    },
+  );
+}
+
+Future<void> _createScrobblesTable(Database db) async {
+  await db.execute('''
+    CREATE TABLE scrobbles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      artist TEXT NOT NULL,
+      track TEXT NOT NULL,
+      album TEXT,
+      timestamp INTEGER NOT NULL,
+      is_synced INTEGER NOT NULL DEFAULT 0
+    )
+  ''');
+}
+
   FutureOr<void> _createOrUpdateDb(Database db) async {
     await db.transaction((txn) async {
       await txn.execute('''

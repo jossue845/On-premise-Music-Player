@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_nav_bar/google_nav_bar.dart';
-import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -20,6 +19,7 @@ import 'package:music_player_app/presentation/screens/home_screen.dart';
 import 'package:music_player_app/presentation/screens/all_songs_screen.dart';
 import 'package:music_player_app/presentation/screens/settings_screen.dart';
 import 'package:music_player_app/presentation/screens/player_screen.dart';
+import 'package:music_player_app/presentation/screens/lastfm_screen.dart';
 
 class MusicDashboard extends StatefulWidget {
   const MusicDashboard({super.key});
@@ -38,6 +38,7 @@ class _MusicDashboardState extends State<MusicDashboard> {
     const PlaylistScreen(),
     const AllSongsScreen(),
     const SettingsScreen(),
+    const LastFmAuthScreen(),
   ];
   
   // --- Mini Player State ---
@@ -183,6 +184,20 @@ class _MusicDashboardState extends State<MusicDashboard> {
           }, 
           icon: const Icon(Icons.settings, color: Colors.black)
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.last_page, color: Colors.black),
+            tooltip: 'Last.fm Integration',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LastFmAuthScreen(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       
       body: Stack(
