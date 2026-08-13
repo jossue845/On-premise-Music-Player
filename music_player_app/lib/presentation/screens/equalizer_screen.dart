@@ -1,18 +1,19 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:sqflite/sqflite.dart'; 
-import 'package:music_player_app/utils/global_player.dart';
 import 'package:music_player_app/data/services/database_service.dart';
+import 'package:music_player_app/data/providers/audio_player_provider.dart';
 
-class EqualizerScreen extends StatefulWidget {
+class EqualizerScreen extends ConsumerStatefulWidget {
   const EqualizerScreen({super.key});
 
   @override
-  State<EqualizerScreen> createState() => _EqualizerScreenState();
+  ConsumerState<EqualizerScreen> createState() => _EqualizerScreenState();
 }
 
-class _EqualizerScreenState extends State<EqualizerScreen> {
+class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
   late DatabaseService _databaseService;
 
   // --- EQ State ---
@@ -29,18 +30,19 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
   void initState() {
     super.initState();
     _databaseService = DatabaseService(databaseFactory: databaseFactory);
-    _preampValue = globalAudioPlayer.volume;
+    _preampValue = ref.read(audioPlayerProvider).volume;
     _initEqualizer();
     _loadPresets();
   }
 
   Future<void> _initEqualizer() async {
     try {
-      if (!globalEqualizer.enabled) {
-        await globalEqualizer.setEnabled(true);
+      final equalizer = ref.read(equalizerProvider);
+      if (!equalizer.enabled) {
+        await equalizer.setEnabled(true);
       }
 
-      final params = await globalEqualizer.parameters;
+      final params = await equalizer.parameters;
       if (mounted) {
         setState(() {
           _eqParams = params;
@@ -84,7 +86,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
   void _applyPreset(Map<String, dynamic> preset) {
     setState(() {
       _preampValue = preset['preamp'] ?? 1.0;
-      globalAudioPlayer.setVolume(_preampValue);
+      ref.read(audioPlayerProvider).setVolume(_preampValue);
 
       if (_eqParams != null) {
         final List<dynamic> savedBands = preset['bands'] ?? [];
@@ -140,7 +142,6 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
                         onPressed: () {
                           final name = presetNameController.text.trim();
                           if (name.isNotEmpty) {
-                            
                             bool isDuplicate = false;
                             String duplicateMessage = '';
 
@@ -151,14 +152,12 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
                                       ?.map((e) => (e as num).toDouble())
                                       .toList() ?? [];
 
-                              // 1. Check if name already exists (case-insensitive check)
                               if (savedName.toLowerCase() == name.toLowerCase()) {
                                 isDuplicate = true;
                                 duplicateMessage = 'A preset named "$name" already exists.';
                                 break;
                               }
 
-                              // 2. Check if exact configuration already exists
                               if ((savedPreamp - _preampValue).abs() > 0.01) continue;
                               if (savedBands.length != _bandValues.length) continue;
                               
@@ -221,7 +220,6 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
                   ),
                   const SizedBox(height: 20),
                   
-                  // Saved Presets List
                   if (_presets.isEmpty)
                     const Padding(
                       padding: EdgeInsets.all(20.0),
@@ -287,7 +285,6 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
           padding: const EdgeInsets.all(20.0),
           child: Column(
             children: [
-              
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -354,7 +351,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
             activeColor: Colors.greenAccent,
             onChanged: (val) {
               setState(() => _preampValue = val);
-              globalAudioPlayer.setVolume(val); 
+              ref.read(audioPlayerProvider).setVolume(val); 
             },
           ),
           
@@ -402,7 +399,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
             inactiveColor: Colors.grey.shade800,
             onChanged: (val) {
               setState(() => _pitchValue = val);
-              globalAudioPlayer.setPitch(val); 
+              ref.read(audioPlayerProvider).setPitch(val); 
             },
           ),
           const SizedBox(height: 10),
@@ -485,7 +482,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
     setState(() {
       if (_activeMenu == 'Equalizer') {
         _preampValue = 1.0;
-        globalAudioPlayer.setVolume(1.0);
+        ref.read(audioPlayerProvider).setVolume(1.0);
         if (_eqParams != null) {
           for (int i = 0; i < _bandValues.length; i++) {
             _bandValues[i] = 0.0;
@@ -494,7 +491,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
         }
       } else if (_activeMenu == 'Pitch') {
         _pitchValue = 1.0;
-        globalAudioPlayer.setPitch(1.0);
+        ref.read(audioPlayerProvider).setPitch(1.0);
       }
     });
   }

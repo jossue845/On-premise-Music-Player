@@ -1,15 +1,16 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_nav_bar/google_nav_bar.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:sqflite/sqflite.dart';
 
-// Services & Global Audio
+// Services & Audio Provider
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
-import 'package:music_player_app/utils/global_player.dart';
+import 'package:music_player_app/data/providers/audio_player_provider.dart';
 
 // Screens
 import 'package:music_player_app/presentation/screens/artists_screen.dart';
@@ -21,14 +22,14 @@ import 'package:music_player_app/presentation/screens/settings_screen.dart';
 import 'package:music_player_app/presentation/screens/player_screen.dart';
 import 'package:music_player_app/presentation/screens/lastfm_screen.dart';
 
-class MusicDashboard extends StatefulWidget {
+class MusicDashboard extends ConsumerStatefulWidget {
   const MusicDashboard({super.key});
 
   @override
-  State<MusicDashboard> createState() => _MusicDashboardState();
+  ConsumerState<MusicDashboard> createState() => _MusicDashboardState();
 }
 
-class _MusicDashboardState extends State<MusicDashboard> {
+class _MusicDashboardState extends ConsumerState<MusicDashboard> {
   int _selectedIndex = 0; 
 
   final List<Widget> _pages = [
@@ -74,8 +75,9 @@ class _MusicDashboardState extends State<MusicDashboard> {
         final songs = result.getOrThrow();
         
         Song? activeSong;
-        if (globalAudioPlayer.sequenceState?.currentSource != null) {
-          final tag = globalAudioPlayer.sequenceState!.currentSource!.tag as MediaItem?;
+        final audioPlayer = ref.read(audioPlayerProvider);
+        if (audioPlayer.sequenceState?.currentSource != null) {
+          final tag = audioPlayer.sequenceState!.currentSource!.tag as MediaItem?;
           if (tag != null) {
             try {
               activeSong = songs.firstWhere((s) => s.id.toString() == tag.id);
@@ -100,9 +102,10 @@ class _MusicDashboardState extends State<MusicDashboard> {
 
   void _setupAudioStreams() {
     int? lastProcessedIndex;
+    final audioPlayer = ref.read(audioPlayerProvider);
 
     // Listen to changes in the current playing sequence/index
-    _sequenceStateSubscription = globalAudioPlayer.sequenceStateStream.listen((sequence) {
+    _sequenceStateSubscription = audioPlayer.sequenceStateStream.listen((sequence) {
       if (sequence?.currentSource != null) {
         final tag = sequence!.currentSource!.tag as MediaItem;
         try {
@@ -130,16 +133,17 @@ class _MusicDashboardState extends State<MusicDashboard> {
       }
     });
 
-    _playerStateSubscription = globalAudioPlayer.playerStateStream.listen((state) {
+    _playerStateSubscription = audioPlayer.playerStateStream.listen((state) {
       if (mounted) setState(() => _isPlaying = state.playing);
     });
   }
 
   Future<void> _togglePlayback() async {
-    if (globalAudioPlayer.playing) {
-      await globalAudioPlayer.pause();
+    final audioPlayer = ref.read(audioPlayerProvider);
+    if (audioPlayer.playing) {
+      await audioPlayer.pause();
     } else {
-      if (globalAudioPlayer.sequenceState == null && _allSongs.isNotEmpty) {
+      if (audioPlayer.sequenceState == null && _allSongs.isNotEmpty) {
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -150,7 +154,7 @@ class _MusicDashboardState extends State<MusicDashboard> {
           ),
         );
       } else {
-        await globalAudioPlayer.play();
+        await audioPlayer.play();
       }
     }
   }
@@ -167,7 +171,6 @@ class _MusicDashboardState extends State<MusicDashboard> {
     const panelWidth = 70.0;
     const panelHeight = 160.0;
 
-    // --- UPDATED: Pushed up to 250 pixels to clear the tall GNav bar ---
     _panelPosition ??= Offset(20, screenSize.height - panelHeight - 250);
 
     return Scaffold(
@@ -213,7 +216,6 @@ class _MusicDashboardState extends State<MusicDashboard> {
                   setState(() {
                     _panelPosition = _panelPosition! + details.delta;
                     
-                    // --- UPDATED: Clamp also accounts for the 250px buffer ---
                     _panelPosition = Offset(
                       _panelPosition!.dx.clamp(0.0, screenSize.width - panelWidth),
                       _panelPosition!.dy.clamp(0.0, screenSize.height - panelHeight - 250),

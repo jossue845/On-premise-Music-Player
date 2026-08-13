@@ -2,7 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:sqflite/sqflite.dart'; 
-import 'package:music_player_app/utils/global_player.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:music_player_app/data/providers/audio_player_provider.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 // Linked screens
 import 'package:music_player_app/data/services/database_service.dart';
@@ -13,7 +14,7 @@ import 'package:music_player_app/presentation/screens/edit_song_screen.dart';
 import 'package:music_player_app/presentation/screens/lyrics_screen.dart';
 import 'package:music_player_app/presentation/screens/equalizer_screen.dart';
 
-class PlayerScreen extends StatefulWidget {
+class PlayerScreen extends ConsumerStatefulWidget {
   final List<Song> playlist;
   final int initialIndex;
 
@@ -24,14 +25,14 @@ class PlayerScreen extends StatefulWidget {
   });
 
   @override
-  State<PlayerScreen> createState() => _PlayerScreenState();
+  ConsumerState<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-class _PlayerScreenState extends State<PlayerScreen> {
+class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   // Using global player to prevent ANR crashes and allow background playback
-  final AudioPlayer _audioPlayer = globalAudioPlayer;
   late SongRepository _songRepository;
   late List<Song> _localPlaylist;
+  late AudioPlayer _audioPlayer;
   
   bool _isPlaying = false;
   // Song position control
@@ -44,6 +45,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void initState() {
     super.initState();
+    _audioPlayer = ref.read(audioPlayerProvider);
     _currentIndex = widget.initialIndex;
     _localPlaylist = List.from(widget.playlist);
     

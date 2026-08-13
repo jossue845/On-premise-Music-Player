@@ -1,24 +1,25 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:just_audio_background/just_audio_background.dart';
+import 'package:just_audio/just_audio.dart';
 
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
 import 'package:music_player_app/presentation/screens/player_screen.dart';
-import 'package:music_player_app/utils/global_player.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:music_player_app/data/providers/audio_player_provider.dart';
 
-class HomeDashboard extends StatefulWidget {
+class HomeDashboard extends ConsumerStatefulWidget {
   const HomeDashboard({super.key});
 
   @override
-  State<HomeDashboard> createState() => _HomeDashboardState();
+  ConsumerState<HomeDashboard> createState() => _HomeDashboardState();
 }
 
-class _HomeDashboardState extends State<HomeDashboard> {
+class _HomeDashboardState extends ConsumerState<HomeDashboard> {
   late DatabaseService _databaseService;
   late SongRepository _songRepository;
   List<Song> _allSongs = []; 
@@ -84,8 +85,9 @@ class _HomeDashboardState extends State<HomeDashboard> {
         
         Song? activeSong;
         
-        if (globalAudioPlayer.sequenceState?.currentSource != null) {
-          final tag = globalAudioPlayer.sequenceState!.currentSource!.tag as MediaItem?;
+        final audioPlayer = ref.read(audioPlayerProvider);
+        if (audioPlayer.sequenceState?.currentSource != null) {
+          final tag = audioPlayer.sequenceState!.currentSource!.tag as MediaItem?;
           if (tag != null) {
             try {
               activeSong = songs.firstWhere((s) => s.id.toString() == tag.id);
@@ -113,7 +115,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
   }
 
   void _setupAudioStreams() {
-    _playerStateSubscription = globalAudioPlayer.playerStateStream.listen((state) {
+    final audioPlayer = ref.read(audioPlayerProvider);
+    _playerStateSubscription = audioPlayer.playerStateStream.listen((state) {
       if (mounted) {
         setState(() {
           _isPlaying = state.playing;
@@ -153,10 +156,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
   }
 
   Future<void> _togglePlayback() async {
-    if (globalAudioPlayer.playing) {
-      await globalAudioPlayer.pause();
+    final audioPlayer = ref.read(audioPlayerProvider);
+    if (audioPlayer.playing) {
+      await audioPlayer.pause();
     } else {
-      if (globalAudioPlayer.sequenceState == null && _allSongs.isNotEmpty) {
+      if (audioPlayer.sequenceState == null && _allSongs.isNotEmpty) {
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -167,7 +171,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
           ),
         );
       } else {
-        await globalAudioPlayer.play();
+        await audioPlayer.play();
       }
     }
   }
@@ -238,6 +242,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
     
     return topArtist;
   }
+  
   String get _topSong {
     if (_allSongs.isEmpty) return '-';
     

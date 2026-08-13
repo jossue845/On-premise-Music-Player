@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/providers/auth_notifier.dart';
+import '../../data/providers/auth_provider.dart';
 
 class LastFmAuthScreen extends ConsumerStatefulWidget {
   const LastFmAuthScreen({super.key});
