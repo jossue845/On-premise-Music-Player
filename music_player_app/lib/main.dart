@@ -6,6 +6,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 import 'package:music_player_app/presentation/screens/main_navigation.dart';
 import 'package:music_player_app/presentation/components/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:music_player_app/data/providers/sync_provider.dart';
 import 'package:music_player_app/data/providers/scrobble_provider.dart';
 
 Future<void> main() async {
@@ -50,6 +51,7 @@ class MyApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Wake up the scrobble manager on boot
     ref.read(scrobbleManagerProvider);
+    ref.read(syncManagerProvider);
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,

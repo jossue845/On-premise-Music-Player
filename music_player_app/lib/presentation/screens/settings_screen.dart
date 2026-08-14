@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/services/filesystem_service.dart';
 import 'package:music_player_app/data/repositories/music_folder_repository.dart';
@@ -6,16 +7,19 @@ import 'package:music_player_app/data/repositories/song_repository.dart';
 import 'package:music_player_app/presentation/screens/equalizer_screen.dart';
 import 'package:sqflite/sqflite.dart';
 
-class SettingsScreen extends StatefulWidget {
+import 'package:music_player_app/data/providers/sync_provider.dart';
+
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _isScanning = false;
   bool _isFetchingArt = false;
+  bool _isSyncingLastFm = false; 
   String _scanStatus = '';
   late MusicFolderRepository _musicFolderRepository;
   late DatabaseService _databaseService;
@@ -109,7 +113,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  // --- Automated Artwork Fetching Pipeline ---
   Future<void> _scanForMissingArtwork() async {
     setState(() => _isFetchingArt = true);
     
@@ -121,7 +124,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (result.isSuccess()) {
         final songs = result.getOrThrow();
         
-        // Loop through all songs and target the ones missing images
         for (var song in songs) {
           if (song.imagePath == null || song.imagePath!.isEmpty) {
             await songRepo.fetchAndSaveMissingArtwork(song);
@@ -148,77 +150,118 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: const Text('Settings'),
       ),
       body: Center(
-        child: Column(
-          children: [
-            // Scan for music
-            Padding(
-              padding: const EdgeInsets.only(left: 25.0, top: 25),
-              child: ListTile(
-                title: const Text("Look for new music"), // Scan songs
-                subtitle: _scanStatus.isNotEmpty 
-                    ? Text(
-                        _scanStatus,
-                        style: TextStyle(
-                          color: _scanStatus.contains('Error') ? Colors.red : Colors.green,
-                        ),
-                      )
-                    : null,
-                onTap: _isScanning ? null : _scanMusic,
-                enabled: !_isScanning,
-                trailing: _isScanning
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.music_note),
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 25.0, top: 25),
+                child: ListTile(
+                  title: const Text("Look for new music"), 
+                  subtitle: _scanStatus.isNotEmpty 
+                      ? Text(
+                          _scanStatus,
+                          style: TextStyle(
+                            color: _scanStatus.contains('Error') ? Colors.red : Colors.green,
+                          ),
+                        )
+                      : null,
+                  onTap: _isScanning ? null : _scanMusic,
+                  enabled: !_isScanning,
+                  trailing: _isScanning
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.music_note),
+                ),
               ),
-            ),
-            
-            Padding(
-              padding: const EdgeInsets.only(left: 25.0, top: 25),
-              child: ListTile(
-                title: const Text("Songs folder"), // Define where the songs are going to be
-                subtitle: const Text("Set the folder to scan for music"),
-                onTap: _setSongsFolder,
-                trailing: const Icon(Icons.folder),
+              
+              Padding(
+                padding: const EdgeInsets.only(left: 25.0, top: 25),
+                child: ListTile(
+                  title: const Text("Songs folder"), 
+                  subtitle: const Text("Set the folder to scan for music"),
+                  onTap: _setSongsFolder,
+                  trailing: const Icon(Icons.folder),
+                ),
               ),
-            ),
+          
+              Padding(
+                padding: const EdgeInsets.only(left: 25.0, top: 25),
+                child: ListTile(
+                  title: const Text('Fetch Missing Album Art'),
+                  subtitle: const Text('Searches MusicBrainz & Cover Art Archive'),
+                  onTap: _isFetchingArt ? null : _scanForMissingArtwork,
+                  trailing: _isFetchingArt 
+                      ? const SizedBox(
+                          width: 24, 
+                          height: 24, 
+                          child: CircularProgressIndicator(strokeWidth: 2)
+                        ) 
+                      : const Icon(Icons.image_search),
+                ),
+              ),
+                          
+              Padding(
+                padding: const EdgeInsets.only(left: 25.0, top: 25),
+                child: ListTile(
+                  title: const Text("Equalizer"),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const EqualizerScreen(),
+                      ),
+                    ); 
+                  },
+                  trailing: const Icon(Icons.equalizer),
+                ),
+              ),
 
-            // --- NEW: Fetch Missing Artwork Trigger ---
-            Padding(
-              padding: const EdgeInsets.only(left: 25.0, top: 25),
-              child: ListTile(
-                title: const Text('Fetch Missing Album Art'),
-                subtitle: const Text('Searches MusicBrainz & Cover Art Archive'),
-                onTap: _isFetchingArt ? null : _scanForMissingArtwork,
-                trailing: _isFetchingArt 
-                    ? const SizedBox(
-                        width: 24, 
-                        height: 24, 
-                        child: CircularProgressIndicator(strokeWidth: 2)
-                      ) 
-                    : const Icon(Icons.image_search),
+              Padding(
+                padding: const EdgeInsets.only(left: 25.0, top: 25),
+                child: ListTile(
+                  title: const Text("Force Sync Last.fm"),
+                  subtitle: const Text("Manually push offline scrobbles to your account"),
+                  onTap: _isSyncingLastFm ? null : () async {
+                    setState(() => _isSyncingLastFm = true);
+
+                    try {
+                      await ref.read(syncManagerProvider).forceSync();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Offline sync cycle completed.'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Sync Failed: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    } finally {
+                      if (mounted) setState(() => _isSyncingLastFm = false);
+                    }
+                  },
+                  trailing: _isSyncingLastFm
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.sync, color: Colors.green),
+                ),
               ),
-            ),
-                        
-            // Equalizer
-            Padding(
-              padding: const EdgeInsets.only(left: 25.0, top: 25),
-              child: ListTile(
-                title: const Text("Equalizer"),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const EqualizerScreen(),
-                    ),
-                  ); 
-                },
-                trailing: const Icon(Icons.equalizer),
-              ),
-            ),
-          ],
+              const SizedBox(height: 40), 
+            ],
+          ),
         ),
       ),
     );

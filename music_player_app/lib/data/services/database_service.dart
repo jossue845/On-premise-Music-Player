@@ -48,49 +48,20 @@ class DatabaseService {
   static const String _keyColumnName = "key";
   static const String _valueColumnName = "value";
 
+  // --- NEW: Scrobbles table name ---
+  static const String _scrobblesTableName = "scrobbles";
+
   Database? _database;
   DatabaseFactory databaseFactory;
 
   DatabaseService({required this.databaseFactory});
 
+  // --- CORRECTED: Route directly through your existing open() method ---
   Future<Database> get database async {
     if (_database != null) return _database!;
-    
-    _database = await initDatabase();
+    await open();
     return _database!;
   }
-
-  Future<Database> initDatabase() async {
-  final dbPath = await getDatabasesPath();
-  final path = join(dbPath, 'offpulse_app.db');
-
-  return await openDatabase(
-    path,
-    version: 2, // Incremented database version
-    onCreate: (db, version) async {
-      // Existing tables creation...
-      await _createScrobblesTable(db);
-    },
-    onUpgrade: (db, oldVersion, newVersion) async {
-      if (oldVersion < 2) {
-        await _createScrobblesTable(db);
-      }
-    },
-  );
-}
-
-Future<void> _createScrobblesTable(Database db) async {
-  await db.execute('''
-    CREATE TABLE scrobbles (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      artist TEXT NOT NULL,
-      track TEXT NOT NULL,
-      album TEXT,
-      timestamp INTEGER NOT NULL,
-      is_synced INTEGER NOT NULL DEFAULT 0
-    )
-  ''');
-}
 
   FutureOr<void> _createOrUpdateDb(Database db) async {
     await db.transaction((txn) async {
@@ -109,7 +80,7 @@ Future<void> _createScrobblesTable(Database db) async {
            FOREIGN KEY($_artistIdColumnName) REFERENCES $_artistTableName($_artistIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT);
           ''');
           
-      // --- CORRECTED: Added lyrics TEXT column to the end of the song table schema ---
+      // Added lyrics TEXT column to the end of the song table schema
       await txn.execute('''
          CREATE TABLE IF NOT EXISTS $_songTableName(
            $_songIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -144,6 +115,19 @@ Future<void> _createScrobblesTable(Database db) async {
       await txn.execute('''
          CREATE TABLE IF NOT EXISTS $_keyValueStoreTableName($_keyColumnName TEXT PRIMARY KEY, $_valueColumnName TEXT NOT NULL);
           ''');
+
+      // --- CORRECTED: Offline scrobbles caching table injected here ---
+      await txn.execute('''
+         CREATE TABLE IF NOT EXISTS $_scrobblesTableName(
+           id INTEGER PRIMARY KEY AUTOINCREMENT,
+           artist TEXT NOT NULL,
+           track TEXT NOT NULL,
+           album TEXT,
+           timestamp INTEGER NOT NULL,
+           is_synced INTEGER NOT NULL DEFAULT 0
+         );
+      ''');
+
       await txn.execute('''
          CREATE TRIGGER IF NOT EXISTS delete_album_if_songs_are_deleted
            AFTER DELETE ON $_songTableName
@@ -229,10 +213,11 @@ Future<void> _createScrobblesTable(Database db) async {
           await db.execute('DROP TABLE IF EXISTS $_artistTableName');
           await db.execute('DROP TABLE IF EXISTS $_playlistTableName');
           await db.execute('DROP TABLE IF EXISTS $_keyValueStoreTableName');
+          await db.execute('DROP TABLE IF EXISTS $_scrobblesTableName'); // Included the scrobbles drop
           return await _createOrUpdateDb(db);
         },
-        // --- CORRECTED: Incremented version to 6 to trigger onUpgrade ---
-        version: 6,
+        // --- CORRECTED: Incremented version to 7 to safely trigger the upgrade and build the new table ---
+        version: 7, 
       ),
     );
   }
@@ -243,18 +228,6 @@ Future<void> _createScrobblesTable(Database db) async {
   }
 
   /// Returns the songs in the database associated to an album and at least one song artist.
-  ///
-  /// Is's required for an inserted song to have those attributes, therefore no song is expected to be ignored.
-  ///
-  /// Returns the songs made by the artist identified by [artistId] when it is not null.
-  ///
-  /// Returns the songs in the album identified by [albumId] when it is not null.
-  ///
-  /// Returns the songs in the playlist identified by [playlistId] when it is not null.
-  ///
-  /// Returns the song with the [path] when it is not null.
-  ///
-  /// Only one of all the attributes should be set.
   Future<Result<List<Song>>> getSongs({
     int? artistId,
     int? albumId,
@@ -264,7 +237,6 @@ Future<void> _createScrobblesTable(Database db) async {
     try {
       final List<Map<String, Object?>> entries;
 
-      // Get the songs, with a different entry for each song, song_artist pair.
       if (artistId != null) {
         entries = await _database!.rawQuery('''
           SELECT * FROM $_songTableName NATURAL JOIN $_albumTableName NATURAL JOIN $_songArtistTableName NATURAL JOIN $_artistTableName WHERE $_songIdColumnName IN
@@ -323,14 +295,11 @@ Future<void> _createScrobblesTable(Database db) async {
   }
 
   /// Helper for the getSongs* functions.
-  ///
-  /// Creates the [Song] objects from the query result [entries] and returns them as a list.
   List<Song> _processSongQuery(List<Map<String, Object?>> entries) {
     final Map<int, Song> songs = {};
     for (final entry in entries) {
       final songId = entry[_songIdColumnName] as int;
 
-      // Create and add song if it's id is not present in the map.
       if (!songs.containsKey(songId)) {
         songs[songId] = Song(
           id: songId,
@@ -347,10 +316,9 @@ Future<void> _createScrobblesTable(Database db) async {
           imagePath: entry[_imagePathColumnName] as String?,
           favorite: ((entry[_favoriteColumnName] as int) == 1) ? true : false,
           playCount: entry[_playCountColumnName] as int? ?? 0,
-          lyrics: entry['lyrics'] as String?, // --- CORRECTED: Ensure lyrics map back ---
+          lyrics: entry['lyrics'] as String?, 
         );
       } else {
-        // Add the artist to the list of song artists if the song is already created.
         final artists = List.of(songs[songId]!.artists);
         artists.add(entry[_artistNameColumnName] as String);
         songs[songId] = songs[songId]!.copyWith(
@@ -361,7 +329,7 @@ Future<void> _createScrobblesTable(Database db) async {
     return songs.values.toList();
   }
 
-/// Increments the play count of the song identified by [songId].
+  /// Increments the play count of the song identified by [songId].
   Future<Result<void>> incrementPlayCount(int songId) async {
     try {
       await _database!.rawUpdate(
@@ -374,11 +342,9 @@ Future<void> _createScrobblesTable(Database db) async {
     }
   }
 
-  // --- CORRECTED: Using the correct schema parameter names in the update ---
   Future<int> updateSong(Song song) async {
     final db = await _database; 
     
-    // We must map the properties exactly to the column names used in the table
     return await db!.update(
       _songTableName,
       {
@@ -399,21 +365,12 @@ Future<void> _createScrobblesTable(Database db) async {
   }
 
   /// Returns the albums in the database associated to at least one album artist.
-  ///
-  /// Is's required for an inserted album to have that attribute, therefore no album is expected to be ignored.
-  ///
-  /// Returns the albums made by the artist identified by [artistId] when it is not null.
-  ///
-  /// Returns the album that contains the song identified by [songId] when it is not null.
-  ///
-  /// Only one of all the attributes should be set.
   Future<Result<List<Album>>> getAlbums({int? artistId, int? songId}) async {
     final Map<int, Album> albums = {};
     late List<Map<String, Object?>> albumArtistsEntries;
     late List<Map<String, Object?>> albumInfoEntries;
 
     try {
-      // Get the albums and the associated metadata.
       await _database!.transaction((txn) async {
         if (artistId != null) {
           albumArtistsEntries = await txn.rawQuery('''
@@ -446,7 +403,6 @@ Future<void> _createScrobblesTable(Database db) async {
       for (final entry in albumArtistsEntries) {
         final albumId = entry[_albumIdColumnName] as int;
 
-        // Create and add album if it's id is not present in the map.
         if (!albums.containsKey(albumId)) {
           albums[albumId] = Album(
             id: albumId,
@@ -456,7 +412,6 @@ Future<void> _createScrobblesTable(Database db) async {
             ]),
           );
         } else {
-          // Add the artist to the list of album artists if the song is already created.
           final artists = List.of(albums[albumId]!.albumArtists);
           artists.add(entry[_artistNameColumnName] as String);
           albums[albumId] = albums[albumId]!.copyWith(
@@ -465,7 +420,6 @@ Future<void> _createScrobblesTable(Database db) async {
         }
       }
 
-      // Add image and year to the albums.
       for (final entry in albumInfoEntries) {
         final albumId = entry[_albumIdColumnName] as int;
         if (albums.containsKey(albumId)) {
@@ -531,13 +485,11 @@ Future<void> _createScrobblesTable(Database db) async {
       final List<int> queueList = [];
       int currentSongIndex = 0;
 
-      // Get queue
       final queueEntries = await _database!.query(
         _queuedSongTableName,
         orderBy: _positionColumnName,
       );
 
-      // Build id list and check for current song.
       for (final entry in queueEntries) {
         queueList.add(entry[_songIdColumnName] as int);
         if ((entry[_currentSongColumnName] as int) == 1) {
@@ -555,11 +507,6 @@ Future<void> _createScrobblesTable(Database db) async {
     }
   }
 
-  /// Inserts a row in the song table with the specified metadata.
-  ///
-  /// Uses the specified database [executor] to perform the insert.
-  ///
-  /// Returns the id of the inserted song.
   Future<Result<int>> _insertSong({
     required DatabaseExecutor executor,
     required String title,
@@ -586,11 +533,6 @@ Future<void> _createScrobblesTable(Database db) async {
     }
   }
 
-  /// Inserts a row in the album table with the specified [title].
-  ///
-  /// Uses the specified database [executor] to perform the insert.
-  ///
-  /// Returns the id of the inserted album.
   Future<Result<int>> _insertAlbum({
     required DatabaseExecutor executor,
     required String title,
@@ -605,11 +547,6 @@ Future<void> _createScrobblesTable(Database db) async {
     }
   }
 
-  /// Inserts a row in the artist table with the specified [artistName] if it wasn't already present.
-  ///
-  /// Uses the specified database [executor] to perform the insert.
-  ///
-  /// Returns the id of the inserted, or already present, artist.
   Future<Result<int>> _insertArtistIfAbsent(
     DatabaseExecutor executor,
     String artistName,
@@ -635,9 +572,6 @@ Future<void> _createScrobblesTable(Database db) async {
     }
   }
 
-  /// Inserts a row in the song artist table with the specified [songId] and [artistId].
-  ///
-  /// Uses the specified database [executor] to perform the insert.
   Future<Result<void>> _insertSongArtist(
     DatabaseExecutor executor,
     int songId,
@@ -650,7 +584,7 @@ Future<void> _createScrobblesTable(Database db) async {
           _songIdColumnName: songId,
           _artistIdColumnName: artistId,
         },
-        conflictAlgorithm: ConflictAlgorithm.ignore, // Prevents duplicate artist tag crashes
+        conflictAlgorithm: ConflictAlgorithm.ignore, 
       );
       return Success(unit);
     } on Exception catch (e) {
@@ -658,9 +592,6 @@ Future<void> _createScrobblesTable(Database db) async {
     }
   }
 
-  /// Inserts a row in the album artist table with the specified [albumId] and [artistId].
-  ///
-  /// Uses the specified database [executor] to perform the insert.
   Future<Result<void>> _insertAlbumArtist(
     DatabaseExecutor executor,
     int albumId,
@@ -673,7 +604,7 @@ Future<void> _createScrobblesTable(Database db) async {
           _albumIdColumnName: albumId,
           _artistIdColumnName: artistId,
         },
-        conflictAlgorithm: ConflictAlgorithm.ignore, // Prevents duplicate artist tag crashes
+        conflictAlgorithm: ConflictAlgorithm.ignore, 
       );
       return Success(unit);
     } on Exception catch (e) {
@@ -681,13 +612,6 @@ Future<void> _createScrobblesTable(Database db) async {
     }
   }
 
-  /// Inserts a row in the album table with the specified [albumTitle] if it wasn't already present.
-  ///
-  /// Checks album equality using [albumTitle] and [albumArtistIds].
-  ///
-  /// Uses the specified database [executor] to perform the insert.
-  ///
-  /// Returns the id of the inserted, or already present, album.
   Future<Result<int>> _insertAlbumIfAbsent(
     DatabaseExecutor executor,
     String albumTitle,
@@ -697,13 +621,11 @@ Future<void> _createScrobblesTable(Database db) async {
       int albumId = -1;
       final Map<int, List<int>> potentialAlbums = {};
 
-      // Get albums titled $albumTitle, with one entry per album, album artist pair.
       final albumQueryResult = await executor.rawQuery(
         "SELECT * FROM $_albumTableName NATURAL JOIN $_albumArtistTableName WHERE $_albumTitleColumnName = ?;",
         [albumTitle],
       );
 
-      // Map the album artists to the album ids.
       for (final element in albumQueryResult) {
         final potentialAlbumId = element[_albumIdColumnName] as int;
         potentialAlbums.putIfAbsent(potentialAlbumId, () => []);
@@ -712,9 +634,7 @@ Future<void> _createScrobblesTable(Database db) async {
         );
       }
 
-      // Check if the album was already inserted.
       for (final album in potentialAlbums.keys) {
-        // Check if the album artists are the same.
         if (potentialAlbums[album]!.length == albumArtistIds.length &&
             albumArtistIds.toSet().containsAll(
               potentialAlbums[album]!.toSet(),
@@ -724,7 +644,6 @@ Future<void> _createScrobblesTable(Database db) async {
         }
       }
 
-      // If the album was not present, create it and insert the album artists.
       if (albumId == -1) {
         albumId = await _insertAlbum(
           executor: executor,
@@ -741,11 +660,6 @@ Future<void> _createScrobblesTable(Database db) async {
     }
   }
 
-  /// Inserts a song and all of the entities related to it into the database.
-  ///
-  /// The following tables are affected:
-  /// song, song artist
-  /// album, artist, album artist if they are not already present
   Future<Result<int>> insertSong({
     required String title,
     String? genre,
@@ -780,7 +694,6 @@ Future<void> _createScrobblesTable(Database db) async {
         final List<int> albumArtistIds = [];
         final int albumId;
 
-        // Insert artists and save their ids.
         for (final artist in songArtistNames) {
           songArtistIds.add(
             await _insertArtistIfAbsent(txn, artist).getOrThrow(),
@@ -792,14 +705,12 @@ Future<void> _createScrobblesTable(Database db) async {
           );
         }
 
-        // Insert album and get its id.
         albumId = await _insertAlbumIfAbsent(
           txn,
           albumTitle,
           albumArtistIds,
         ).getOrThrow();
 
-        // Insert song and song artists.
         songId = await _insertSong(
           executor: txn,
           title: title,
@@ -821,9 +732,6 @@ Future<void> _createScrobblesTable(Database db) async {
     }
   }
 
-  /// Deletes the songs identified by [songIds] from the database.
-  ///
-  /// The related metadata is handled by triggers and foreign key actions.
   Future<Result<void>> deleteSongs({
     List<int>? songIds,
     List<String>? songPaths,
@@ -863,9 +771,6 @@ Future<void> _createScrobblesTable(Database db) async {
     }
   }
 
-  /// Updates [oldSong] with the specified metadata.
-  ///
-  /// Returns a new [Song] with the updated metadata.
   Future<Result<Song>> updateTags({
     required Song oldSong,
     String? newTitle,
@@ -884,32 +789,27 @@ Future<void> _createScrobblesTable(Database db) async {
         final List<int> songArtistIds = [];
         final List<int> albumArtistIds = [];
 
-        // Update song artists.
         if (newSongArtistNames != null &&
             newSongArtistNames.isNotEmpty &&
             newSongArtistNames.where((a) => a.isEmpty).isEmpty) {
-          // Delete old song artists.
           await txn.delete(
             _songArtistTableName,
             where: "$_songIdColumnName = ?",
             whereArgs: [oldSong.id],
           );
 
-          // Insert artists and save their ids.
           for (final artist in newSongArtistNames) {
             songArtistIds.add(
               await _insertArtistIfAbsent(txn, artist).getOrThrow(),
             );
           }
 
-          // Insert song artists.
           for (final artistId in songArtistIds) {
             (await _insertSongArtist(txn, oldSong.id, artistId)).getOrThrow();
           }
         }
 
         if (newAlbumTitle != null && newAlbumTitle.isNotEmpty) {
-          // Get album artist ids.
           final albumArtistEntries = await txn.query(
             _albumArtistTableName,
             where: "$_albumIdColumnName = ?",
@@ -924,7 +824,6 @@ Future<void> _createScrobblesTable(Database db) async {
                 .toList(),
           ).getOrThrow();
 
-          // Update song tuple with the new albumId.
           txn.update(
             _songTableName,
             Map.fromEntries([MapEntry(_albumIdColumnName, albumId)]),
@@ -935,25 +834,21 @@ Future<void> _createScrobblesTable(Database db) async {
           newSong = newSong.copyWith(albumId: albumId);
         }
 
-        // Update album artists.
         if (newAlbumArtistNames != null &&
             newAlbumArtistNames.isNotEmpty &&
             newAlbumArtistNames.where((a) => a.isEmpty).isEmpty) {
-          // Delete old album artists.
           await txn.delete(
             _albumArtistTableName,
             where: "$_albumIdColumnName = ?",
             whereArgs: [newSong.albumId],
           );
 
-          // Insert artists and save their ids.
           for (final artist in newAlbumArtistNames) {
             albumArtistIds.add(
               await _insertArtistIfAbsent(txn, artist).getOrThrow(),
             );
           }
 
-          // Insert album artists.
           for (final artistId in albumArtistIds) {
             (await _insertAlbumArtist(
               txn,
@@ -963,7 +858,6 @@ Future<void> _createScrobblesTable(Database db) async {
           }
         }
 
-        // Update title.
         if (newTitle != null && newTitle.isNotEmpty) {
           await txn.update(
             _songTableName,
@@ -974,7 +868,6 @@ Future<void> _createScrobblesTable(Database db) async {
           newSong = newSong.copyWith(title: newTitle);
         }
 
-        // Update genre.
         if (newGenre != null && newGenre.isNotEmpty) {
           await txn.update(
             _songTableName,
@@ -985,7 +878,6 @@ Future<void> _createScrobblesTable(Database db) async {
           newSong = newSong.copyWith(genre: newGenre);
         }
 
-        // Update year.
         if (newYear != null) {
           await txn.update(
             _songTableName,
@@ -996,7 +888,6 @@ Future<void> _createScrobblesTable(Database db) async {
           newSong = newSong.copyWith(year: newYear);
         }
 
-        // Update track number.
         if (newTrackNumber != null) {
           await txn.update(
             _songTableName,
@@ -1007,7 +898,6 @@ Future<void> _createScrobblesTable(Database db) async {
           newSong = newSong.copyWith(trackNumber: newTrackNumber);
         }
 
-        // Update path.
         if (newPath != null && newPath.isNotEmpty) {
           await txn.update(
             _songTableName,
@@ -1018,7 +908,6 @@ Future<void> _createScrobblesTable(Database db) async {
           newSong = newSong.copyWith(path: newPath);
         }
 
-        // Update image path.
         if (newImagePath != null && newImagePath.isNotEmpty) {
           await txn.update(
             _songTableName,
@@ -1036,9 +925,6 @@ Future<void> _createScrobblesTable(Database db) async {
     }
   }
 
-  /// Inserts a playlist titled [playlistTitle] in the database.
-  ///
-  /// Returns the playlist id.
   Future<Result<int>> insertPlaylist(String playlistTitle) async {
     try {
       final playlistId = await _database!.insert(_playlistTableName, {
@@ -1050,7 +936,6 @@ Future<void> _createScrobblesTable(Database db) async {
     }
   }
 
-  /// Inserts rows in the playlist track table with the specified [playlistId] and [songIds].
   Future<Result<void>> insertPlaylistTracks(
     int playlistId,
     List<int> songIds,
@@ -1072,7 +957,6 @@ Future<void> _createScrobblesTable(Database db) async {
     }
   }
 
-  /// Deletes rows from the playlist table identified by [playlistIds].
   Future<Result<void>> deletePlaylists(List<int> playlistIds) async {
     try {
       await _database!.transaction((txn) async {
@@ -1096,7 +980,6 @@ Future<void> _createScrobblesTable(Database db) async {
     }
   }
 
-  /// Deletes rows from the playlist track table identified by [playlistId] and [songIds].
   Future<Result<void>> deletePlaylistTracks(
     int playlistId,
     List<int> songIds,
@@ -1126,7 +1009,6 @@ Future<void> _createScrobblesTable(Database db) async {
     }
   }
 
-  /// Saves the [queue] to the database, raplacing whatever was saved before it.
   Future<Result<void>> saveQueue(SongQueue queue) async {
     try {
       await _database!.transaction((txn) async {
@@ -1148,35 +1030,6 @@ Future<void> _createScrobblesTable(Database db) async {
     }
   }
 
-  /*
-  Future<Result<void>> addSongsToQueue(List<int> songIds) async {
-    try {
-      await _database!.transaction((txn) async {
-        final queue = await txn.query(
-          _queuedSongTableName,
-          columns: [_songIdColumnName],
-        );
-        final batch = txn.batch();
-
-        for (final id in songIds) {
-          batch.insert(_queuedSongTableName, {
-            _songIdColumnName: id,
-            _positionColumnName: songIds.indexOf(id) + queue.length,
-            _currentSongColumnName: (queue.isEmpty && songIds.indexOf(id) == 0)
-                ? 1
-                : 0,
-          });
-        }
-        batch.commit();
-      });
-      return Success(unit);
-    } on Exception catch (e) {
-      return Failure(e);
-    }
-  }
-  */
-
-  /// Empties the queue table.
   Future<Result<void>> deleteQueue({DatabaseExecutor? executor}) async {
     try {
       DatabaseExecutor? db = (executor != null) ? executor : _database;
@@ -1187,14 +1040,6 @@ Future<void> _createScrobblesTable(Database db) async {
     }
   }
 
-  // Future<void> _deleteDatabase() async {
-  //   if (_database == null) {
-  //     await open();
-  //   }
-  //   databaseFactory.deleteDatabase(_database!.path);
-  // }
-
-  /// Returns the paths of all the songs.
   Future<Result<List<String>>> getSongPaths() async {
     try {
       final list = (await _database!.query(
@@ -1207,7 +1052,6 @@ Future<void> _createScrobblesTable(Database db) async {
     }
   }
 
-  /// Inserts a key-value pair in the key-value store.
   Future<Result<void>> insertKVPair(String key, String value) async {
     try {
       await _database!.insert(_keyValueStoreTableName, {
@@ -1220,7 +1064,6 @@ Future<void> _createScrobblesTable(Database db) async {
     }
   }
 
-  /// Returns the value associated to the provided [key] in the key-value store.
   Future<Result<String>> getValue(String key) async {
     try {
       final queryResult = (await _database!.query(
@@ -1240,7 +1083,6 @@ Future<void> _createScrobblesTable(Database db) async {
     }
   }
 
-  /// Whether the provided [imagePath] is in the database.
   Future<Result<bool>> isImagePathPresent(String imagePath) async {
     try {
       final queryResult = (await _database!.rawQuery(
@@ -1257,15 +1099,13 @@ Future<void> _createScrobblesTable(Database db) async {
     }
   }
 
-  /// Sets the favorite status of the song identified by [songId] to [favorite].
   Future<Result<void>> setFavoriteStatus(int songId, bool favorite) async {
     try {
       final int value = (favorite) ? 1 : 0;
       await _database!.update(
         _songTableName,
         {_favoriteColumnName: value},
-        where:
-            "$_songIdColumnName = ?", //missing dollar sign, it previouly was looking for the colum named _sonIdColumName xd
+        where: "$_songIdColumnName = ?", 
         whereArgs: [songId],
       );
       return Success(unit);
