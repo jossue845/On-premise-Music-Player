@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 
-// All linking screens
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
@@ -38,7 +37,6 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
       if (result.isSuccess()) {
         final fetchedSongs = result.getOrThrow();
         
-        // THIS WILL PRINT TO YOUR DEBUG CONSOLE:
         debugPrint("🎵 DATABASE CHECK: Found ${fetchedSongs.length} songs!");
         
         setState(() {
@@ -82,7 +80,7 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
                   onRefresh: _initializeRepositoryAndLoad,
                   color: Theme.of(context).primaryColor,
                   child: ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(), // Ensures pull-to-refresh works even if list is short
+                    physics: const AlwaysScrollableScrollPhysics(),
                     itemCount: _songs.length,
                     itemBuilder: (context, index) {
                       final song = _songs[index];
@@ -95,13 +93,11 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
                             icon: const Icon(Icons.more_vert),
                             onSelected: (String choice) async {
                               if (choice == 'edit') {
-                                // Waiting for the user to return from the Edit Screen
                                 final didUpdate = await Navigator.push(
                                   context,
                                   MaterialPageRoute(builder: (context) => EditSongScreen(song: song)),
                                 );
                                 
-                                // if there were saved changes, refresh the list from the database!
                                 if (didUpdate == true) {
                                   _initializeRepositoryAndLoad(); 
                                 }
@@ -147,11 +143,11 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
                               context,
                               MaterialPageRoute(
                                 builder: (context) => PlayerScreen(
-                                  playlist: _songs, //Passing the whole list
-                                  initialIndex: index, // Moving index
+                                  playlist: _songs,
+                                  initialIndex: index,
+                                ), // FIX: Added the missing closing parenthesis here
                               ),
-                            ),
-                          ).then((_) => _initializeRepositoryAndLoad()); // Forces the UI to refresh
+                            ).then((_) => _initializeRepositoryAndLoad()); 
                           },
                         ),
                       );

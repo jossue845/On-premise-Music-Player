@@ -31,7 +31,7 @@ Future<void> main() async {
       debugPrint('🔴 STACK: $stack');
       return true;
     };
-
+ 
     // Wrap the root widget in ProviderScope to enable Riverpod state management
     runApp(
       const ProviderScope(

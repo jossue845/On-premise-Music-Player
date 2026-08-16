@@ -5,7 +5,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:music_player_app/data/providers/audio_player_provider.dart';
 import 'package:just_audio_background/just_audio_background.dart';
-// Linked screens
+
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
@@ -29,13 +29,11 @@ class PlayerScreen extends ConsumerStatefulWidget {
 }
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
-  // Using global player to prevent ANR crashes and allow background playback
   late SongRepository _songRepository;
   late List<Song> _localPlaylist;
   late AudioPlayer _audioPlayer;
   
   bool _isPlaying = false;
-  // Song position control
   double _currentPosition = 0.0;
   double _totalDuration = 1.0; 
   bool _isShuffle = false;
@@ -58,18 +56,42 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   Future<void> _initPlayer() async {
     if (_localPlaylist.isEmpty) return;
     _setupStreams();
-    // Ask the global player what it is currently playing
+    
     final targetSong = _localPlaylist[widget.initialIndex];
     final currentTag = _audioPlayer.sequenceState?.currentSource?.tag as MediaItem?;
-    // Check if the IDs match
     final isAlreadyPlaying = currentTag?.id == targetSong.id.toString();
 
-    //If it's the exact same song, DO NOT reset the player.
     if (isAlreadyPlaying) {
       return; 
     }
 
-    // If it's a new song, build the new playlist queue and start playback
+    // --- FIX: Check if the current queue matches the intended playlist ---
+    final currentSequence = _audioPlayer.sequenceState?.sequence;
+    bool isSamePlaylist = false;
+    
+    if (currentSequence != null && currentSequence.length == _localPlaylist.length) {
+      isSamePlaylist = true;
+      for (int i = 0; i < currentSequence.length; i++) {
+         final tag = currentSequence[i].tag as MediaItem?;
+         if (tag?.id != _localPlaylist[i].id.toString()) {
+           isSamePlaylist = false;
+           break;
+         }
+      }
+    }
+
+    // If the sequence is the same, simply jump to the target song without destroying the queue
+    if (isSamePlaylist) {
+       try {
+          await _audioPlayer.seek(Duration.zero, index: widget.initialIndex);
+          await _audioPlayer.play();
+       } catch (e) {
+          debugPrint("PLAYER SEEK ERROR: $e");
+       }
+       return;
+    }
+
+    // If it's a completely new sequence, safely load it
     try {
       final audioSources = _localPlaylist.map((song) {
         return AudioSource.uri(
@@ -94,11 +116,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   void _setupStreams() {
     _audioPlayer.currentIndexStream.listen((index) {
-      // Safety check to prevent out-of-bounds crashes
       if (mounted && index != null && index < _localPlaylist.length) {
-        setState(() {
-          _currentIndex = index;
-        });
+        // --- FIX: Verify the audio engine has actually loaded the new song before visually jumping ---
+        final tag = _audioPlayer.sequenceState?.sequence[index].tag as MediaItem?;
+        if (tag?.id == _localPlaylist[index].id.toString()) {
+          setState(() {
+            _currentIndex = index;
+          });
+        }
       }
     });
 
@@ -117,7 +142,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   void dispose() {
-    // Do not dispose the global player here to allow music to continue playing across screens 
     super.dispose();
   }
 
@@ -180,7 +204,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Failsafe in case the index gets out of sync briefly during a shuffle
     if (_currentIndex >= _localPlaylist.length) return const Scaffold();
 
     final currentSong = _localPlaylist[_currentIndex];
@@ -214,15 +237,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         );
 
                         if (didUpdate == true) {
-                          // Fetch the updated song from the database without stopping the music
                           final result = await _songRepository.getSongs();
                           if (result.isSuccess()) {
                             final allSongs = result.getOrThrow();
                             
-                            // Find the newly edited song by its ID
                             final updatedSong = allSongs.firstWhere((s) => s.id == currentSong.id);
                             
-                            // Update the local playlist and refresh the UI
                             setState(() {
                               _localPlaylist[_currentIndex] = updatedSong;
                             });
@@ -232,7 +252,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            // Fixed: Now correctly navigating to the EqualizerScreen
                             builder: (context) => const EqualizerScreen(),
                           ),
                         );
@@ -347,7 +366,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               
               const SizedBox(height: 30),
               
-              // LYRICS BUTTON
               Center(
                 child: TextButton.icon(
                   style: TextButton.styleFrom(
@@ -370,7 +388,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         ),
                       );
                     } catch (e, stackTrace) {
-                      // This will catch and print any synchronous errors thrown during navigation or initial screen build
                       debugPrint('NAVIGATION CRASH: $e');
                       debugPrint('STACK TRACE:\n$stackTrace');
                     }

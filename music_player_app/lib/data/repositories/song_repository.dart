@@ -2,12 +2,12 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:audiotags/audiotags.dart';
+import 'package:http/http.dart' as http;
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
 import 'package:music_player_app/utils/tag_utils.dart';
 import 'package:result_dart/result_dart.dart';
-import 'package:music_player_app/data/services/musicbrainz_service.dart';
-import 'package:music_player_app/data/services/cover_art_archive_service.dart';
+import 'package:music_player_app/data/services/audiodb_service.dart';
 import 'package:music_player_app/data/services/lrclib_service.dart';
 
 class SongRepository {
@@ -15,11 +15,6 @@ class SongRepository {
 
   SongRepository({required DatabaseService database}) : _database = database;
 
-  /// Returns all the songs.
-  ///
-  /// Returns the songs in the album identified by [albumId] if it is not null.
-  /// Returns the songs from the artist identified by [artistId] if it is not null.
-  /// Returns the songs in the playlist identified by [playlistId] if it is not null.
   Future<Result<List<Song>>> getSongs({
     int? albumId,
     int? artistId,
@@ -36,52 +31,48 @@ class SongRepository {
   }
 
   Future<Result<Song>> fetchAndSaveMissingArtwork(Song song) async {
-    // Skip the network call if the song already has an image.
     if (song.imagePath != null && song.imagePath!.isNotEmpty) {
       return Success(song);
     }
 
-    final mbService = MusicBrainzService();
-    final caaService = CoverArtArchiveService();
+    final adbService = AudioDbService();
     
-    // Fallback to avoid searching with empty metadata
     final artistName = song.artists.isNotEmpty ? song.artists.first : '';
     if (artistName.isEmpty || artistName == 'Unknown Artist' || song.album.isEmpty || song.album == 'Unknown Album') {
       return Failure(Exception("Missing valid album or artist metadata for search."));
     }
 
     try {
-      // 1. Search MusicBrainz for the Album (Release Group) ID
-      final searchResult = await mbService.searchAlbum(song.album, artistName);
+      final searchResult = await adbService.searchAlbum(song.album, artistName);
       if (searchResult.isError()) return Failure(searchResult.exceptionOrNull()!);
 
       final data = searchResult.getOrThrow();
-      final releaseGroups = data['release-groups'] as List?;
+      final albums = data['album'] as List?;
       
-      if (releaseGroups == null || releaseGroups.isEmpty) {
-        return Failure(Exception("No matching album found on MusicBrainz."));
+      if (albums == null || albums.isEmpty) {
+        return Failure(Exception("No matching album found on TheAudioDB."));
       }
 
-      // Extract the MusicBrainz ID (MBID) of the highest-ranked search match
-      final mbid = releaseGroups.first['id'] as String;
+      final artUrl = albums.first['strAlbumThumb'] as String?;
+      if (artUrl == null || artUrl.isEmpty) {
+        return Failure(Exception("No artwork image found for this album."));
+      }
 
-      // 2. Fetch the Cover Art bytes using the MBID
-      final artResult = await caaService.getFrontCover(mbid);
-      if (artResult.isError()) return Failure(artResult.exceptionOrNull()!);
+      final response = await http.get(Uri.parse(artUrl));
+      if (response.statusCode != 200) {
+         return Failure(Exception("Failed to download image."));
+      }
 
-      final pictureBytes = artResult.getOrThrow();
-
-      // 3. Save the downloaded bytes directly into the MP3 file and SQLite DB
       return await editTags(
         oldSong: song,
-        pictureBytes: pictureBytes,
+        pictureBytes: response.bodyBytes,
       );
     } catch (e) {
       return Failure(Exception("Failed to fetch artwork: $e"));
     }
   }
   
-Future<Result<String>> fetchAndSaveLyrics(Song song) async {
+  Future<Result<String>> fetchAndSaveLyrics(Song song) async {
     if (song.lyrics != null && song.lyrics!.isNotEmpty) {
       return Success(song.lyrics!);
     }
@@ -107,7 +98,6 @@ Future<Result<String>> fetchAndSaveLyrics(Song song) async {
 
       final Map<String, dynamic> data = fetchResult.getOrThrow();
       
-      // Use safe casting to guarantee we handle nulls correctly
       final String? synced = data['syncedLyrics'] as String?;
       final String? plain = data['plainLyrics'] as String?;
       
@@ -135,6 +125,7 @@ Future<Result<String>> fetchAndSaveLyrics(Song song) async {
     }
     return _database.incrementPlayCount(songId);
   }
+
   /// Updates [oldSong] with the provided metadata.
   Future<Result<Song>> editTags({
     required Song oldSong,
@@ -149,7 +140,6 @@ Future<Result<String>> fetchAndSaveLyrics(Song song) async {
   }) async {
     Tag? oldTag = await AudioTags.read(oldSong.path);
 
-    // If the file has no tags, create a new empty tag structure to hold the data
     oldTag ??= Tag(
       title: oldSong.title,
       trackArtist: oldSong.artists.isNotEmpty ? oldSong.artists.first : 'Unknown',
@@ -159,7 +149,6 @@ Future<Result<String>> fetchAndSaveLyrics(Song song) async {
 
     List<Picture> songPics = oldTag.pictures;
 
-    // Replace the old cover picture with the new picture.
     if (pictureBytes != null) {
       songPics.removeWhere((p) => p.pictureType == PictureType.coverFront);
       songPics.add(
@@ -171,10 +160,8 @@ Future<Result<String>> fetchAndSaveLyrics(Song song) async {
       );
     }
 
-    // If the new tags are set, use those, othewise use the old ones to preserve them.
     Tag tag = Tag(
       title: (newTitle != null) ? newTitle : oldSong.title,
-      // --- FIXED: Using .join() cleanly creates the string without duplicating the first item ---
       trackArtist: (newSongArtistNames != null)
           ? newSongArtistNames.join("; ")
           : oldSong.artists.join("; "),
@@ -189,7 +176,6 @@ Future<Result<String>> fetchAndSaveLyrics(Song song) async {
       trackNumber: (newTrackNumber != null)
           ? newTrackNumber
           : oldSong.trackNumber,
-      // These are tags that the app does't handle, they're here just so that they don't get deleted.
       pictures: songPics,
       trackTotal: oldTag.trackTotal,
       discNumber: oldTag.discNumber,
@@ -232,5 +218,102 @@ Future<Result<String>> fetchAndSaveLyrics(Song song) async {
       await _database.open();
     }
     return _database.setFavoriteStatus(songId, favorite);
+  }
+
+  /// Batch validates all songs against TheAudioDB and updates their tags.
+  Future<int> validateAndFixAllSongs({Function(int current, int total)? onProgress}) async {
+    final songsResult = await getSongs();
+    if (songsResult.isError()) return 0;
+
+    final songs = songsResult.getOrThrow();
+    int updatedCount = 0;
+
+    for (int i = 0; i < songs.length; i++) {
+      final song = songs[i];
+      onProgress?.call(i + 1, songs.length);
+
+      final result = await validateAndFixID3Tags(song);
+      if (result.isSuccess()) {
+        updatedCount++;
+      }
+      
+      await Future.delayed(const Duration(milliseconds: 1200)); 
+    }
+
+    return updatedCount;
+  }
+
+  //// Validates a song against TheAudioDB, overwrites the physical ID3 tags, 
+  /// and updates the local SQLite database.
+  Future<Result<Song>> validateAndFixID3Tags(Song currentSong) async {
+    final adbService = AudioDbService();
+    final artistName = currentSong.artists.isNotEmpty ? currentSong.artists.first : '';
+
+    if (artistName.isEmpty || artistName == 'Unknown Artist') {
+      return Failure(Exception("Valid artist name required for validation."));
+    }
+
+    try {
+      final searchResult = await adbService.searchTrack(currentSong.title, artistName);
+      if (searchResult.isError()) return Failure(searchResult.exceptionOrNull()!);
+
+      final data = searchResult.getOrThrow();
+      final tracks = data['track'] as List?;
+
+      if (tracks == null || tracks.isEmpty) {
+        return Failure(Exception("No matching track found on TheAudioDB."));
+      }
+
+      final match = tracks.first;
+      final newTitle = match['strTrack'] as String? ?? currentSong.title;
+      final newArtist = match['strArtist'] as String? ?? artistName;
+      final newAlbum = match['strAlbum'] as String? ?? currentSong.album;
+      final newGenre = match['strGenre'] as String?;
+
+      // --- FIX: Force fetch artwork directly from the Album ID ---
+      Uint8List? pictureBytes;
+      String? artUrl;
+      
+      final albumIdStr = match['idAlbum'] as String?;
+      
+      // If we have an exact album ID, use it to fetch the artwork
+      if (albumIdStr != null && albumIdStr.isNotEmpty) {
+        // We can bypass a full search and just use the exact album endpoint if the service supports it.
+        // However, since we only have searchAlbum exposed in our service right now:
+        final albumResult = await adbService.searchAlbum(newAlbum, newArtist);
+        if (albumResult.isSuccess()) {
+           final albumData = albumResult.getOrThrow();
+           final albums = albumData['album'] as List?;
+           if (albums != null && albums.isNotEmpty) {
+             // Ensure we grab the thumbnail from the exact matching album
+             final targetAlbum = albums.firstWhere(
+                (a) => a['idAlbum'] == albumIdStr, 
+                orElse: () => albums.first
+             );
+             artUrl = targetAlbum['strAlbumThumb'] as String?;
+           }
+        }
+      }
+
+      // Download the image bytes if a URL was found
+      if (artUrl != null && artUrl.isNotEmpty) {
+        final response = await http.get(Uri.parse(artUrl));
+        if (response.statusCode == 200) {
+          pictureBytes = response.bodyBytes;
+        }
+      }
+
+      return await editTags(
+        oldSong: currentSong,
+        newTitle: newTitle,
+        newSongArtistNames: [newArtist],
+        newAlbumArtistNames: [newArtist],
+        newAlbumTitle: newAlbum.isNotEmpty ? newAlbum : null,
+        newGenre: newGenre,
+        pictureBytes: pictureBytes, 
+      );
+    } catch (e) {
+      return Failure(Exception("Failed to validate and fix tags: $e"));
+    }
   }
 }

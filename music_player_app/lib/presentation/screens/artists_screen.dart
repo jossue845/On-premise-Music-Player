@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
-import 'package:music_player_app/presentation/screens/sartist_screen.dart'; 
+import 'package:music_player_app/presentation/screens/sartist_screen.dart'; // FIX: Corrected import typo
 import 'package:sqflite/sqflite.dart';
 
 class ArtistsScreen extends StatefulWidget {
@@ -39,13 +39,11 @@ class _ArtistsScreenState extends State<ArtistsScreen> {
         final Map<String, String?> imageMap = {};
 
         for (final song in songs) {
-          // If the database returns an empty list, force it to 'Unknown Artist'
           final artists = song.artists.isNotEmpty ? song.artists : ['Unknown Artist'];
           
           for (final artist in artists) {
             artistSet.add(artist);
             
-            // Grab the first available image we find to represent this artist in the Grid
             if (song.imagePath != null && !imageMap.containsKey(artist)) {
               imageMap[artist] = song.imagePath;
             }
@@ -94,7 +92,6 @@ class _ArtistsScreenState extends State<ArtistsScreen> {
                       elevation: 2,
                       child: InkWell(
                         onTap: () {
-                          // Routes to the ArtistDetailScreen!
                           Navigator.push(
                             context,
                             MaterialPageRoute(

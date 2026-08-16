@@ -555,15 +555,20 @@ class DatabaseService {
       int id = await executor.insert(_artistTableName, {
         _artistNameColumnName: artistName,
       }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      
       if (id <= 0) {
+        // --- FIX: Use a case-insensitive LIKE query to find the existing artist ---
         final result = await executor.query(
           _artistTableName,
           columns: [_artistIdColumnName],
-          where: "$_artistNameColumnName = ?",
+          where: "$_artistNameColumnName LIKE ?",
           whereArgs: [artistName],
         );
         if (result.isNotEmpty) {
           id = result.first[_artistIdColumnName] as int;
+        } else {
+          // Absolute fallback if something goes wrong, ensuring we never return 0
+          throw Exception("Artist could not be inserted or found.");
         }
       }
       return Success(id);

@@ -19,8 +19,10 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _isScanning = false;
   bool _isFetchingArt = false;
+  bool _isBatchValidating = false;
   bool _isSyncingLastFm = false; 
   String _scanStatus = '';
+  String _validationProgress = '';
   late MusicFolderRepository _musicFolderRepository;
   late DatabaseService _databaseService;
   late FilesystemService _filesystemService;
@@ -142,6 +144,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       );
     }
   }
+
+  Future<void> _batchValidateTags() async {
+    setState(() {
+      _isBatchValidating = true;
+      _validationProgress = 'Starting validation...';
+    });
+
+    final databaseService = DatabaseService(databaseFactory: databaseFactory);
+    final songRepo = SongRepository(database: databaseService);
+
+    final updatedCount = await songRepo.validateAndFixAllSongs(
+      onProgress: (current, total) {
+        if (mounted) {
+          setState(() {
+            _validationProgress = 'Validating $current of $total songs...';
+          });
+        }
+      },
+    );
+
+    if (mounted) {
+      setState(() {
+        _isBatchValidating = false;
+        _validationProgress = '';
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Batch validation complete! Updated $updatedCount tracks.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
   
   @override
   Widget build(BuildContext context) {
@@ -191,7 +227,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 padding: const EdgeInsets.only(left: 25.0, top: 25),
                 child: ListTile(
                   title: const Text('Fetch Missing Album Art'),
-                  subtitle: const Text('Searches MusicBrainz & Cover Art Archive'),
+                  subtitle: const Text('Searches audioDB & Cover Art Archive'),
                   onTap: _isFetchingArt ? null : _scanForMissingArtwork,
                   trailing: _isFetchingArt 
                       ? const SizedBox(
@@ -200,6 +236,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2)
                         ) 
                       : const Icon(Icons.image_search),
+                ),
+              ),
+
+              Padding(
+                padding: const EdgeInsets.only(left: 25.0, top: 25),
+                child: ListTile(
+                  title: const Text('Auto-Fix All Metadata'),
+                  subtitle: _isBatchValidating
+                      ? Text(_validationProgress, style: const TextStyle(color: Colors.orangeAccent))
+                      : const Text('Batch validate all track tags with audioDB'),
+                  onTap: _isBatchValidating ? null : _batchValidateTags,
+                  trailing: _isBatchValidating
+                      ? const SizedBox(
+                          width: 24, 
+                          height: 24, 
+                          child: CircularProgressIndicator(strokeWidth: 2)
+                        )
+                      : const Icon(Icons.auto_fix_high, color: Colors.orangeAccent),
                 ),
               ),
                           
