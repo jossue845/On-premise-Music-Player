@@ -25,15 +25,12 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
   List<Song> _allSongs = []; 
   bool _isLoading = false;
 
-  // --- Real Audio Engine State ---
   Song? _currentActiveSong; 
   bool _isPlaying = false;
   
-  // --- Timer State ---
   int _secondsListened = 0;
   Timer? _playbackTimer;
 
-  // Stream Subscriptions
   StreamSubscription? _playerStateSubscription;
   StreamSubscription? _sequenceStateSubscription;
 
@@ -64,14 +61,9 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
       if (!_databaseService.isOpen()) {
         await _databaseService.open();
       }
-      
       final result = await _databaseService.getValue('total_time_listened');
       if (result.isSuccess()) {
-        if (mounted) {
-          setState(() {
-            _secondsListened = int.tryParse(result.getOrThrow()) ?? 0;
-          });
-        }
+        if (mounted) setState(() => _secondsListened = int.tryParse(result.getOrThrow()) ?? 0);
       }
     } catch (_) {}
   }
@@ -82,7 +74,6 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
       final result = await _songRepository.getSongs();
       if (result.isSuccess()) {
         final songs = result.getOrThrow();
-        
         Song? activeSong;
         
         final audioPlayer = ref.read(audioPlayerProvider);
@@ -95,9 +86,7 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
           }
         }
         
-        if (activeSong == null && songs.isNotEmpty) {
-          activeSong = songs.first;
-        }
+        activeSong ??= songs.isNotEmpty ? songs.first : null;
 
         if (mounted) {
           setState(() {
@@ -120,17 +109,9 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
       if (mounted) {
         setState(() {
           _isPlaying = state.playing;
-          if (_isPlaying) {
-            _startTimer();
-          } else {
-            _stopTimer();
-          }
+          _isPlaying ? _startTimer() : _stopTimer();
         });
-        
-        // --- NEW: Refresh UI when a song finishes ---
-        if (state.processingState == ProcessingState.completed) {
-          _loadSongs(); // Fetches the newly incremented play_counts from the database
-        }
+        if (state.processingState == ProcessingState.completed) _loadSongs(); 
       }
     });
   }
@@ -140,7 +121,6 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
     _playbackTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
         setState(() => _secondsListened++);
-        
         if (_secondsListened % 5 == 0) {
           _databaseService.insertKVPair('total_time_listened', _secondsListened.toString());
         }
@@ -163,12 +143,7 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
       if (audioPlayer.sequenceState == null && _allSongs.isNotEmpty) {
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (context) => PlayerScreen(
-              playlist: _allSongs,
-              initialIndex: 0,
-            ),
-          ),
+          MaterialPageRoute(builder: (context) => PlayerScreen(playlist: _allSongs, initialIndex: 0)),
         );
       } else {
         await audioPlayer.play();
@@ -176,262 +151,331 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
     }
   }
 
-  // --- Dynamic Stat Generators ---
+  // --- DATA AGGREGATORS ---
+
+  List<Map<String, dynamic>> get _topArtists {
+    final Map<String, Map<String, dynamic>> artistsData = {};
+    for (var song in _allSongs) {
+      final artist = (song.artists.isNotEmpty && song.artists.first.trim().isNotEmpty) ? song.artists.first.trim() : 'Unknown Artist';
+      if (artist == 'Unknown Artist' || artist == 'Unknown') continue;
+
+      if (!artistsData.containsKey(artist)) {
+        artistsData[artist] = {'name': artist, 'plays': 0, 'image': song.imagePath};
+      }
+      artistsData[artist]!['plays'] += song.playCount;
+      artistsData[artist]!['image'] ??= song.imagePath; // Use the first available image
+    }
+    
+    final sorted = artistsData.values.toList()..sort((a, b) => (b['plays'] as int).compareTo(a['plays'] as int));
+    return sorted.where((a) => (a['plays'] as int) > 0).toList();
+  }
+
+  List<Map<String, dynamic>> get _topAlbums {
+    final Map<String, Map<String, dynamic>> albumsData = {};
+    for (var song in _allSongs) {
+      final album = (song.album.trim().isNotEmpty) ? song.album.trim() : 'Unknown Album';
+      if (album == 'Unknown Album') continue;
+
+      if (!albumsData.containsKey(album)) {
+        albumsData[album] = {'name': album, 'artist': song.artists.isNotEmpty ? song.artists.first : '', 'plays': 0, 'image': song.imagePath};
+      }
+      albumsData[album]!['plays'] += song.playCount;
+      albumsData[album]!['image'] ??= song.imagePath;
+    }
+    
+    final sorted = albumsData.values.toList()..sort((a, b) => (b['plays'] as int).compareTo(a['plays'] as int));
+    return sorted.where((a) => (a['plays'] as int) > 0).toList();
+  }
 
   String get _formattedTime {
     final hours = _secondsListened ~/ 3600;
     final minutes = (_secondsListened % 3600) ~/ 60;
-    final seconds = _secondsListened % 60;
-
-    if (hours > 0) return '${hours}h ${minutes}m ${seconds}s';
-    if (minutes > 0) return '${minutes}m ${seconds}s';
-    return '${seconds}s';
-  }
-
-  String get _topArtist {
-    if (_allSongs.isEmpty) return '-';
-    
-    final Map<String, int> artistPlays = {};
-    int totalPlays = 0;
-
-    for (var song in _allSongs) {
-      String artist = 'Unknown Artist';
-      if (song.artists.isNotEmpty && song.artists.first.trim().isNotEmpty) {
-        artist = song.artists.first.trim();
-      }
-      
-      // --- NEW: Disqualify untagged songs from the artist ranking ---
-      if (artist != 'Unknown Artist' && artist != 'Unknown') {
-        artistPlays[artist] = (artistPlays[artist] ?? 0) + song.playCount;
-      }
-      
-      totalPlays += song.playCount;
-    }
-    
-    var topArtist = '-';
-    int maxPlays = 0;
-    
-    // Only search by plays if at least one song has been played
-    if (totalPlays > 0 && artistPlays.isNotEmpty) {
-      artistPlays.forEach((artist, plays) {
-        if (plays > maxPlays) {
-          maxPlays = plays;
-          topArtist = artist;
-        }
-      });
-    } else {
-       // Fallback: If no songs have been played yet, show the tagged artist with the most tracks
-       final Map<String, int> artistCounts = {};
-       for (var song in _allSongs) {
-          String artist = 'Unknown Artist';
-          if (song.artists.isNotEmpty && song.artists.first.trim().isNotEmpty) {
-            artist = song.artists.first.trim();
-          }
-          
-          if (artist != 'Unknown Artist' && artist != 'Unknown') {
-             artistCounts[artist] = (artistCounts[artist] ?? 0) + 1;
-          }
-       }
-       artistCounts.forEach((artist, count) {
-          if (count > maxPlays) {
-             maxPlays = count;
-             topArtist = artist;
-          }
-       });
-    }
-    
-    return topArtist;
-  }
-  
-  String get _topSong {
-    if (_allSongs.isEmpty) return '-';
-    
-    final sortedSongs = List<Song>.from(_allSongs)
-      ..sort((a, b) => b.playCount.compareTo(a.playCount));
-      
-    if (sortedSongs.first.playCount == 0) return '-'; 
-    return sortedSongs.first.title;
+    if (hours > 0) return '${hours}h ${minutes}m';
+    return '${minutes}m ${_secondsListened % 60}s';
   }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          
-          // --- LAST PLAYED ---
-          const Text('Last Played', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 10), 
-          _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _currentActiveSong != null
-                  ? Card(
-                      child: ListTile(
-                        leading: ClipRRect(
-                          borderRadius: BorderRadius.circular(4.0),
-                          child: Container(
-                            width: 45,
-                            height: 45,
-                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                            child: _currentActiveSong!.imagePath != null
-                                ? Image.file(File(_currentActiveSong!.imagePath!), fit: BoxFit.cover)
-                                : Icon(Icons.music_note, color: Theme.of(context).iconTheme.color?.withOpacity(0.5)),
-                          ),
-                        ),
-                        title: Text(
-                          _currentActiveSong!.title,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Text(
-                          _currentActiveSong!.artists.isNotEmpty 
-                              ? _currentActiveSong!.artists.first 
-                              : 'Unknown',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        onTap: () {
-                          final songIndex = _allSongs.indexOf(_currentActiveSong!);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => PlayerScreen(
-                                playlist: _allSongs,
-                                initialIndex: songIndex != -1 ? songIndex : 0,
+    final bottomPadding = MediaQuery.of(context).padding.bottom + 100.0;
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      // We use a CustomScrollView to allow the AppBar to float and disappear
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            title: const Text('Home', style: TextStyle(fontWeight: FontWeight.bold)),
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            floating: true, 
+            snap: true, 
+            elevation: 0,
+          ),
+          SliverPadding(
+            padding: EdgeInsets.only(bottom: bottomPadding, left: 16.0, right: 16.0, top: 8.0),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                
+                // --- LAST PLAYED ---
+                const Text('Last Played', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10), 
+                _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _currentActiveSong != null
+                        ? Card(
+                            child: ListTile(
+                              leading: ClipRRect(
+                                borderRadius: BorderRadius.circular(4.0),
+                                child: Container(
+                                  width: 45,
+                                  height: 45,
+                                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                  child: _currentActiveSong!.imagePath != null
+                                      ? Image.file(File(_currentActiveSong!.imagePath!), fit: BoxFit.cover)
+                                      : Icon(Icons.music_note, color: Theme.of(context).iconTheme.color?.withOpacity(0.5)),
+                                ),
+                              ),
+                              title: Text(
+                                _currentActiveSong!.title,
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text(
+                                _currentActiveSong!.artists.isNotEmpty ? _currentActiveSong!.artists.first : 'Unknown',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              onTap: () {
+                                final songIndex = _allSongs.indexOf(_currentActiveSong!);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => PlayerScreen(playlist: _allSongs, initialIndex: songIndex != -1 ? songIndex : 0),
+                                  ),
+                                );
+                              },
+                              trailing: IconButton(
+                                icon: Icon(
+                                  _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill, 
+                                  size: 36,
+                                  color: Theme.of(context).primaryColor,
+                                ),
+                                onPressed: _togglePlayback,
                               ),
                             ),
-                          );
-                        },
-                        trailing: IconButton(
-                          icon: Icon(
-                            _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill, 
-                            size: 36,
-                            color: Theme.of(context).primaryColor,
-                          ),
-                          onPressed: _togglePlayback,
-                        ),
-                      ),
-                    )
-                  : Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.music_note, size: 40),
-                        title: const Text('No songs found'),
-                        subtitle: const Text('Tap on Settings to scan for music'),
-                        onTap: () {},
-                      ),
-                    ),
-          const SizedBox(height: 24), 
-
-          // --- DAILY STATS ---
-          const Text('Daily Stats', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              _buildStatCard(context, 'Time Listened', _formattedTime, Icons.timer),
-              const SizedBox(width: 16), 
-              _buildStatCard(context, 'Tracks', '${_allSongs.length}', Icons.bar_chart),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              _buildStatCard(context, 'Top Artist', _topArtist, Icons.person),
-              const SizedBox(width: 16), 
-              _buildStatCard(context, 'Top Song', _topSong, Icons.star),
-            ],
-          ),
-          const SizedBox(height: 32),
-
-          // --- MOST REPRODUCED SCROLLER ---
-          const Text('Most Reproduced', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 10),
-          Builder(
-            builder: (context) {
-              final topPlayedSongs = List<Song>.from(_allSongs)
-                ..sort((a, b) => b.playCount.compareTo(a.playCount));
-                
-              final activeTopSongs = topPlayedSongs.where((s) => s.playCount > 0).toList();
-
-              return SizedBox(
-                height: 140, 
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : activeTopSongs.isNotEmpty
-                        ? ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: activeTopSongs.length.clamp(0, 10),
-                            itemBuilder: (context, index) {
-                              final song = activeTopSongs[index];
-                              return Card(
-                                margin: const EdgeInsets.only(right: 12),
-                                clipBehavior: Clip.antiAlias, 
-                                child: InkWell(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => PlayerScreen(
-                                          playlist: activeTopSongs,
-                                          initialIndex: index,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  child: SizedBox(
-                                    width: 120,
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        ClipRRect(
-                                          borderRadius: BorderRadius.circular(4.0),
-                                          child: Container(
-                                            width: 50,
-                                            height: 50,
-                                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                            child: song.imagePath != null
-                                                ? Image.file(File(song.imagePath!), fit: BoxFit.cover)
-                                                : Icon(Icons.music_note, color: Theme.of(context).iconTheme.color?.withOpacity(0.5)),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                                          child: Text(
-                                            song.title,
-                                            style: const TextStyle(fontWeight: FontWeight.bold),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                                          child: Text(
-                                            song.artists.isNotEmpty 
-                                                ? song.artists.first 
-                                                : 'Unknown',
-                                            style: Theme.of(context).textTheme.bodySmall,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
                           )
-                        : const Center(
-                            child: Text('Play some music to see your top tracks!'),
+                        : Card(
+                            child: ListTile(
+                              leading: const Icon(Icons.music_note, size: 40),
+                              title: const Text('No songs found'),
+                              subtitle: const Text('Tap on Settings to scan for music'),
+                            ),
                           ),
-              );
-            }
+                const SizedBox(height: 24), 
+
+                // --- DAILY STATS OVERVIEW ---
+                const Text('Quick Stats', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    _buildStatCard(context, 'Listened', _formattedTime, Icons.timer),
+                    const SizedBox(width: 16), 
+                    _buildStatCard(context, 'Total Tracks', '${_allSongs.length}', Icons.library_music),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // --- MOST REPRODUCED SONGS ---
+                const Text('Top Tracks', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                Builder(
+                  builder: (context) {
+                    final topPlayedSongs = List<Song>.from(_allSongs)..sort((a, b) => b.playCount.compareTo(a.playCount));
+                    final activeTopSongs = topPlayedSongs.where((s) => s.playCount > 0).toList();
+                    return _buildHorizontalScroller(
+                      items: activeTopSongs,
+                      isEmpty: activeTopSongs.isEmpty,
+                      itemBuilder: (context, index) {
+                        final song = activeTopSongs[index];
+                        return _buildSquareCard(
+                          context,
+                          title: song.title,
+                          subtitle: song.artists.isNotEmpty ? song.artists.first : 'Unknown',
+                          imagePath: song.imagePath,
+                          isRound: false,
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PlayerScreen(playlist: activeTopSongs, initialIndex: index))),
+                        );
+                      }
+                    );
+                  }
+                ),
+                const SizedBox(height: 24),
+
+                // --- MOST REPRODUCED ARTISTS ---
+                const Text('Top Artists', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                Builder(
+                  builder: (context) {
+                    final topArtists = _topArtists;
+                    return _buildHorizontalScroller(
+                      items: topArtists,
+                      isEmpty: topArtists.isEmpty,
+                      itemBuilder: (context, index) {
+                        final artist = topArtists[index];
+                        return _buildSquareCard(
+                          context,
+                          title: artist['name'],
+                          subtitle: '${artist['plays']} plays',
+                          imagePath: artist['image'],
+                          isRound: true, // Artists look great as circles
+                          onTap: () {}, // Can be routed to ArtistDetailScreen later
+                        );
+                      }
+                    );
+                  }
+                ),
+                const SizedBox(height: 24),
+
+                // --- MOST REPRODUCED ALBUMS ---
+                const Text('Top Albums', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                Builder(
+                  builder: (context) {
+                    final topAlbums = _topAlbums;
+                    return _buildHorizontalScroller(
+                      items: topAlbums,
+                      isEmpty: topAlbums.isEmpty,
+                      itemBuilder: (context, index) {
+                        final album = topAlbums[index];
+                        return _buildSquareCard(
+                          context,
+                          title: album['name'],
+                          subtitle: album['artist'],
+                          imagePath: album['image'],
+                          isRound: false,
+                          onTap: () {}, 
+                        );
+                      }
+                    );
+                  }
+                ),
+                const SizedBox(height: 32),
+
+                // --- TRACK YOUR STATS WIDGET ---
+                const Text('Listening Habits', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.access_time, color: Colors.blueAccent),
+                            SizedBox(width: 12),
+                            Text('Peak Time: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            Text('Evening (6 PM - 9 PM)', style: TextStyle(fontSize: 16)),
+                          ],
+                        ),
+                        const Divider(height: 30),
+                        const Row(
+                          children: [
+                            Icon(Icons.calendar_today, color: Colors.deepPurpleAccent),
+                            SizedBox(width: 12),
+                            Text('Top Day: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            Text('Friday', style: TextStyle(fontSize: 16)),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).primaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            "Note: Historical scrobbles data will be populated here shortly.",
+                            style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
+                            textAlign: TextAlign.center,
+                          ),
+                        )
+                      ],
+                    ),
+                  ),
+                ),
+
+              ]),
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  // Helper for rendering top cards
+  Widget _buildSquareCard(BuildContext context, {required String title, required String subtitle, String? imagePath, required bool isRound, required VoidCallback onTap}) {
+    return Card(
+      margin: const EdgeInsets.only(right: 12),
+      clipBehavior: Clip.antiAlias, 
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(isRound ? 16 : 8)),
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          width: 120,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(isRound ? 60 : 4.0),
+                child: Container(
+                  width: 70,
+                  height: 70,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  child: imagePath != null
+                      ? Image.file(File(imagePath), fit: BoxFit.cover)
+                      : Icon(isRound ? Icons.person : Icons.album, size: 30, color: Theme.of(context).iconTheme.color?.withOpacity(0.5)),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHorizontalScroller({required List items, required bool isEmpty, required Widget Function(BuildContext, int) itemBuilder}) {
+    return SizedBox(
+      height: 140, 
+      child: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : isEmpty
+              ? const Center(child: Text('Play some music to populate this list!'))
+              : ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: items.length.clamp(0, 10),
+                  itemBuilder: itemBuilder,
+                ),
     );
   }
 

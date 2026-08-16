@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
-// Other screens
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
 import 'package:music_player_app/data/repositories/playlist_repository.dart';
@@ -99,7 +98,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     _loadData(); 
   }
 
-  // --- NEW: Universal Navigation to Manage Screen ---
   void _navigateToManageSongs({required String title, int? id, bool isFavorites = false}) {
     Navigator.push(
       context,
@@ -111,7 +109,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         ),
       ),
     ).then((changesMade) {
-      // If the user hit save on the manage screen, refresh the playlist counts!
       if (changesMade == true) {
         _loadData();
       }
@@ -121,20 +118,24 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // The AppBar remains fixed at the top for this specific screen
       appBar: AppBar(
         title: const Text('Playlists', style: TextStyle(fontWeight: FontWeight.bold)),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showCreatePlaylistDialog,
-        tooltip: 'Create Playlist',
-        child: const Icon(Icons.add),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: 'Create Playlist',
+            onPressed: _showCreatePlaylistDialog,
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.all(16.0),
               children: [
-                // --- 1. DEFAULT FAVORITES PLAYLIST ---
                 Card(
                   clipBehavior: Clip.antiAlias,
                   child: ListTile(
@@ -149,8 +150,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                     ),
                     title: const Text('Favorites', style: TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text('$_favoritesCount songs'),
-                    
-                    // Added PopupMenu for Favorites
                     trailing: PopupMenuButton<String>(
                       onSelected: (value) {
                         if (value == 'manage') {
@@ -187,7 +186,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 
                 const SizedBox(height: 24),
                 
-                // --- CUSTOM PLAYLISTS ---
                 if (_customPlaylists.isNotEmpty) ...[
                   Padding(
                     padding: const EdgeInsets.only(left: 4.0, bottom: 8.0),
@@ -214,8 +212,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                           child: Icon(Icons.queue_music, color: Theme.of(context).primaryColor),
                         ),
                         title: Text(playlistTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        
-                        // Updated to include Manage Songs
                         trailing: PopupMenuButton<String>(
                           onSelected: (value) {
                             if (value == 'manage') {
