@@ -33,6 +33,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   late List<Song> _localPlaylist;
   late AudioPlayer _audioPlayer;
   
+  // --- ADDED: PageController for swipe animations ---
+  late PageController _pageController;
+  
   bool _isPlaying = false;
   double _currentPosition = 0.0;
   double _totalDuration = 1.0; 
@@ -46,6 +49,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _audioPlayer = ref.read(audioPlayerProvider);
     _currentIndex = widget.initialIndex;
     _localPlaylist = List.from(widget.playlist);
+    
+    // Initialize the controller at the starting song's index
+    _pageController = PageController(initialPage: widget.initialIndex);
     
     final databaseService = DatabaseService(databaseFactory: databaseFactory);
     _songRepository = SongRepository(database: databaseService);
@@ -65,7 +71,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       return; 
     }
 
-    // --- FIX: Check if the current queue matches the intended playlist ---
     final currentSequence = _audioPlayer.sequenceState?.sequence;
     bool isSamePlaylist = false;
     
@@ -80,7 +85,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       }
     }
 
-    // If the sequence is the same, simply jump to the target song without destroying the queue
     if (isSamePlaylist) {
        try {
           await _audioPlayer.seek(Duration.zero, index: widget.initialIndex);
@@ -91,7 +95,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
        return;
     }
 
-    // If it's a completely new sequence, safely load it
     try {
       final audioSources = _localPlaylist.map((song) {
         return AudioSource.uri(
@@ -117,12 +120,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void _setupStreams() {
     _audioPlayer.currentIndexStream.listen((index) {
       if (mounted && index != null && index < _localPlaylist.length) {
-        // --- FIX: Verify the audio engine has actually loaded the new song before visually jumping ---
         final tag = _audioPlayer.sequenceState?.sequence[index].tag as MediaItem?;
         if (tag?.id == _localPlaylist[index].id.toString()) {
           setState(() {
             _currentIndex = index;
           });
+          
+          // --- FIX: Sync the PageView animation if the song changes automatically or via skip buttons ---
+          if (_pageController.hasClients && _pageController.page?.round() != index) {
+            _pageController.animateToPage(
+              index, 
+              duration: const Duration(milliseconds: 300), 
+              curve: Curves.easeOutCubic,
+            );
+          }
         }
       }
     });
@@ -142,6 +153,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   void dispose() {
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -288,15 +300,35 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   child: PlayerSettings(
                     child: Column(
                       children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            height: 300,
-                            width: double.infinity,
-                            color: Theme.of(context).cardTheme.color,
-                            child: currentSong.imagePath != null
-                                ? Image.file(File(currentSong.imagePath!), fit: BoxFit.cover)
-                                : const Icon(Icons.album, size: 100),
+                        // --- REPLACED: GestureDetector with PageView.builder ---
+                        SizedBox(
+                          height: 300,
+                          child: PageView.builder(
+                            controller: _pageController,
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: _localPlaylist.length,
+                            onPageChanged: (newIndex) {
+                              // Triggers the song change when the user finishes swiping
+                              if (_currentIndex != newIndex) {
+                                _audioPlayer.seek(Duration.zero, index: newIndex);
+                              }
+                            },
+                            itemBuilder: (context, index) {
+                              final song = _localPlaylist[index];
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 5.0),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    width: double.infinity,
+                                    color: Theme.of(context).cardTheme.color,
+                                    child: song.imagePath != null
+                                        ? Image.file(File(song.imagePath!), fit: BoxFit.cover)
+                                        : const Icon(Icons.album, size: 100),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ),
                         const SizedBox(height: 15),

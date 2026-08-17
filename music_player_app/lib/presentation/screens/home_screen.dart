@@ -12,6 +12,9 @@ import 'package:music_player_app/domain/models/song/song.dart';
 import 'package:music_player_app/presentation/screens/player_screen.dart';
 import 'package:music_player_app/data/providers/audio_player_provider.dart';
 import 'package:music_player_app/presentation/screens/listening_habits_screen.dart';
+import 'package:music_player_app/presentation/screens/sartist_screen.dart';
+import 'package:music_player_app/presentation/screens/salbum_screen.dart';
+
 class HomeDashboard extends ConsumerStatefulWidget {
   const HomeDashboard({super.key});
 
@@ -320,7 +323,16 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                           subtitle: '${artist['plays']} plays',
                           imagePath: artist['image'],
                           isRound: true, 
-                          onTap: () {}, 
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ArtistDetailScreen(
+                                  artistName: artist['name'],
+                                ),
+                              ),
+                            );
+                          }, 
                         );
                       }
                     );
@@ -345,7 +357,16 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                           subtitle: album['artist'],
                           imagePath: album['image'],
                           isRound: false,
-                          onTap: () {}, 
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AlbumDetailScreen(
+                                  albumName: album['name'],
+                                ),
+                              ),
+                            );
+                          }, 
                         );
                       }
                     );
@@ -358,7 +379,7 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                 const SizedBox(height: 10),
                 Card(
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(16), // Match your Card theme radius
+                    borderRadius: BorderRadius.circular(16), 
                     onTap: () {
                       Navigator.push(
                         context,
