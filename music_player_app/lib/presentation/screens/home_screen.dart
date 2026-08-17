@@ -11,7 +11,7 @@ import 'package:music_player_app/data/repositories/song_repository.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
 import 'package:music_player_app/presentation/screens/player_screen.dart';
 import 'package:music_player_app/data/providers/audio_player_provider.dart';
-
+import 'package:music_player_app/presentation/screens/listening_habits_screen.dart';
 class HomeDashboard extends ConsumerStatefulWidget {
   const HomeDashboard({super.key});
 
@@ -357,45 +357,56 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                 const Text('Listening Habits', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
                 Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.access_time, color: Colors.blueAccent),
-                            const SizedBox(width: 12),
-                            const Text('Peak Time: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                            Text(_peakTime, style: const TextStyle(fontSize: 16)),
-                          ],
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16), // Match your Card theme radius
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ListeningHabitsScreen(),
                         ),
-                        const Divider(height: 30),
-                        Row(
-                          children: [
-                            const Icon(Icons.calendar_today, color: Colors.deepPurpleAccent),
-                            const SizedBox(width: 12),
-                            const Text('Top Day: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                            Text(_topDay, style: const TextStyle(fontSize: 16)),
-                          ],
-                        ),
-                        if (_topDay == 'Not enough data') ...[
-                          const SizedBox(height: 16),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).primaryColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Text(
-                              "Play more music to generate your habits profile!",
-                              style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
-                              textAlign: TextAlign.center,
-                            ),
-                          )
-                        ]
-                      ],
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.access_time, color: Colors.blueAccent),
+                              const SizedBox(width: 12),
+                              const Text('Peak Time: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              Text(_peakTime, style: const TextStyle(fontSize: 16)),
+                            ],
+                          ),
+                          const Divider(height: 30),
+                          Row(
+                            children: [
+                              const Icon(Icons.calendar_today, color: Colors.deepPurpleAccent),
+                              const SizedBox(width: 12),
+                              const Text('Top Day: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              Text(_topDay, style: const TextStyle(fontSize: 16)),
+                            ],
+                          ),
+                          if (_topDay == 'Not enough data') ...[
+                            const SizedBox(height: 16),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).primaryColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                "Play more music to generate your habits profile!",
+                                style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
+                                textAlign: TextAlign.center,
+                              ),
+                            )
+                          ]
+                        ],
+                      ),
                     ),
                   ),
                 ),

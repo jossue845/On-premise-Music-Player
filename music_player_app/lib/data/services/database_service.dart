@@ -1111,6 +1111,28 @@ class DatabaseService {
     }
   }
 
+  /// Retrieves listening frequency grouped by day of the week and hour of the day
+  Future<Result<List<Map<String, dynamic>>>> getHeatmapData() async {
+    try {
+      final db = await database;
+      
+      // %w returns day of week (0-6, Sunday is 0)
+      // %H returns hour (00-23)
+      final result = await db.rawQuery('''
+        SELECT 
+          CAST(strftime('%w', timestamp / 1000, 'unixepoch', 'localtime') AS INTEGER) as day_index,
+          CAST(strftime('%H', timestamp / 1000, 'unixepoch', 'localtime') AS INTEGER) as hour_index,
+          COUNT(*) as play_count
+        FROM $_scrobblesTableName
+        GROUP BY day_index, hour_index
+      ''');
+
+      return Success(result);
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+
   Future<Result<void>> insertKVPair(String key, String value) async {
     try {
       // --- FIX: Use the async 'database' getter instead of forcing '_database!' ---
