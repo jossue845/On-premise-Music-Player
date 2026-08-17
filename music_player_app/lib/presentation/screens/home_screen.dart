@@ -34,12 +34,16 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
   StreamSubscription? _playerStateSubscription;
   StreamSubscription? _sequenceStateSubscription;
 
+  String _topDay = 'Loading...';
+  String _peakTime = 'Loading...';
+
   @override
   void initState() {
     super.initState();
     _initializeServices();
     _loadSongs();
     _loadTotalTime(); 
+    _loadListeningHabits();
     _setupAudioStreams();
   }
 
@@ -64,6 +68,21 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
       final result = await _databaseService.getValue('total_time_listened');
       if (result.isSuccess()) {
         if (mounted) setState(() => _secondsListened = int.tryParse(result.getOrThrow()) ?? 0);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadListeningHabits() async {
+    try {
+      final result = await _databaseService.getListeningHabits();
+      if (result.isSuccess()) {
+        final data = result.getOrThrow();
+        if (mounted) {
+          setState(() {
+            _topDay = data['topDay'] ?? 'Not enough data';
+            _peakTime = data['peakTime'] ?? 'Not enough data';
+          });
+        }
       }
     } catch (_) {}
   }
@@ -135,24 +154,6 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
     }
   }
 
-  Future<void> _togglePlayback() async {
-    final audioPlayer = ref.read(audioPlayerProvider);
-    if (audioPlayer.playing) {
-      await audioPlayer.pause();
-    } else {
-      if (audioPlayer.sequenceState == null && _allSongs.isNotEmpty) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => PlayerScreen(playlist: _allSongs, initialIndex: 0)),
-        );
-      } else {
-        await audioPlayer.play();
-      }
-    }
-  }
-
-  // --- DATA AGGREGATORS ---
-
   List<Map<String, dynamic>> get _topArtists {
     final Map<String, Map<String, dynamic>> artistsData = {};
     for (var song in _allSongs) {
@@ -163,7 +164,7 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
         artistsData[artist] = {'name': artist, 'plays': 0, 'image': song.imagePath};
       }
       artistsData[artist]!['plays'] += song.playCount;
-      artistsData[artist]!['image'] ??= song.imagePath; // Use the first available image
+      artistsData[artist]!['image'] ??= song.imagePath; 
     }
     
     final sorted = artistsData.values.toList()..sort((a, b) => (b['plays'] as int).compareTo(a['plays'] as int));
@@ -200,15 +201,14 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      // We use a CustomScrollView to allow the AppBar to float and disappear
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            title: const Text('Home', style: TextStyle(fontWeight: FontWeight.bold)),
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            backgroundColor: Colors.transparent,
             floating: true, 
             snap: true, 
             elevation: 0,
+            toolbarHeight: 10,
           ),
           SliverPadding(
             padding: EdgeInsets.only(bottom: bottomPadding, left: 16.0, right: 16.0, top: 8.0),
@@ -254,14 +254,6 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                                   ),
                                 );
                               },
-                              trailing: IconButton(
-                                icon: Icon(
-                                  _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill, 
-                                  size: 36,
-                                  color: Theme.of(context).primaryColor,
-                                ),
-                                onPressed: _togglePlayback,
-                              ),
                             ),
                           )
                         : Card(
@@ -327,8 +319,8 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                           title: artist['name'],
                           subtitle: '${artist['plays']} plays',
                           imagePath: artist['image'],
-                          isRound: true, // Artists look great as circles
-                          onTap: () {}, // Can be routed to ArtistDetailScreen later
+                          isRound: true, 
+                          onTap: () {}, 
                         );
                       }
                     );
@@ -370,42 +362,43 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Row(
+                        Row(
                           children: [
-                            Icon(Icons.access_time, color: Colors.blueAccent),
-                            SizedBox(width: 12),
-                            Text('Peak Time: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                            Text('Evening (6 PM - 9 PM)', style: TextStyle(fontSize: 16)),
+                            const Icon(Icons.access_time, color: Colors.blueAccent),
+                            const SizedBox(width: 12),
+                            const Text('Peak Time: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            Text(_peakTime, style: const TextStyle(fontSize: 16)),
                           ],
                         ),
                         const Divider(height: 30),
-                        const Row(
+                        Row(
                           children: [
-                            Icon(Icons.calendar_today, color: Colors.deepPurpleAccent),
-                            SizedBox(width: 12),
-                            Text('Top Day: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                            Text('Friday', style: TextStyle(fontSize: 16)),
+                            const Icon(Icons.calendar_today, color: Colors.deepPurpleAccent),
+                            const SizedBox(width: 12),
+                            const Text('Top Day: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            Text(_topDay, style: const TextStyle(fontSize: 16)),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            "Note: Historical scrobbles data will be populated here shortly.",
-                            style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
-                            textAlign: TextAlign.center,
-                          ),
-                        )
+                        if (_topDay == 'Not enough data') ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).primaryColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              "Play more music to generate your habits profile!",
+                              style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
+                              textAlign: TextAlign.center,
+                            ),
+                          )
+                        ]
                       ],
                     ),
                   ),
                 ),
-
               ]),
             ),
           ),
@@ -414,7 +407,6 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
     );
   }
 
-  // Helper for rendering top cards
   Widget _buildSquareCard(BuildContext context, {required String title, required String subtitle, String? imagePath, required bool isRound, required VoidCallback onTap}) {
     return Card(
       margin: const EdgeInsets.only(right: 12),

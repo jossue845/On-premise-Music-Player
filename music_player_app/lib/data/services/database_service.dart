@@ -576,6 +576,60 @@ class DatabaseService {
       return Failure(e);
     }
   }
+  /// Retrieves the peak listening time and top day from the scrobbles table.
+  Future<Result<Map<String, String>>> getListeningHabits() async {
+    try {
+      final db = await database;
+      
+      // %w returns the day of the week 0-6 (0 = Sunday)
+      final topDayResult = await db.rawQuery('''
+        SELECT CAST(strftime('%w', timestamp / 1000, 'unixepoch', 'localtime') AS INTEGER) as day_index, COUNT(*) as play_count
+        FROM $_scrobblesTableName
+        GROUP BY day_index
+        ORDER BY play_count DESC
+        LIMIT 1
+      ''');
+
+      // %H returns the hour 00-24
+      final peakHourResult = await db.rawQuery('''
+        SELECT CAST(strftime('%H', timestamp / 1000, 'unixepoch', 'localtime') AS INTEGER) as hour_index, COUNT(*) as play_count
+        FROM $_scrobblesTableName
+        GROUP BY hour_index
+        ORDER BY play_count DESC
+        LIMIT 1
+      ''');
+
+      String topDay = 'Not enough data';
+      String peakTime = 'Not enough data';
+
+      if (topDayResult.isNotEmpty) {
+        final dayIndex = topDayResult.first['day_index'] as int;
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        topDay = days[dayIndex];
+      }
+
+      if (peakHourResult.isNotEmpty) {
+        final hourIndex = peakHourResult.first['hour_index'] as int;
+        
+        if (hourIndex >= 5 && hourIndex < 12) {
+          peakTime = 'Morning (5 AM - 12 PM)';
+        } else if (hourIndex >= 12 && hourIndex < 17) {
+          peakTime = 'Afternoon (12 PM - 5 PM)';
+        } else if (hourIndex >= 17 && hourIndex < 21) {
+          peakTime = 'Evening (5 PM - 9 PM)';
+        } else {
+          peakTime = 'Night (9 PM - 5 AM)';
+        }
+      }
+
+      return Success({
+        'topDay': topDay,
+        'peakTime': peakTime,
+      });
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
 
   Future<Result<void>> _insertSongArtist(
     DatabaseExecutor executor,
@@ -1059,7 +1113,9 @@ class DatabaseService {
 
   Future<Result<void>> insertKVPair(String key, String value) async {
     try {
-      await _database!.insert(_keyValueStoreTableName, {
+      // --- FIX: Use the async 'database' getter instead of forcing '_database!' ---
+      final db = await database; 
+      await db.insert(_keyValueStoreTableName, {
         _keyColumnName: key,
         _valueColumnName: value,
       }, conflictAlgorithm: ConflictAlgorithm.replace);
@@ -1071,12 +1127,15 @@ class DatabaseService {
 
   Future<Result<String>> getValue(String key) async {
     try {
-      final queryResult = (await _database!.query(
+      // --- FIX: Use the async 'database' getter ---
+      final db = await database;
+      final queryResult = (await db.query(
         _keyValueStoreTableName,
         columns: [_valueColumnName],
         where: "$_keyColumnName = ?",
         whereArgs: [key],
       )).map((e) => e[_valueColumnName] as String).toList();
+      
       if (queryResult.isNotEmpty) {
         final String value = (queryResult.isNotEmpty) ? queryResult.first : "";
         return Success(value);

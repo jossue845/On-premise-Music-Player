@@ -5,6 +5,7 @@ import 'package:music_player_app/data/services/filesystem_service.dart';
 import 'package:music_player_app/data/repositories/music_folder_repository.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
 import 'package:music_player_app/presentation/screens/equalizer_screen.dart';
+import 'package:music_player_app/presentation/screens/lastfm_screen.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'package:music_player_app/data/providers/sync_provider.dart';
@@ -13,14 +14,16 @@ class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState {
   bool _isScanning = false;
   bool _isFetchingArt = false;
   bool _isBatchValidating = false;
   bool _isSyncingLastFm = false; 
+  bool _tiltEnabled = false;
+  
   String _scanStatus = '';
   String _validationProgress = '';
   late MusicFolderRepository _musicFolderRepository;
@@ -36,9 +39,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       database: _databaseService,
       fs: _filesystemService,
     );
+    _loadTiltSetting();
   }
 
-  Future<void> _scanMusic() async {
+  Future _loadTiltSetting() async {
+    final res = await _databaseService.getValue('tilt_enabled');
+    if (res.isSuccess() && mounted) {
+      setState(() => _tiltEnabled = res.getOrThrow() == 'true');
+    }
+  }
+
+  Future _scanMusic() async {
     setState(() {
       _isScanning = true;
       _scanStatus = 'Scanning for music...';
@@ -85,7 +96,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  Future<void> _setSongsFolder() async {
+  Future _setSongsFolder() async {
     try {
       final result = await _musicFolderRepository.setMusicFolder();
       
@@ -115,7 +126,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  Future<void> _scanForMissingArtwork() async {
+  Future _scanForMissingArtwork() async {
     setState(() => _isFetchingArt = true);
     
     final databaseService = DatabaseService(databaseFactory: databaseFactory);
@@ -145,7 +156,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  Future<void> _batchValidateTags() async {
+  Future _batchValidateTags() async {
     setState(() {
       _isBatchValidating = true;
       _validationProgress = 'Starting validation...';
@@ -189,6 +200,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: SingleChildScrollView(
           child: Column(
             children: [
+              // --- FIX: Moved Tilt Toggle to the Top ---
+              Padding(
+                padding: const EdgeInsets.only(left: 25.0, top: 25),
+                child: SwitchListTile(
+                  title: const Text("Tilt to Move Player"),
+                  subtitle: const Text("Use device gyroscope to move the floating player"),
+                  value: _tiltEnabled,
+                  activeColor: Colors.cyanAccent,
+                  onChanged: (val) async {
+                    setState(() => _tiltEnabled = val);
+                    await _databaseService.insertKVPair('tilt_enabled', val.toString());
+                  },
+                  secondary: const Icon(Icons.screen_rotation),
+                ),
+              ),
+
               Padding(
                 padding: const EdgeInsets.only(left: 25.0, top: 25),
                 child: ListTile(
@@ -245,7 +272,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   title: const Text('Auto-Fix All Metadata'),
                   subtitle: _isBatchValidating
                       ? Text(_validationProgress, style: const TextStyle(color: Colors.orangeAccent))
-                      : const Text('Batch validate all track tags with audioDB'),
+                      : const Text('Batch validate all track tags with TheAudioDB'),
                   onTap: _isBatchValidating ? null : _batchValidateTags,
                   trailing: _isBatchValidating
                       ? const SizedBox(
@@ -270,6 +297,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ); 
                   },
                   trailing: const Icon(Icons.equalizer),
+                ),
+              ),
+
+              Padding(
+                padding: const EdgeInsets.only(left: 25.0, top: 25),
+                child: ListTile(
+                  title: const Text("Last.fm Login"),
+                  subtitle: const Text("Connect your Last.fm account"),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LastFmAuthScreen(),
+                      ),
+                    );
+                  },
+                  trailing: const Icon(Icons.login),
                 ),
               ),
 
