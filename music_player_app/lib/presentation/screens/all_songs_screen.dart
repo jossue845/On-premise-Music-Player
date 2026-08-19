@@ -35,7 +35,9 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
     try {
       final result = await _songRepository.getSongs();
       if (result.isSuccess()) {
-        final fetchedSongs = result.getOrThrow();
+        final List<Song> fetchedSongs = List<Song>.from(result.getOrThrow());
+        
+        fetchedSongs.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
         
         debugPrint("🎵 DATABASE CHECK: Found ${fetchedSongs.length} songs!");
         
@@ -79,81 +81,104 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
               : RefreshIndicator(
                   onRefresh: _initializeRepositoryAndLoad,
                   color: Theme.of(context).primaryColor,
-                  child: ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    itemCount: _songs.length,
-                    itemBuilder: (context, index) {
-                      final song = _songs[index];
-                      
-                      return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
-                        clipBehavior: Clip.antiAlias,
-                        child: ListTile(
-                          trailing: PopupMenuButton<String>(
-                            icon: const Icon(Icons.more_vert),
-                            onSelected: (String choice) async {
-                              if (choice == 'edit') {
-                                final didUpdate = await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => EditSongScreen(song: song)),
-                                );
-                                
-                                if (didUpdate == true) {
-                                  _initializeRepositoryAndLoad(); 
-                                }
-                              }
-                            },
-                            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                              const PopupMenuItem<String>(
-                                value: 'edit',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.edit_outlined, size: 20),
-                                    SizedBox(width: 12),
-                                    Text('Edit song info'),
-                                  ],
-                                ),
-                              ),
-                            ],
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      if (constraints.maxWidth >= 600) {
+                        // Tablet layout: Grid of list tiles
+                        return GridView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+                          itemCount: _songs.length,
+                          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 400,
+                            mainAxisExtent: 75,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 12,
                           ),
-                          leading: ClipRRect(
-                            borderRadius: BorderRadius.circular(8.0),
-                            child: Container(
-                              width: 50,
-                              height: 50,
-                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                              child: song.imagePath != null
-                                  ? Image.file(File(song.imagePath!), fit: BoxFit.cover)
-                                  : const Icon(Icons.music_note),
-                            ),
-                          ),
-                          title: Text(
-                            song.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(
-                            song.artists.isNotEmpty ? song.artists.first : 'Unknown Artist',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => PlayerScreen(
-                                  playlist: _songs,
-                                  initialIndex: index,
-                                ), // FIX: Added the missing closing parenthesis here
-                              ),
-                            ).then((_) => _initializeRepositoryAndLoad()); 
-                          },
-                        ),
-                      );
+                          itemBuilder: (context, index) => _buildSongCard(context, index),
+                        );
+                      } else {
+                        // Phone layout: Standard list
+                        return ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemCount: _songs.length,
+                          itemBuilder: (context, index) => _buildSongCard(context, index),
+                        );
+                      }
                     },
                   ),
                 ),
+    );
+  }
+
+  Widget _buildSongCard(BuildContext context, int index) {
+    final song = _songs[index];
+    
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        trailing: PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert),
+          onSelected: (String choice) async {
+            if (choice == 'edit') {
+              final didUpdate = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => EditSongScreen(song: song)),
+              );
+              
+              if (didUpdate == true) {
+                _initializeRepositoryAndLoad(); 
+              }
+            }
+          },
+          itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+            const PopupMenuItem<String>(
+              value: 'edit',
+              child: Row(
+                children: [
+                  Icon(Icons.edit_outlined, size: 20),
+                  SizedBox(width: 12),
+                  Text('Edit song info'),
+                ],
+              ),
+            ),
+          ],
+        ),
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(8.0),
+          child: Container(
+            width: 50,
+            height: 50,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: song.imagePath != null
+                ? Image.file(File(song.imagePath!), fit: BoxFit.cover)
+                : const Icon(Icons.music_note),
+          ),
+        ),
+        title: Text(
+          song.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(
+          song.artists.isNotEmpty ? song.artists.first : 'Unknown Artist',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PlayerScreen(
+                playlist: _songs,
+                initialIndex: index,
+              ), 
+            ),
+          ).then((_) => _initializeRepositoryAndLoad()); 
+        },
+      ),
     );
   }
 }

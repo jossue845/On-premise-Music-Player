@@ -118,7 +118,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // The AppBar remains fixed at the top for this specific screen
       appBar: AppBar(
         title: const Text('Playlists', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -133,91 +132,30 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16.0),
-              children: [
-                Card(
-                  clipBehavior: Clip.antiAlias,
-                  child: ListTile(
-                    leading: Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(Icons.favorite, color: Colors.red),
-                    ),
-                    title: const Text('Favorites', style: TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text('$_favoritesCount songs'),
-                    trailing: PopupMenuButton<String>(
-                      onSelected: (value) {
-                        if (value == 'manage') {
-                          _navigateToManageSongs(title: 'Favorites', isFavorites: true);
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: 'manage',
-                          child: Row(
-                            children: [
-                              Icon(Icons.checklist, size: 20),
-                              SizedBox(width: 12),
-                              Text('Add / Remove songs'),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const PlaylistDetailScreen(
-                            playlistTitle: 'Favorites',
-                            initialIsPinned: true,
-                            isFavoritesPlaylist: true, 
-                          ),
-                        ),
-                      ).then((_) => _loadData()); 
-                    },
-                  ),
-                ),
-                
-                const SizedBox(height: 24),
-                
-                if (_customPlaylists.isNotEmpty) ...[
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4.0, bottom: 8.0),
-                    child: Text(
-                      'My Playlists', 
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)
-                    ),
-                  ),
-                  ..._customPlaylists.map((playlist) {
-                    final playlistTitle = playlist.title; 
-                    final playlistId = playlist.id;
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8.0),
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: ListView(
+                  padding: const EdgeInsets.all(16.0),
+                  children: [
+                    Card(
                       clipBehavior: Clip.antiAlias,
                       child: ListTile(
                         leading: Container(
                           width: 50,
                           height: 50,
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                            color: Colors.red.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Icon(Icons.queue_music, color: Theme.of(context).primaryColor),
+                          child: const Icon(Icons.favorite, color: Colors.red),
                         ),
-                        title: Text(playlistTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        title: const Text('Favorites', style: TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text('$_favoritesCount songs'),
                         trailing: PopupMenuButton<String>(
                           onSelected: (value) {
                             if (value == 'manage') {
-                              _navigateToManageSongs(title: playlistTitle, id: playlistId);
-                            } else if (value == 'delete') {
-                              _deletePlaylist(playlistId);
+                              _navigateToManageSongs(title: 'Favorites', isFavorites: true);
                             }
                           },
                           itemBuilder: (context) => [
@@ -231,35 +169,101 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                                 ],
                               ),
                             ),
-                            PopupMenuItem(
-                              value: 'delete',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error, size: 20),
-                                  const SizedBox(width: 12),
-                                  Text('Delete playlist', style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                                ],
-                              ),
-                            ),
                           ],
                         ),
                         onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => PlaylistDetailScreen(
-                                playlistTitle: playlistTitle,
-                                playlistId: playlistId, 
-                                initialIsPinned: false,
+                              builder: (context) => const PlaylistDetailScreen(
+                                playlistTitle: 'Favorites',
+                                initialIsPinned: true,
+                                isFavoritesPlaylist: true, 
                               ),
                             ),
                           ).then((_) => _loadData()); 
                         },
                       ),
-                    );
-                  }),
-                ]
-              ],
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    if (_customPlaylists.isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4.0, bottom: 8.0),
+                        child: Text(
+                          'My Playlists', 
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)
+                        ),
+                      ),
+                      ..._customPlaylists.map((playlist) {
+                        final playlistTitle = playlist.title; 
+                        final playlistId = playlist.id;
+
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8.0),
+                          clipBehavior: Clip.antiAlias,
+                          child: ListTile(
+                            leading: Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(Icons.queue_music, color: Theme.of(context).primaryColor),
+                            ),
+                            title: Text(playlistTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            trailing: PopupMenuButton<String>(
+                              onSelected: (value) {
+                                if (value == 'manage') {
+                                  _navigateToManageSongs(title: playlistTitle, id: playlistId);
+                                } else if (value == 'delete') {
+                                  _deletePlaylist(playlistId);
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                const PopupMenuItem(
+                                  value: 'manage',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.checklist, size: 20),
+                                      SizedBox(width: 12),
+                                      Text('Add / Remove songs'),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error, size: 20),
+                                      const SizedBox(width: 12),
+                                      Text('Delete playlist', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => PlaylistDetailScreen(
+                                    playlistTitle: playlistTitle,
+                                    playlistId: playlistId, 
+                                    initialIsPinned: false,
+                                  ),
+                                ),
+                              ).then((_) => _loadData()); 
+                            },
+                          ),
+                        );
+                      }),
+                    ]
+                  ],
+                ),
+              ),
             ),
     );
   }

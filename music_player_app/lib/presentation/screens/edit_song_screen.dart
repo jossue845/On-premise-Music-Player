@@ -3,7 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
-import 'package:music_player_app/data/services/audiodb_service.dart'; // Natively calling the new service
+import 'package:music_player_app/data/services/audiodb_service.dart'; 
 
 class EditSongScreen extends StatefulWidget {
   final Song song;
@@ -62,7 +62,6 @@ class _EditSongScreenState extends State<EditSongScreen> {
       const SnackBar(content: Text('Searching TheAudioDB for metadata...')),
     );
 
-    // Explicitly using the AudioDbService to fetch data WITHOUT saving to DB yet
     final adbService = AudioDbService();
     final artistName = _artistController.text.isNotEmpty ? _artistController.text : 'Unknown Artist';
     
@@ -171,50 +170,55 @@ class _EditSongScreenState extends State<EditSongScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _titleController,
-                    decoration: const InputDecoration(labelText: 'Title'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _artistController,
-                    decoration: const InputDecoration(labelText: 'Artists (semicolon-separated)'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _albumController,
-                    decoration: const InputDecoration(labelText: 'Album'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _genreController,
-                    decoration: const InputDecoration(labelText: 'Genre'),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
                     children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _yearController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'Year'),
-                        ),
+                      TextField(
+                        controller: _titleController,
+                        decoration: const InputDecoration(labelText: 'Title'),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: TextField(
-                          controller: _trackNumberController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'Track #'),
-                        ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _artistController,
+                        decoration: const InputDecoration(labelText: 'Artists (semicolon-separated)'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _albumController,
+                        decoration: const InputDecoration(labelText: 'Album'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _genreController,
+                        decoration: const InputDecoration(labelText: 'Genre'),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _yearController,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(labelText: 'Year'),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: TextField(
+                              controller: _trackNumberController,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(labelText: 'Track #'),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
             ),
     );

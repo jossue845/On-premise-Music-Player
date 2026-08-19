@@ -25,7 +25,6 @@ class _LastFmAuthScreenState extends ConsumerState<LastFmAuthScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
 
-    // Listen for state changes strictly to show error popups without hiding the form
     ref.listen<AsyncValue<String?>>(authProvider, (previous, next) {
       next.whenOrNull(
         error: (error, stackTrace) {
@@ -57,7 +56,6 @@ class _LastFmAuthScreenState extends ConsumerState<LastFmAuthScreen> {
           return _buildLoginForm(isLoading: false);
         },
         loading: () => _buildLoginForm(isLoading: true),
-        // On error, we manually rebuild the form so the user can re-enter credentials
         error: (err, stack) => _buildLoginForm(isLoading: false),
       ),
     );
@@ -67,100 +65,103 @@ class _LastFmAuthScreenState extends ConsumerState<LastFmAuthScreen> {
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 32.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Last.fm',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 56,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -2.0,
-                  color: Colors.redAccent, 
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Connect your account to track your offline listening habits.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.white.withOpacity(0.7),
-                ),
-              ),
-              const SizedBox(height: 48),
-              TextFormField(
-                controller: _usernameController,
-                decoration: InputDecoration(
-                  labelText: 'Username',
-                  prefixIcon: const Icon(Icons.person_outline),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 450),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Last.fm',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 56,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -2.0,
+                    color: Colors.redAccent, 
                   ),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.08),
                 ),
-                validator: (value) => value!.isEmpty ? 'Please enter your username' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _passwordController,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
+                const SizedBox(height: 8),
+                Text(
+                  'Connect your account to track your offline listening habits.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.white.withOpacity(0.7),
                   ),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.08),
                 ),
-                obscureText: true,
-                validator: (value) => value!.isEmpty ? 'Please enter your password' : null,
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                height: 56,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
+                const SizedBox(height: 48),
+                TextFormField(
+                  controller: _usernameController,
+                  decoration: InputDecoration(
+                    labelText: 'Username',
+                    prefixIcon: const Icon(Icons.person_outline),
+                    border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
                     ),
-                    elevation: 4,
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.08),
                   ),
-                  onPressed: isLoading
-                      ? null
-                      : () {
-                          if (_formKey.currentState!.validate()) {
-                            ref.read(authProvider.notifier).login(
-                                  _usernameController.text,
-                                  _passwordController.text,
-                                );
-                          }
-                        },
-                  child: isLoading
-                      ? const SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 3,
-                          ),
-                        )
-                      : const Text(
-                          'Connect Account',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
+                  validator: (value) => value!.isEmpty ? 'Please enter your username' : null,
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _passwordController,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.08),
+                  ),
+                  obscureText: true,
+                  validator: (value) => value!.isEmpty ? 'Please enter your password' : null,
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  height: 56,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 4,
+                    ),
+                    onPressed: isLoading
+                        ? null
+                        : () {
+                            if (_formKey.currentState!.validate()) {
+                              ref.read(authProvider.notifier).login(
+                                    _usernameController.text,
+                                    _passwordController.text,
+                                  );
+                            }
+                          },
+                    child: isLoading
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 3,
+                            ),
+                          )
+                        : const Text(
+                            'Connect Account',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

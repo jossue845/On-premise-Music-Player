@@ -31,18 +31,13 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     _songRepository = SongRepository(database: databaseService);
     
     try {
-      // Fetch all songs
       final result = await _songRepository.getSongs();
       if (result.isSuccess()) {
         final allSongs = result.getOrThrow();
         
         setState(() {
-          // Filter to only include songs from this specific album
           _songs = allSongs.where((song) => song.album == widget.albumName).toList();
-          
-          // Sort them by their official track number so the album plays in order!
           _songs.sort((a, b) => (a.trackNumber ?? 0).compareTo(b.trackNumber ?? 0));
-          
           _isLoading = false;
         });
       } else {
@@ -60,53 +55,56 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       appBar: AppBar(
         title: Text(widget.albumName, style: const TextStyle(fontWeight: FontWeight.bold)),
       ),
-      body: _isLoading
-        ? const Center(child: CircularProgressIndicator())
-        : _songs.isEmpty
-          ? Center(child: Text('No tracks found for ${widget.albumName}.'))
-          : ListView.builder(
-              padding: const EdgeInsets.all(16.0),
-              itemCount: _songs.length,
-              itemBuilder: (context, index) {
-                final song = _songs[index];
+      // --- FIX: Wrapped body in Center and ConstrainedBox ---
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 700),
+          child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _songs.isEmpty
+              ? Center(child: Text('No tracks found for ${widget.albumName}.'))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16.0),
+                  itemCount: _songs.length,
+                  itemBuilder: (context, index) {
+                    final song = _songs[index];
 
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8.0),
-                  child: ListTile(
-                    leading: Text(
-                      // Show the track number if available, otherwise just use the list index
-                      song.trackNumber?.toString() ?? '${index + 1}',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8.0),
+                      child: ListTile(
+                        leading: Text(
+                          song.trackNumber?.toString() ?? '${index + 1}',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                        title: Text(
+                          song.title, 
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: Text(
+                          '--:--', 
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context, 
+                            MaterialPageRoute(
+                              builder: (context) => PlayerScreen(
+                                playlist: _songs,
+                                initialIndex: index,
+                              )
+                            )
+                          );
+                        },
                       ),
-                    ),
-                    title: Text(
-                      song.title, 
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    // Pulls the soft grey text style from your global theme for the duration
-                    trailing: Text(
-                      '--:--', // Placeholder until duration is added to the database model
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    onTap: () {
-                      // FIXED: Passes the entire album tracklist and the tapped index!
-                      Navigator.push(
-                        context, 
-                        MaterialPageRoute(
-                          builder: (context) => PlayerScreen(
-                            playlist: _songs,
-                            initialIndex: index,
-                          )
-                        )
-                      );
-                    },
-                  ),
-                );
-              },
-            ),
+                    );
+                  },
+                ),
+        ),
+      ),
     );
   }
 }

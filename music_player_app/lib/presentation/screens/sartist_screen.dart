@@ -37,7 +37,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
         final allSongs = result.getOrThrow();
         
         setState(() {
-          // FIXED: Safely handles "Unknown Artist" mapping
           _songs = allSongs.where((song) {
             if (widget.artistName == 'Unknown Artist' && song.artists.isEmpty) {
               return true;
@@ -62,65 +61,72 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
       appBar: AppBar(
         title: Text(widget.artistName, style: const TextStyle(fontWeight: FontWeight.bold)),
       ),
+      // --- FIX: Added LayoutBuilder to scale grid columns up on tablets ---
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator())
         : _songs.isEmpty
           ? Center(child: Text('No songs found for ${widget.artistName}.'))
-          : GridView.builder(
-              padding: const EdgeInsets.all(16.0),
-              itemCount: _songs.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 16.0,
-                mainAxisSpacing: 16.0,
-                childAspectRatio: 0.85, 
-              ),
-              itemBuilder: (context, index) {
-                final song = _songs[index];
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                final int columns = constraints.maxWidth >= 600 ? 4 : 2;
 
-                return Card(
-                  clipBehavior: Clip.antiAlias, 
-                  elevation: 2,
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context, 
-                        MaterialPageRoute(
-                          builder: (context) => PlayerScreen(
-                            playlist: _songs,
-                            initialIndex: index,
-                          )
-                        )
-                      );
-                    },
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: Container(
-                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                            child: song.imagePath != null
-                                ? Image.file(File(song.imagePath!), fit: BoxFit.cover)
-                                : Icon(
-                                    Icons.music_note, 
-                                    size: 50, 
-                                    color: Theme.of(context).iconTheme.color?.withOpacity(0.5)
-                                  ),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: Text(
-                            song.title, 
-                            textAlign: TextAlign.center, 
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
-                    ),
+                return GridView.builder(
+                  padding: const EdgeInsets.all(16.0),
+                  itemCount: _songs.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    crossAxisSpacing: 16.0,
+                    mainAxisSpacing: 16.0,
+                    childAspectRatio: 0.85, 
                   ),
+                  itemBuilder: (context, index) {
+                    final song = _songs[index];
+
+                    return Card(
+                      clipBehavior: Clip.antiAlias, 
+                      elevation: 2,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context, 
+                            MaterialPageRoute(
+                              builder: (context) => PlayerScreen(
+                                playlist: _songs,
+                                initialIndex: index,
+                              )
+                            )
+                          );
+                        },
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: Container(
+                                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                child: song.imagePath != null
+                                    ? Image.file(File(song.imagePath!), fit: BoxFit.cover)
+                                    : Icon(
+                                        Icons.music_note, 
+                                        size: 50, 
+                                        color: Theme.of(context).iconTheme.color?.withOpacity(0.5)
+                                      ),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Text(
+                                song.title, 
+                                textAlign: TextAlign.center, 
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 );
               },
             ),

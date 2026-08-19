@@ -271,10 +271,11 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                 // --- DAILY STATS OVERVIEW ---
                 const Text('Quick Stats', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
-                Row(
+                Wrap(
+                  spacing: 16.0, // Horizontal space between the cards
+                  runSpacing: 16.0, // Vertical space if they wrap to a new line
                   children: [
                     _buildStatCard(context, 'Listened', _formattedTime, Icons.timer),
-                    const SizedBox(width: 16), 
                     _buildStatCard(context, 'Total Tracks', '${_allSongs.length}', Icons.library_music),
                   ],
                 ),
@@ -377,56 +378,62 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                 // --- TRACK YOUR STATS WIDGET ---
                 const Text('Listening Habits', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
-                Card(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(16), 
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ListeningHabitsScreen(),
+                Align(
+                  alignment: Alignment.centerLeft, // Keeps it aligned with the titles
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 500), // Prevents infinite stretching
+                    child: Card(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16), 
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ListeningHabitsScreen(),
+                            ),
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(20.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.access_time, color: Colors.blueAccent),
+                                  const SizedBox(width: 12),
+                                  const Text('Peak Time: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                  Text(_peakTime, style: const TextStyle(fontSize: 16)),
+                                ],
+                              ),
+                              const Divider(height: 30),
+                              Row(
+                                children: [
+                                  const Icon(Icons.calendar_today, color: Colors.deepPurpleAccent),
+                                  const SizedBox(width: 12),
+                                  const Text('Top Day: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                  Text(_topDay, style: const TextStyle(fontSize: 16)),
+                                ],
+                              ),
+                              if (_topDay == 'Not enough data') ...[
+                                const SizedBox(height: 16),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).primaryColor.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text(
+                                    "Play more music to generate your habits profile!",
+                                    style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                )
+                              ]
+                            ],
+                          ),
                         ),
-                      );
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.access_time, color: Colors.blueAccent),
-                              const SizedBox(width: 12),
-                              const Text('Peak Time: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                              Text(_peakTime, style: const TextStyle(fontSize: 16)),
-                            ],
-                          ),
-                          const Divider(height: 30),
-                          Row(
-                            children: [
-                              const Icon(Icons.calendar_today, color: Colors.deepPurpleAccent),
-                              const SizedBox(width: 12),
-                              const Text('Top Day: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                              Text(_topDay, style: const TextStyle(fontSize: 16)),
-                            ],
-                          ),
-                          if (_topDay == 'Not enough data') ...[
-                            const SizedBox(height: 16),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).primaryColor.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Text(
-                                "Play more music to generate your habits profile!",
-                                style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
-                                textAlign: TextAlign.center,
-                              ),
-                            )
-                          ]
-                        ],
                       ),
                     ),
                   ),
@@ -504,25 +511,27 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
   }
 
   Widget _buildStatCard(BuildContext context, String title, String value, IconData icon) {
-    return Expanded(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              Icon(icon, color: Theme.of(context).primaryColor),
-              const SizedBox(height: 8),
-              Text(
-                value, 
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              Text(title, style: Theme.of(context).textTheme.labelMedium),
-            ],
-          ),
+  // --- FIX: Replaced Expanded with ConstrainedBox ---
+  return ConstrainedBox(
+    constraints: const BoxConstraints(minWidth: 140, maxWidth: 200),
+    child: Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Icon(icon, color: Theme.of(context).primaryColor),
+            const SizedBox(height: 8),
+            Text(
+              value, 
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(title, style: Theme.of(context).textTheme.labelMedium),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

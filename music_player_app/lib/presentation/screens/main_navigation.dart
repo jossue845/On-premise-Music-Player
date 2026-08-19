@@ -54,7 +54,7 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
   bool _tiltEnabled = false;
   bool _isDragging = false; 
   bool _isManualOverride = false; 
-  String _ignoredAxis = 'none'; // Tracks the resting gravity angle to ignore
+  String _ignoredAxis = 'none'; 
   
   DateTime _lastTiltUpdate = DateTime.now();
   String _currentTilt = 'top'; 
@@ -87,57 +87,66 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
 
   void _setupSensors() {
     _accelSubscription = accelerometerEventStream().listen((AccelerometerEvent event) {
+      if (!mounted) return; // Prevent crashes when reading context in background
       if (!_tiltEnabled || _isDragging || _currentActiveSong == null) return;
 
       if (DateTime.now().difference(_lastTiltUpdate).inMilliseconds < 150) return;
 
       final screenSize = MediaQuery.of(context).size;
       final padding = MediaQuery.of(context).padding;
+      final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+      
+      // Calculate responsive boundaries
+      final bool isTablet = screenSize.width >= 600;
+      final double railWidth = isTablet ? 72.0 : 0.0;
+      final double effectiveWidth = screenSize.width - railWidth;
+      
       final double topBoundary = padding.top + 5.0; 
-      final double bottomNavHeight = padding.bottom + 90.0;
+      final double bottomNavHeight = isTablet ? padding.bottom + 10.0 : padding.bottom + 90.0;
 
-      final bool isTablet = screenSize.width > 600;
       final double hWidth = isTablet ? 350.0 : 260.0;
       final double hHeight = 75.0;
       final double vWidth = 70.0;
       final double vHeight = 160.0;
 
       String newTilt = 'none';
-      
-      // Heavy inclination (8.5) required to break manual override, standard (6.0) otherwise
       final double activeThreshold = _isManualOverride ? 8.5 : 6.0; 
 
-      if (event.x.abs() > event.y.abs()) {
-        if (event.x > activeThreshold) newTilt = 'left';
-        else if (event.x < -activeThreshold) newTilt = 'right';
+      // --- FIX: Map physical hardware axes to logical UI axes ---
+      double logicalX = event.x;
+      double logicalY = event.y;
+
+      if (isLandscape) {
+        logicalX = -event.y;
+        logicalY = event.x;
+      }
+
+      if (logicalX.abs() > logicalY.abs()) {
+        if (logicalX > activeThreshold) newTilt = 'left';
+        else if (logicalX < -activeThreshold) newTilt = 'right';
       } else {
-        if (event.y > activeThreshold) newTilt = 'bottom';
-        else if (event.y < -activeThreshold) newTilt = 'top';
+        if (logicalY > activeThreshold) newTilt = 'bottom';
+        else if (logicalY < -activeThreshold) newTilt = 'top';
       }
 
-      // If manual override is active, block the accelerometer from pulling the widget
-      // towards the direction gravity was resting at when the user dropped the widget.
-      if (_isManualOverride && newTilt == _ignoredAxis) {
-        return; 
-      }
+      if (_isManualOverride && newTilt == _ignoredAxis) return; 
 
-      // Only move if we hit a threshold AND it's a completely different side
       if (newTilt != 'none' && newTilt != _currentTilt) {
         Offset? newPos;
         if (newTilt == 'left') {
           newPos = Offset(0, (screenSize.height - vHeight) / 2);
         } else if (newTilt == 'right') {
-          newPos = Offset(screenSize.width - vWidth, (screenSize.height - vHeight) / 2);
+          newPos = Offset(effectiveWidth - vWidth, (screenSize.height - vHeight) / 2);
         } else if (newTilt == 'bottom') {
-          newPos = Offset((screenSize.width - hWidth) / 2, screenSize.height - hHeight - bottomNavHeight - 10);
+          newPos = Offset((effectiveWidth - hWidth) / 2, screenSize.height - hHeight - bottomNavHeight - 10);
         } else if (newTilt == 'top') {
-          newPos = Offset((screenSize.width - hWidth) / 2, topBoundary + 8.0);
+          newPos = Offset((effectiveWidth - hWidth) / 2, topBoundary + 8.0);
         }
 
         if (newPos != null) {
           setState(() {
-            _isManualOverride = false; // Heavy tilt successfully broke the manual lock
-            _ignoredAxis = 'none'; // Clear the ignored axis
+            _isManualOverride = false; 
+            _ignoredAxis = 'none'; 
             _currentTilt = newTilt;
             _panelPosition = newPos;
             _lastTiltUpdate = DateTime.now();
@@ -245,36 +254,11 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
     final padding = MediaQuery.of(context).padding;
-    final bool isTablet = screenSize.width > 600;
     
-    final double topBoundary = padding.top + 5.0; 
-    final double bottomNavHeight = padding.bottom + 90.0;
-
-    bool isHorizontal = true; 
-    if (_panelPosition != null) {
-      if (_panelPosition!.dy < topBoundary + 60 || _panelPosition!.dy > screenSize.height - bottomNavHeight - 180) {
-        isHorizontal = true;
-      } else {
-        isHorizontal = false;
-      }
-    }
-
-    final double currentWidth = isHorizontal ? (isTablet ? 350.0 : 260.0) : 70.0;
-    final double currentHeight = isHorizontal ? 75.0 : 160.0;
-
-    _panelPosition ??= Offset((screenSize.width - currentWidth) / 2 + 15, topBoundary + 8.0);
-
-    _panelPosition = Offset(
-      _panelPosition!.dx.clamp(0.0, screenSize.width - currentWidth),
-      _panelPosition!.dy.clamp(topBoundary, screenSize.height - currentHeight - bottomNavHeight), 
-    );
-
     return Scaffold(
       extendBody: true,
       extendBodyBehindAppBar: true,
-      
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -282,99 +266,173 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
           onPressed: () {
             Navigator.push(
               context, 
-              MaterialPageRoute(
-                builder: (context) => const SettingsScreen(),
-              ),
+              MaterialPageRoute(builder: (context) => const SettingsScreen()),
             ).then((_) => _loadTiltSetting()); 
           }, 
           icon: const Icon(Icons.settings) 
         ),
       ),
-      
-      body: Stack(
-        children: [
-          _pages[_selectedIndex], 
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool showRail = constraints.maxWidth >= 600;
           
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: SafeArea(
-                child: Container(
-                  width: isTablet ? 600 : double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 10.0),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [
-                        Theme.of(context).scaffoldBackgroundColor.withOpacity(0.95),
-                        Theme.of(context).scaffoldBackgroundColor.withOpacity(0.0),
-                      ],
-                    ),
-                  ),
-                  child: GNav(
-                    backgroundColor: Colors.transparent,
-                    color: Theme.of(context).bottomNavigationBarTheme.unselectedItemColor ?? Colors.white70,
-                    activeColor: Theme.of(context).bottomNavigationBarTheme.selectedItemColor,
-                    tabBackgroundColor: (Theme.of(context).bottomNavigationBarTheme.selectedItemColor ?? Colors.cyanAccent).withOpacity(0.1),
-                    padding: const EdgeInsets.all(16), 
-                    selectedIndex: _selectedIndex, 
-                    onTabChange: _onItemTapped, 
-                    tabs: const [
-                      GButton(icon: Icons.home, text: 'Home'),
-                      GButton(icon: Icons.search, text: 'Search'),
-                      GButton(icon: Icons.person, text: 'Artist'),
-                      GButton(icon: Icons.queue_music, text: 'Playlists'),
-                      GButton(icon: Icons.library_music_rounded, text: 'All songs'),
+          // Determine the width the stack (main content) occupies
+          final double stackWidth = showRail ? constraints.maxWidth - 72.0 : constraints.maxWidth;
+          final double topBoundary = padding.top + 5.0; 
+          final double bottomNavHeight = showRail ? padding.bottom + 10.0 : padding.bottom + 90.0;
+
+          bool isHorizontal = true; 
+          if (_panelPosition != null) {
+            if (_panelPosition!.dy < topBoundary + 60 || _panelPosition!.dy > constraints.maxHeight - bottomNavHeight - 180) {
+              isHorizontal = true;
+            } else {
+              isHorizontal = false;
+            }
+          }
+
+          final double currentWidth = isHorizontal ? (showRail ? 350.0 : 260.0) : 70.0;
+          final double currentHeight = isHorizontal ? 75.0 : 160.0;
+
+          // Start at top center by default
+          _panelPosition ??= Offset((stackWidth - currentWidth) / 2 + 15, topBoundary + 8.0);
+
+          // Constrain coordinates safely within the newly calculated stackWidth
+          _panelPosition = Offset(
+            _panelPosition!.dx.clamp(0.0, stackWidth - currentWidth),
+            _panelPosition!.dy.clamp(topBoundary, constraints.maxHeight - currentHeight - bottomNavHeight), 
+          );
+
+          return Row(
+            children: [
+              // Show NavigationRail on Tablet/Landscape
+              if (showRail)
+            SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: NavigationRail(
+                    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                    selectedIndex: _selectedIndex,
+                    onDestinationSelected: _onItemTapped,
+                    selectedIconTheme: IconThemeData(color: Theme.of(context).primaryColor),
+                    unselectedIconTheme: const IconThemeData(color: Colors.white70),
+                    selectedLabelTextStyle: TextStyle(color: Theme.of(context).primaryColor, fontSize: 12),
+                    unselectedLabelTextStyle: const TextStyle(color: Colors.white70, fontSize: 12),
+                    labelType: NavigationRailLabelType.all,
+                    destinations: const [
+                      NavigationRailDestination(icon: Icon(Icons.home), label: Text('Home')),
+                      NavigationRailDestination(icon: Icon(Icons.search), label: Text('Search')),
+                      NavigationRailDestination(icon: Icon(Icons.person), label: Text('Artist')),
+                      NavigationRailDestination(icon: Icon(Icons.queue_music), label: Text('Playlists')),
+                      NavigationRailDestination(icon: Icon(Icons.library_music_rounded), label: Text('Songs')),
                     ],
                   ),
                 ),
               ),
             ),
-          ),
-
-          if (_currentActiveSong != null)
-            AnimatedPositioned(
-              duration: _isDragging ? Duration.zero : const Duration(milliseconds: 400),
-              curve: Curves.easeOutCubic,
-              left: _panelPosition!.dx,
-              top: _panelPosition!.dy,
-              child: GestureDetector(
-                onPanStart: (_) => setState(() => _isDragging = true),
-                onPanEnd: (_) {
-                  setState(() {
-                    _isDragging = false;
-                    _isManualOverride = true; 
-                    // Lock out the current gravitational pull so it doesn't instantly snap back
-                    _ignoredAxis = _currentTilt; 
-                  });
-                },
-                onPanUpdate: (details) {
-                  setState(() {
-                    _panelPosition = _panelPosition! + details.delta;
-                  });
-                },
-                onTap: () {
-                  final songIndex = _allSongs.indexOf(_currentActiveSong!);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => PlayerScreen(
-                        playlist: List<Song>.from(_allSongs),
-                        initialIndex: songIndex != -1 ? songIndex : 0,
+                
+              // The main page content
+              Expanded(
+                child: Stack(
+                  children: [
+                    _pages[_selectedIndex], 
+                    
+                    // Show standard GNav on Phones/Portrait
+                    if (!showRail)
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: Align(
+                          alignment: Alignment.bottomCenter,
+                          child: SafeArea(
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 10.0),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.bottomCenter,
+                                  end: Alignment.topCenter,
+                                  colors: [
+                                    Theme.of(context).scaffoldBackgroundColor.withOpacity(0.95),
+                                    Theme.of(context).scaffoldBackgroundColor.withOpacity(0.0),
+                                  ],
+                                ),
+                              ),
+                              child: GNav(
+                                backgroundColor: Colors.transparent,
+                                color: Theme.of(context).bottomNavigationBarTheme.unselectedItemColor ?? Colors.white70,
+                                activeColor: Theme.of(context).bottomNavigationBarTheme.selectedItemColor,
+                                tabBackgroundColor: (Theme.of(context).bottomNavigationBarTheme.selectedItemColor ?? Colors.cyanAccent).withOpacity(0.1),
+                                
+                                // --- FIX: Force smaller icons and text to guarantee fit on narrow screens ---
+                                iconSize: 20, 
+                                textStyle: TextStyle(
+                                  fontSize: 12, 
+                                  fontWeight: FontWeight.bold, 
+                                  color: Theme.of(context).bottomNavigationBarTheme.selectedItemColor,
+                                ),
+                                gap: 4, 
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10), 
+                                
+                                selectedIndex: _selectedIndex, 
+                                onTabChange: _onItemTapped, 
+                                tabs: const [
+                                  GButton(icon: Icons.home, text: 'Home'),
+                                  GButton(icon: Icons.search, text: 'Search'),
+                                  GButton(icon: Icons.person, text: 'Artist'),
+                                  GButton(icon: Icons.queue_music, text: 'Playlists'),
+                                  GButton(icon: Icons.library_music_rounded, text: 'Songs'), 
+                                ],
+                              )
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  );
-                },
-                child: isHorizontal 
-                    ? _buildHorizontalMiniPlayer(currentWidth, currentHeight)
-                    : _buildVerticalMiniPlayer(currentWidth, currentHeight),
+
+                    if (_currentActiveSong != null)
+                      AnimatedPositioned(
+                        duration: _isDragging ? Duration.zero : const Duration(milliseconds: 400),
+                        curve: Curves.easeOutCubic,
+                        left: _panelPosition!.dx,
+                        top: _panelPosition!.dy,
+                        child: GestureDetector(
+                          onPanStart: (_) => setState(() => _isDragging = true),
+                          onPanEnd: (_) {
+                            setState(() {
+                              _isDragging = false;
+                              _isManualOverride = true; 
+                              _ignoredAxis = _currentTilt; 
+                            });
+                          },
+                          onPanUpdate: (details) {
+                            setState(() {
+                              _panelPosition = _panelPosition! + details.delta;
+                            });
+                          },
+                          onTap: () {
+                            final songIndex = _allSongs.indexOf(_currentActiveSong!);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => PlayerScreen(
+                                  playlist: List<Song>.from(_allSongs),
+                                  initialIndex: songIndex != -1 ? songIndex : 0,
+                                ),
+                              ),
+                            );
+                          },
+                          child: isHorizontal 
+                              ? _buildHorizontalMiniPlayer(currentWidth, currentHeight)
+                              : _buildVerticalMiniPlayer(currentWidth, currentHeight),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }

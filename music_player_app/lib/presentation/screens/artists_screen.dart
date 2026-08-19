@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
-import 'package:music_player_app/presentation/screens/sartist_screen.dart'; // FIX: Corrected import typo
+import 'package:music_player_app/presentation/screens/sartist_screen.dart';
 import 'package:sqflite/sqflite.dart';
 
 class ArtistsScreen extends StatefulWidget {
@@ -74,61 +74,68 @@ class _ArtistsScreenState extends State<ArtistsScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _artists.isEmpty
               ? const Center(child: Text('No artists found. Scan for music in Settings.'))
-              : GridView.builder(
-                  padding: const EdgeInsets.all(16.0),
-                  itemCount: _artists.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 16.0,
-                    mainAxisSpacing: 16.0,
-                    childAspectRatio: 0.85, 
-                  ),
-                  itemBuilder: (context, index) {
-                    final artistName = _artists[index];
-                    final imagePath = _artistImages[artistName];
-
-                    return Card(
-                      clipBehavior: Clip.antiAlias,
-                      elevation: 2,
-                      child: InkWell(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ArtistDetailScreen(artistName: artistName),
-                            ),
-                          );
-                        },
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(
-                              child: Container(
-                                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                child: imagePath != null
-                                    ? Image.file(File(imagePath), fit: BoxFit.cover)
-                                    : Icon(
-                                        Icons.person, 
-                                        size: 50,
-                                        color: Theme.of(context).iconTheme.color?.withOpacity(0.5),
-                                      ),
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(12.0),
-                              child: Text(
-                                artistName,
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
-                        ),
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    // Adjust column count based on width
+                    final int columns = constraints.maxWidth >= 600 ? 4 : 2;
+                    
+                    return GridView.builder(
+                      padding: const EdgeInsets.all(16.0),
+                      itemCount: _artists.length,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: columns,
+                        crossAxisSpacing: 16.0,
+                        mainAxisSpacing: 16.0,
+                        childAspectRatio: 0.85, 
                       ),
+                      itemBuilder: (context, index) {
+                        final artistName = _artists[index];
+                        final imagePath = _artistImages[artistName];
+
+                        return Card(
+                          clipBehavior: Clip.antiAlias,
+                          elevation: 2,
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ArtistDetailScreen(artistName: artistName),
+                                ),
+                              );
+                            },
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(
+                                  child: Container(
+                                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                    child: imagePath != null
+                                        ? Image.file(File(imagePath), fit: BoxFit.cover)
+                                        : Icon(
+                                            Icons.person, 
+                                            size: 50,
+                                            color: Theme.of(context).iconTheme.color?.withOpacity(0.5),
+                                          ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(12.0),
+                                  child: Text(
+                                    artistName,
+                                    textAlign: TextAlign.center,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     );
-                  },
+                  }
                 ),
     );
   }
