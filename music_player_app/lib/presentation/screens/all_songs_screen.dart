@@ -4,6 +4,8 @@ import 'package:sqflite/sqflite.dart';
 
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
+// --- FIX: Imported PlaylistRepository ---
+import 'package:music_player_app/data/repositories/playlist_repository.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
 import 'package:music_player_app/presentation/screens/player_screen.dart';
 import 'package:music_player_app/presentation/screens/edit_song_screen.dart';
@@ -17,6 +19,7 @@ class AllSongsScreen extends StatefulWidget {
 
 class _AllSongsScreenState extends State<AllSongsScreen> {
   late SongRepository _songRepository;
+  late PlaylistRepository _playlistRepository; // Added repository
   List<Song> _songs = [];
   bool _isLoading = true;
 
@@ -31,6 +34,7 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
     
     final databaseService = DatabaseService(databaseFactory: databaseFactory);
     _songRepository = SongRepository(database: databaseService);
+    _playlistRepository = PlaylistRepository(database: databaseService); // Initialized repository
     
     try {
       final result = await _songRepository.getSongs();
@@ -52,6 +56,52 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
     } catch (e) {
       debugPrint("🎵 EXCEPTION CAUGHT: $e");
       setState(() => _isLoading = false);
+    }
+  }
+
+  // --- NEW: Reused Add to Playlist Dialog ---
+  Future<void> _showAddToPlaylistDialog(Song song) async {
+    final result = await _playlistRepository.getPlaylists();
+    if (result.isSuccess()) {
+      final playlists = result.getOrThrow();
+      if (!mounted) return;
+      
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Add to Playlist'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: playlists.isEmpty 
+                ? const Text('No custom playlists available. Create one first!')
+                : ListView.builder(
+                shrinkWrap: true,
+                itemCount: playlists.length,
+                itemBuilder: (context, index) {
+                  final pl = playlists[index];
+                  return ListTile(
+                    leading: const Icon(Icons.queue_music),
+                    title: Text(pl.title),
+                    onTap: () async {
+                      await _playlistRepository.addSongsToPlaylist(pl.id, [song.id]);
+                      if (mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Added to ${pl.title}', style: const TextStyle(color: Colors.white)), backgroundColor: Colors.green),
+                        );
+                      }
+                    },
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ],
+          );
+        }
+      );
     }
   }
 
@@ -84,7 +134,6 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       if (constraints.maxWidth >= 600) {
-                        // Tablet layout: Grid of list tiles
                         return GridView.builder(
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
@@ -98,7 +147,6 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
                           itemBuilder: (context, index) => _buildSongCard(context, index),
                         );
                       } else {
-                        // Phone layout: Standard list
                         return ListView.builder(
                           physics: const AlwaysScrollableScrollPhysics(),
                           itemCount: _songs.length,
@@ -130,9 +178,23 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
               if (didUpdate == true) {
                 _initializeRepositoryAndLoad(); 
               }
+            } else if (choice == 'add_to_playlist') {
+              _showAddToPlaylistDialog(song);
             }
           },
           itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+            // --- NEW: Add to Playlist Option ---
+            const PopupMenuItem<String>(
+              value: 'add_to_playlist',
+              child: Row(
+                children: [
+                  Icon(Icons.playlist_add, size: 20),
+                  SizedBox(width: 12),
+                  Text('Add to Playlist...'),
+                ],
+              ),
+            ),
+            const PopupMenuDivider(),
             const PopupMenuItem<String>(
               value: 'edit',
               child: Row(

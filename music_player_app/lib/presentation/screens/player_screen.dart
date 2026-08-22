@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
@@ -40,8 +41,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   double _currentPosition = 0.0;
   double _totalDuration = 1.0; 
   bool _isShuffle = false;
-  LoopMode _loopMode = LoopMode.off;
+  late LoopMode _loopMode; 
   late int _currentIndex;
+
+  StreamSubscription? _currentIndexSub;
+  StreamSubscription? _playerStateSub;
+  StreamSubscription? _positionSub;
+  StreamSubscription? _durationSub;
 
   @override
   void initState() {
@@ -49,6 +55,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _initTime = DateTime.now(); 
     
     _audioPlayer = ref.read(audioPlayerProvider);
+    _loopMode = _audioPlayer.loopMode; 
+    
     _currentIndex = widget.initialIndex;
     _localPlaylist = List.from(widget.playlist);
     
@@ -57,6 +65,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final databaseService = DatabaseService(databaseFactory: databaseFactory);
     _songRepository = SongRepository(database: databaseService);
     
+    // --- FIX 1: Set up streams immediately before initiating playback ---
+    _setupStreams();
     _initPlayer();
   }
 
@@ -67,7 +77,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final currentTag = _audioPlayer.sequenceState?.currentSource?.tag as MediaItem?;
     final isAlreadyPlaying = currentTag?.id == targetSong.id.toString();
 
-    // Only configure the player if it isn't already playing the correct song
     if (!isAlreadyPlaying) {
       final currentSequence = _audioPlayer.sequenceState?.sequence;
       bool isSamePlaylist = false;
@@ -112,52 +121,65 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           debugPrint("PLAYER ERROR: $e");
         }
       }
+    } else {
+      // Ensure the player is actively playing if it was already on this track
+      if (!_audioPlayer.playing) {
+        _audioPlayer.play();
+      }
     }
 
-    // --- FIX: Setup streams AFTER the player has settled on the correct initial track ---
-    _setupStreams();
-    
-    // Force sync the PageController if it drifted during startup
     if (_pageController.hasClients && _pageController.page?.round() != widget.initialIndex) {
       _pageController.jumpToPage(widget.initialIndex);
     }
   }
 
   void _setupStreams() {
-    _audioPlayer.currentIndexStream.listen((index) {
-      if (mounted && index != null && index < _localPlaylist.length) {
-        final tag = _audioPlayer.sequenceState?.sequence[index].tag as MediaItem?;
-        if (tag?.id == _localPlaylist[index].id.toString()) {
-          setState(() {
-            _currentIndex = index;
-          });
-          
-          if (_pageController.hasClients && _pageController.page?.round() != index) {
-            _pageController.animateToPage(
-              index, 
-              duration: const Duration(milliseconds: 300), 
-              curve: Curves.easeOutCubic,
-            );
+    _currentIndexSub = _audioPlayer.currentIndexStream.listen((index) {
+      if (mounted && index != null) {
+        // --- FIX 2: Look up the sequence index explicitly to prevent race conditions ---
+        final sequence = _audioPlayer.sequenceState?.sequence;
+        if (sequence != null && index < sequence.length) {
+          final tag = sequence[index].tag as MediaItem?;
+          if (tag != null) {
+            final matchedIndex = _localPlaylist.indexWhere((s) => s.id.toString() == tag.id);
+            if (matchedIndex != -1) {
+              setState(() => _currentIndex = matchedIndex);
+              
+              if (_pageController.hasClients) {
+                final currentPage = _pageController.page?.round() ?? widget.initialIndex;
+                if (currentPage != matchedIndex) {
+                  _pageController.animateToPage(
+                    matchedIndex, 
+                    duration: const Duration(milliseconds: 300), 
+                    curve: Curves.easeOutCubic,
+                  );
+                }
+              }
+            }
           }
         }
       }
     });
 
-    _audioPlayer.playerStateStream.listen((state) {
+    _playerStateSub = _audioPlayer.playerStateStream.listen((state) {
       if (mounted) setState(() => _isPlaying = state.playing);
     });
 
-    _audioPlayer.positionStream.listen((position) {
+    _positionSub = _audioPlayer.positionStream.listen((position) {
       if (mounted) setState(() => _currentPosition = position.inMilliseconds.toDouble());
     });
 
-    _audioPlayer.durationStream.listen((duration) {
+    _durationSub = _audioPlayer.durationStream.listen((duration) {
       if (mounted && duration != null) setState(() => _totalDuration = duration.inMilliseconds.toDouble());
     });
   }
 
   @override
   void dispose() {
+    _currentIndexSub?.cancel();
+    _playerStateSub?.cancel();
+    _positionSub?.cancel();
+    _durationSub?.cancel();
     _pageController.dispose();
     super.dispose();
   }
@@ -169,14 +191,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   void _skipNext() async {
-    if (_audioPlayer.hasNext) await _audioPlayer.seekToNext();
+    // --- FIX 3: Explicit fallback to wrap around to index 0 ---
+    if (_audioPlayer.hasNext) {
+      await _audioPlayer.seekToNext();
+    } else {
+      await _audioPlayer.seek(Duration.zero, index: 0);
+    }
   }
 
   void _skipPrevious() async {
+    // --- FIX 3: Explicit fallback to wrap around to the end ---
     if (_audioPlayer.hasPrevious) {
       await _audioPlayer.seekToPrevious();
     } else {
-      await _audioPlayer.seek(Duration.zero); 
+      await _audioPlayer.seek(Duration.zero, index: _localPlaylist.length - 1);
     }
   }
 
@@ -295,8 +323,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           onPageChanged: (newIndex) {
             if (DateTime.now().difference(_initTime).inMilliseconds < 500) return;
             
-            if (_audioPlayer.currentIndex != newIndex) {
-              _audioPlayer.seek(Duration.zero, index: newIndex);
+            final targetSong = _localPlaylist[newIndex];
+            final audioSequence = _audioPlayer.sequenceState?.sequence ?? [];
+            
+            final sequenceIndex = audioSequence.indexWhere((item) => (item.tag as MediaItem?)?.id == targetSong.id.toString());
+            
+            if (sequenceIndex != -1 && _audioPlayer.currentIndex != sequenceIndex) {
+              _audioPlayer.seek(Duration.zero, index: sequenceIndex);
             }
           },
           itemBuilder: (context, index) {

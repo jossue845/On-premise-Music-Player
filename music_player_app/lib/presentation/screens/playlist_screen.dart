@@ -59,13 +59,25 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
+          scrollable: true,
+          // --- FIX: Compress vertical padding and allow the dialog to expand closer to screen edges ---
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          titlePadding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          
           title: const Text('New Playlist'),
-          content: TextField(
-            controller: _playlistNameController,
-            decoration: const InputDecoration(
-              hintText: 'Enter playlist name',
+          // --- FIX: Force the dialog to be wider using a constrained SizedBox ---
+          content: SizedBox(
+            width: MediaQuery.of(context).size.width * 0.8,
+            child: TextField(
+              controller: _playlistNameController,
+              decoration: const InputDecoration(
+                hintText: 'Enter playlist name',
+                isDense: true, // Shrinks the text field's internal height
+              ),
+              autofocus: true,
             ),
-            autofocus: true,
           ),
           actions: [
             TextButton(

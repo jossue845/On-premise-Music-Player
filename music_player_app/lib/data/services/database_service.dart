@@ -48,7 +48,6 @@ class DatabaseService {
   static const String _keyColumnName = "key";
   static const String _valueColumnName = "value";
 
-  // --- NEW: Scrobbles table name ---
   static const String _scrobblesTableName = "scrobbles";
 
   Database? _database;
@@ -56,7 +55,6 @@ class DatabaseService {
 
   DatabaseService({required this.databaseFactory});
 
-  // --- CORRECTED: Route directly through your existing open() method ---
   Future<Database> get database async {
     if (_database != null) return _database!;
     await open();
@@ -80,7 +78,6 @@ class DatabaseService {
            FOREIGN KEY($_artistIdColumnName) REFERENCES $_artistTableName($_artistIdColumnName) ON UPDATE CASCADE ON DELETE RESTRICT);
           ''');
           
-      // Added lyrics TEXT column to the end of the song table schema
       await txn.execute('''
          CREATE TABLE IF NOT EXISTS $_songTableName(
            $_songIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -116,7 +113,6 @@ class DatabaseService {
          CREATE TABLE IF NOT EXISTS $_keyValueStoreTableName($_keyColumnName TEXT PRIMARY KEY, $_valueColumnName TEXT NOT NULL);
           ''');
 
-      // --- CORRECTED: Offline scrobbles caching table injected here ---
       await txn.execute('''
          CREATE TABLE IF NOT EXISTS $_scrobblesTableName(
            id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -189,9 +185,6 @@ class DatabaseService {
     });
   }
 
-  /// Opens the database.
-  ///
-  /// Creates the database if it doesn't exist.
   Future<void> open() async {
     _database = await databaseFactory.openDatabase(
       join(await databaseFactory.getDatabasesPath(), 'app_database.db'),
@@ -203,7 +196,6 @@ class DatabaseService {
           return await _createOrUpdateDb(db);
         },
         onUpgrade: (db, oldVersion, newVersion) async {
-          // Fallback to recreate tables if version changes
           await db.execute('DROP TABLE IF EXISTS $_playlistTrackTableName');
           await db.execute('DROP TABLE IF EXISTS $_queuedSongTableName');
           await db.execute('DROP TABLE IF EXISTS $_songArtistTableName');
@@ -213,21 +205,18 @@ class DatabaseService {
           await db.execute('DROP TABLE IF EXISTS $_artistTableName');
           await db.execute('DROP TABLE IF EXISTS $_playlistTableName');
           await db.execute('DROP TABLE IF EXISTS $_keyValueStoreTableName');
-          await db.execute('DROP TABLE IF EXISTS $_scrobblesTableName'); // Included the scrobbles drop
+          await db.execute('DROP TABLE IF EXISTS $_scrobblesTableName'); 
           return await _createOrUpdateDb(db);
         },
-        // --- CORRECTED: Incremented version to 7 to safely trigger the upgrade and build the new table ---
         version: 7, 
       ),
     );
   }
 
-  /// Whether the database is open.
   bool isOpen() {
     return _database != null;
   }
 
-  /// Returns the songs in the database associated to an album and at least one song artist.
   Future<Result<List<Song>>> getSongs({
     int? artistId,
     int? albumId,
@@ -270,7 +259,6 @@ class DatabaseService {
     }
   }
 
-  /// Returns the songs with the specified [title], [genre], [year] and [trackNumber].
   Future<Result<List<Song>>> getSongsWith({
     String? title,
     String? genre,
@@ -294,7 +282,6 @@ class DatabaseService {
     }
   }
 
-  /// Helper for the getSongs* functions.
   List<Song> _processSongQuery(List<Map<String, Object?>> entries) {
     final Map<int, Song> songs = {};
     for (final entry in entries) {
@@ -329,7 +316,6 @@ class DatabaseService {
     return songs.values.toList();
   }
 
-  /// Increments the play count of the song identified by [songId].
   Future<Result<void>> incrementPlayCount(int songId) async {
     try {
       await _database!.rawUpdate(
@@ -364,7 +350,6 @@ class DatabaseService {
     );
   }
 
-  /// Returns the albums in the database associated to at least one album artist.
   Future<Result<List<Album>>> getAlbums({int? artistId, int? songId}) async {
     final Map<int, Album> albums = {};
     late List<Map<String, Object?>> albumArtistsEntries;
@@ -436,10 +421,11 @@ class DatabaseService {
     }
   }
 
-  /// Returns all the playlists in the database.
   Future<Result<List<Playlist>>> getPlaylists() async {
     try {
-      final playlistEntries = await _database!.rawQuery('''
+      // --- FIX: Use async getter to ensure DB is initialized ---
+      final db = await database;
+      final playlistEntries = await db.rawQuery('''
         SELECT $_playlistIdColumnName, $_playlistTitleColumnName, (SELECT $_imagePathColumnName FROM $_songTableName NATURAL JOIN $_playlistTrackTableName PT
           WHERE PT.$_playlistIdColumnName = P.$_playlistIdColumnName LIMIT 1) as $_imagePathColumnName
         FROM $_playlistTableName P;
@@ -459,10 +445,11 @@ class DatabaseService {
     }
   }
 
-  /// Returns all the artists in the database.
   Future<Result<List<Artist>>> getArtists() async {
     try {
-      final entries = await _database!.rawQuery('''
+      // --- FIX: Use async getter to ensure DB is initialized ---
+      final db = await database;
+      final entries = await db.rawQuery('''
           SELECT * FROM $_artistTableName;
         ''');
       final list = entries
@@ -479,7 +466,6 @@ class DatabaseService {
     }
   }
 
-  /// Returns the queue saved in the database.
   Future<Result<SongQueue>> getQueue() async {
     try {
       final List<int> queueList = [];
@@ -557,7 +543,6 @@ class DatabaseService {
       }, conflictAlgorithm: ConflictAlgorithm.ignore);
       
       if (id <= 0) {
-        // --- FIX: Use a case-insensitive LIKE query to find the existing artist ---
         final result = await executor.query(
           _artistTableName,
           columns: [_artistIdColumnName],
@@ -567,7 +552,6 @@ class DatabaseService {
         if (result.isNotEmpty) {
           id = result.first[_artistIdColumnName] as int;
         } else {
-          // Absolute fallback if something goes wrong, ensuring we never return 0
           throw Exception("Artist could not be inserted or found.");
         }
       }
@@ -576,23 +560,23 @@ class DatabaseService {
       return Failure(e);
     }
   }
-  /// Retrieves the peak listening time and top day from the scrobbles table.
+  
   Future<Result<Map<String, String>>> getListeningHabits() async {
     try {
       final db = await database;
       
-      // %w returns the day of the week 0-6 (0 = Sunday)
+      // --- FIX: Removed the / 1000 division since the timestamps are already in seconds ---
       final topDayResult = await db.rawQuery('''
-        SELECT CAST(strftime('%w', timestamp / 1000, 'unixepoch', 'localtime') AS INTEGER) as day_index, COUNT(*) as play_count
+        SELECT CAST(strftime('%w', timestamp, 'unixepoch', 'localtime') AS INTEGER) as day_index, COUNT(*) as play_count
         FROM $_scrobblesTableName
         GROUP BY day_index
         ORDER BY play_count DESC
         LIMIT 1
       ''');
 
-      // %H returns the hour 00-24
+      // --- FIX: Removed the / 1000 division here as well ---
       final peakHourResult = await db.rawQuery('''
-        SELECT CAST(strftime('%H', timestamp / 1000, 'unixepoch', 'localtime') AS INTEGER) as hour_index, COUNT(*) as play_count
+        SELECT CAST(strftime('%H', timestamp, 'unixepoch', 'localtime') AS INTEGER) as hour_index, COUNT(*) as play_count
         FROM $_scrobblesTableName
         GROUP BY hour_index
         ORDER BY play_count DESC
@@ -1111,17 +1095,15 @@ class DatabaseService {
     }
   }
 
-  /// Retrieves listening frequency grouped by day of the week and hour of the day
   Future<Result<List<Map<String, dynamic>>>> getHeatmapData() async {
     try {
       final db = await database;
       
-      // %w returns day of week (0-6, Sunday is 0)
-      // %H returns hour (00-23)
+      // --- FIX: Removed the / 1000 division here as well ---
       final result = await db.rawQuery('''
         SELECT 
-          CAST(strftime('%w', timestamp / 1000, 'unixepoch', 'localtime') AS INTEGER) as day_index,
-          CAST(strftime('%H', timestamp / 1000, 'unixepoch', 'localtime') AS INTEGER) as hour_index,
+          CAST(strftime('%w', timestamp, 'unixepoch', 'localtime') AS INTEGER) as day_index,
+          CAST(strftime('%H', timestamp, 'unixepoch', 'localtime') AS INTEGER) as hour_index,
           COUNT(*) as play_count
         FROM $_scrobblesTableName
         GROUP BY day_index, hour_index
@@ -1135,7 +1117,6 @@ class DatabaseService {
 
   Future<Result<void>> insertKVPair(String key, String value) async {
     try {
-      // --- FIX: Use the async 'database' getter instead of forcing '_database!' ---
       final db = await database; 
       await db.insert(_keyValueStoreTableName, {
         _keyColumnName: key,
@@ -1149,7 +1130,6 @@ class DatabaseService {
 
   Future<Result<String>> getValue(String key) async {
     try {
-      // --- FIX: Use the async 'database' getter ---
       final db = await database;
       final queryResult = (await db.query(
         _keyValueStoreTableName,

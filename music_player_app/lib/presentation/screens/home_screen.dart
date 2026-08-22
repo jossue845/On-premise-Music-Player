@@ -28,14 +28,14 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
   List<Song> _allSongs = []; 
   bool _isLoading = false;
 
-  Song? _currentActiveSong; 
   bool _isPlaying = false;
   
   int _secondsListened = 0;
+  int _favoritesCount = 0;
+  int _playlistCount = 0;
   Timer? _playbackTimer;
 
   StreamSubscription? _playerStateSubscription;
-  StreamSubscription? _sequenceStateSubscription;
 
   String _topDay = 'Loading...';
   String _peakTime = 'Loading...';
@@ -45,6 +45,7 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
     super.initState();
     _initializeServices();
     _loadSongs();
+    _loadPlaylists();
     _loadTotalTime(); 
     _loadListeningHabits();
     _setupAudioStreams();
@@ -54,7 +55,6 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
   void dispose() {
     _stopTimer();
     _playerStateSubscription?.cancel();
-    _sequenceStateSubscription?.cancel();
     super.dispose();
   }
 
@@ -90,30 +90,33 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
     } catch (_) {}
   }
 
+  Future<void> _loadPlaylists() async {
+    try {
+      if (!_databaseService.isOpen()) {
+        await _databaseService.open();
+      }
+      final result = await _databaseService.getPlaylists();
+      if (result.isSuccess()) {
+        if (mounted) {
+          setState(() => _playlistCount = result.getOrThrow().length);
+        }
+      }
+    } catch (e) {
+      debugPrint("Error loading playlist count: $e");
+    }
+  }
+
   Future<void> _loadSongs() async {
     setState(() => _isLoading = true);
     try {
       final result = await _songRepository.getSongs();
       if (result.isSuccess()) {
         final songs = result.getOrThrow();
-        Song? activeSong;
-        
-        final audioPlayer = ref.read(audioPlayerProvider);
-        if (audioPlayer.sequenceState?.currentSource != null) {
-          final tag = audioPlayer.sequenceState!.currentSource!.tag as MediaItem?;
-          if (tag != null) {
-            try {
-              activeSong = songs.firstWhere((s) => s.id.toString() == tag.id);
-            } catch (_) {}
-          }
-        }
-        
-        activeSong ??= songs.isNotEmpty ? songs.first : null;
 
         if (mounted) {
           setState(() {
             _allSongs = songs;
-            _currentActiveSong = activeSong;
+            _favoritesCount = songs.where((s) => s.favorite).length;
             _isLoading = false;
           });
         }
@@ -206,7 +209,7 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
-          SliverAppBar(
+          const SliverAppBar(
             backgroundColor: Colors.transparent,
             floating: true, 
             snap: true, 
@@ -218,66 +221,24 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 
-                // --- LAST PLAYED ---
-                const Text('Last Played', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 10), 
-                _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _currentActiveSong != null
-                        ? Card(
-                            child: ListTile(
-                              leading: ClipRRect(
-                                borderRadius: BorderRadius.circular(4.0),
-                                child: Container(
-                                  width: 45,
-                                  height: 45,
-                                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                  child: _currentActiveSong!.imagePath != null
-                                      ? Image.file(File(_currentActiveSong!.imagePath!), fit: BoxFit.cover)
-                                      : Icon(Icons.music_note, color: Theme.of(context).iconTheme.color?.withOpacity(0.5)),
-                                ),
-                              ),
-                              title: Text(
-                                _currentActiveSong!.title,
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              subtitle: Text(
-                                _currentActiveSong!.artists.isNotEmpty ? _currentActiveSong!.artists.first : 'Unknown',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              onTap: () {
-                                final songIndex = _allSongs.indexOf(_currentActiveSong!);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => PlayerScreen(playlist: _allSongs, initialIndex: songIndex != -1 ? songIndex : 0),
-                                  ),
-                                );
-                              },
-                            ),
-                          )
-                        : Card(
-                            child: ListTile(
-                              leading: const Icon(Icons.music_note, size: 40),
-                              title: const Text('No songs found'),
-                              subtitle: const Text('Tap on Settings to scan for music'),
-                            ),
-                          ),
-                const SizedBox(height: 24), 
-
                 // --- DAILY STATS OVERVIEW ---
                 const Text('Quick Stats', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
-                Wrap(
-                  spacing: 16.0, // Horizontal space between the cards
-                  runSpacing: 16.0, // Vertical space if they wrap to a new line
-                  children: [
-                    _buildStatCard(context, 'Listened', _formattedTime, Icons.timer),
-                    _buildStatCard(context, 'Total Tracks', '${_allSongs.length}', Icons.library_music),
-                  ],
+                // --- FIX: Replaced Wrap with SingleChildScrollView for horizontal scrolling ---
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  clipBehavior: Clip.none, // Allows card shadows to render properly while scrolling
+                  child: Row(
+                    children: [
+                      _buildStatCard(context, 'Listened', _formattedTime, Icons.timer),
+                      const SizedBox(width: 16),
+                      _buildStatCard(context, 'Total Tracks', '${_allSongs.length}', Icons.library_music),
+                      const SizedBox(width: 16),
+                      _buildStatCard(context, 'Favorites', '$_favoritesCount', Icons.favorite),
+                      const SizedBox(width: 16),
+                      _buildStatCard(context, 'Playlists', '$_playlistCount', Icons.queue_music),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 24),
 
@@ -379,9 +340,9 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                 const Text('Listening Habits', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
                 Align(
-                  alignment: Alignment.centerLeft, // Keeps it aligned with the titles
+                  alignment: Alignment.centerLeft, 
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 500), // Prevents infinite stretching
+                    constraints: const BoxConstraints(maxWidth: 500), 
                     child: Card(
                       child: InkWell(
                         borderRadius: BorderRadius.circular(16), 
@@ -403,7 +364,14 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                                   const Icon(Icons.access_time, color: Colors.blueAccent),
                                   const SizedBox(width: 12),
                                   const Text('Peak Time: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                  Text(_peakTime, style: const TextStyle(fontSize: 16)),
+                                  Expanded(
+                                    child: Text(
+                                      _peakTime, 
+                                      style: const TextStyle(fontSize: 16),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
                                 ],
                               ),
                               const Divider(height: 30),
@@ -412,7 +380,14 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                                   const Icon(Icons.calendar_today, color: Colors.deepPurpleAccent),
                                   const SizedBox(width: 12),
                                   const Text('Top Day: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                  Text(_topDay, style: const TextStyle(fontSize: 16)),
+                                  Expanded(
+                                    child: Text(
+                                      _topDay, 
+                                      style: const TextStyle(fontSize: 16),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
                                 ],
                               ),
                               if (_topDay == 'Not enough data') ...[
@@ -511,27 +486,26 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
   }
 
   Widget _buildStatCard(BuildContext context, String title, String value, IconData icon) {
-  // --- FIX: Replaced Expanded with ConstrainedBox ---
-  return ConstrainedBox(
-    constraints: const BoxConstraints(minWidth: 140, maxWidth: 200),
-    child: Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Icon(icon, color: Theme.of(context).primaryColor),
-            const SizedBox(height: 8),
-            Text(
-              value, 
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            Text(title, style: Theme.of(context).textTheme.labelMedium),
-          ],
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 140, maxWidth: 200),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              Icon(icon, color: Theme.of(context).primaryColor),
+              const SizedBox(height: 8),
+              Text(
+                value, 
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              Text(title, style: Theme.of(context).textTheme.labelMedium),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
