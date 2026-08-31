@@ -16,7 +16,14 @@ import 'package:music_player_app/presentation/screens/sartist_screen.dart';
 import 'package:music_player_app/presentation/screens/salbum_screen.dart';
 
 class HomeDashboard extends ConsumerStatefulWidget {
-  const HomeDashboard({super.key});
+  final DatabaseService? testDatabaseService;
+  final SongRepository? testSongRepository;
+  
+  const HomeDashboard({
+    super.key, 
+    this.testDatabaseService, 
+    this.testSongRepository
+  });
 
   @override
   ConsumerState<HomeDashboard> createState() => _HomeDashboardState();
@@ -40,6 +47,11 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
   String _topDay = 'Loading...';
   String _peakTime = 'Loading...';
 
+  void _initializeServices() {
+    _databaseService = widget.testDatabaseService ?? DatabaseService(databaseFactory: databaseFactory);
+    _songRepository = widget.testSongRepository ?? SongRepository(database: _databaseService);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -56,11 +68,6 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
     _stopTimer();
     _playerStateSubscription?.cancel();
     super.dispose();
-  }
-
-  void _initializeServices() {
-    _databaseService = DatabaseService(databaseFactory: databaseFactory);
-    _songRepository = SongRepository(database: _databaseService);
   }
 
   Future<void> _loadTotalTime() async {
@@ -224,10 +231,9 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                 // --- DAILY STATS OVERVIEW ---
                 const Text('Quick Stats', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
-                // --- FIX: Replaced Wrap with SingleChildScrollView for horizontal scrolling ---
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  clipBehavior: Clip.none, // Allows card shadows to render properly while scrolling
+                  clipBehavior: Clip.none, 
                   child: Row(
                     children: [
                       _buildStatCard(context, 'Listened', _formattedTime, Icons.timer),
@@ -350,7 +356,10 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const ListeningHabitsScreen(),
+                              builder: (context) => ListeningHabitsScreen(
+                                // --- FIX: Injecting the database service for the tests ---
+                                testDatabaseService: widget.testDatabaseService,
+                              ),
                             ),
                           );
                         },

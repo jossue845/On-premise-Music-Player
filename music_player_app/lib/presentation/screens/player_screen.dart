@@ -18,11 +18,17 @@ import 'package:music_player_app/presentation/screens/equalizer_screen.dart';
 class PlayerScreen extends ConsumerStatefulWidget {
   final List<Song> playlist;
   final int initialIndex;
+  
+  // --- NEW: Testing Parameters ---
+  final DatabaseService? testDatabaseService;
+  final SongRepository? testSongRepository;
 
   const PlayerScreen({
     super.key, 
     required this.playlist, 
     required this.initialIndex,
+    this.testDatabaseService,
+    this.testSongRepository,
   });
 
   @override
@@ -62,10 +68,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     
     _pageController = PageController(initialPage: widget.initialIndex);
     
-    final databaseService = DatabaseService(databaseFactory: databaseFactory);
-    _songRepository = SongRepository(database: databaseService);
+    // --- FIX: Use injected mock database if provided ---
+    final databaseService = widget.testDatabaseService ?? DatabaseService(databaseFactory: databaseFactory);
+    _songRepository = widget.testSongRepository ?? SongRepository(database: databaseService);
     
-    // --- FIX 1: Set up streams immediately before initiating playback ---
     _setupStreams();
     _initPlayer();
   }
@@ -122,7 +128,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         }
       }
     } else {
-      // Ensure the player is actively playing if it was already on this track
       if (!_audioPlayer.playing) {
         _audioPlayer.play();
       }
@@ -136,7 +141,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void _setupStreams() {
     _currentIndexSub = _audioPlayer.currentIndexStream.listen((index) {
       if (mounted && index != null) {
-        // --- FIX 2: Look up the sequence index explicitly to prevent race conditions ---
         final sequence = _audioPlayer.sequenceState?.sequence;
         if (sequence != null && index < sequence.length) {
           final tag = sequence[index].tag as MediaItem?;
@@ -191,7 +195,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   void _skipNext() async {
-    // --- FIX 3: Explicit fallback to wrap around to index 0 ---
     if (_audioPlayer.hasNext) {
       await _audioPlayer.seekToNext();
     } else {
@@ -200,7 +203,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   void _skipPrevious() async {
-    // --- FIX 3: Explicit fallback to wrap around to the end ---
     if (_audioPlayer.hasPrevious) {
       await _audioPlayer.seekToPrevious();
     } else {

@@ -8,7 +8,14 @@ import 'package:sqflite/sqflite.dart';
 class AlbumDetailScreen extends StatefulWidget {
   final String albumName;
   
-  const AlbumDetailScreen({super.key, required this.albumName});
+  // --- NEW: Testing Parameter ---
+  final DatabaseService? testDatabaseService;
+
+  const AlbumDetailScreen({
+    super.key, 
+    required this.albumName,
+    this.testDatabaseService,
+  });
 
   @override
   State<AlbumDetailScreen> createState() => _AlbumDetailScreenState();
@@ -27,7 +34,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
   Future<void> _loadAlbumTracks() async {
     setState(() => _isLoading = true);
-    final databaseService = DatabaseService(databaseFactory: databaseFactory);
+    
+    // --- FIX: Use injected mock database if provided ---
+    final databaseService = widget.testDatabaseService ?? DatabaseService(databaseFactory: databaseFactory);
     _songRepository = SongRepository(database: databaseService);
     
     try {
@@ -55,7 +64,6 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       appBar: AppBar(
         title: Text(widget.albumName, style: const TextStyle(fontWeight: FontWeight.bold)),
       ),
-      // --- FIX: Wrapped body in Center and ConstrainedBox ---
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 700),
@@ -95,6 +103,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                               builder: (context) => PlayerScreen(
                                 playlist: _songs,
                                 initialIndex: index,
+                                // --- FIX: Propagate the test database to the Player ---
+                                testDatabaseService: widget.testDatabaseService,
                               )
                             )
                           );

@@ -3,13 +3,15 @@ import 'package:sqflite/sqflite.dart';
 import 'package:music_player_app/data/services/database_service.dart';
 
 class ListeningHabitsScreen extends StatefulWidget {
-  const ListeningHabitsScreen({super.key});
+  final DatabaseService? testDatabaseService; 
 
+  const ListeningHabitsScreen({super.key, this.testDatabaseService});
   @override
   State<ListeningHabitsScreen> createState() => _ListeningHabitsScreenState();
 }
 
 class _ListeningHabitsScreenState extends State<ListeningHabitsScreen> {
+  late DatabaseService _databaseService;
   bool _isLoading = true;
   final Map<String, int> _heatmapData = {};
   
@@ -20,11 +22,12 @@ class _ListeningHabitsScreenState extends State<ListeningHabitsScreen> {
   @override
   void initState() {
     super.initState();
+    _databaseService = widget.testDatabaseService ?? DatabaseService(databaseFactory: databaseFactory);
     _loadData();
   }
 
   Future<void> _loadData() async {
-    final db = DatabaseService(databaseFactory: databaseFactory);
+    final db = _databaseService;
     if (!db.isOpen()) await db.open();
 
     // 1. Fetch Heatmap Grid Data

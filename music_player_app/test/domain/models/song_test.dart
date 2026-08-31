@@ -10,7 +10,6 @@ void main() {
       final originalSong = Song(
         id: 1,
         title: 'Original Title',
-        // --- FIX: Wrap the list in UnmodifiableListView ---
         artists: UnmodifiableListView(['Original Artist']),
         album: 'Original Album',
         albumId: 1, 
