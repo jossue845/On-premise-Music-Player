@@ -16,6 +16,11 @@ class PlaylistDetailScreen extends StatefulWidget {
   final bool initialIsPinned; 
   final int? playlistId; 
   final bool isFavoritesPlaylist; 
+  
+  // --- FIX: Added dependencies for testing ---
+  final DatabaseService? testDatabaseService;
+  final SongRepository? testSongRepository;
+  final PlaylistRepository? testPlaylistRepository;
 
   const PlaylistDetailScreen({
     super.key,
@@ -23,6 +28,9 @@ class PlaylistDetailScreen extends StatefulWidget {
     required this.initialIsPinned,
     this.playlistId, 
     this.isFavoritesPlaylist = false, 
+    this.testDatabaseService,
+    this.testSongRepository,
+    this.testPlaylistRepository,
   });
 
   @override
@@ -47,9 +55,11 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
 
   Future<void> _loadPlaylistSongs() async {
     setState(() => _isLoading = true);
-    _databaseService = DatabaseService(databaseFactory: databaseFactory);
-    _songRepository = SongRepository(database: _databaseService);
-    _playlistRepository = PlaylistRepository(database: _databaseService);
+    
+    // --- FIX: Use injected repositories if available ---
+    _databaseService = widget.testDatabaseService ?? DatabaseService(databaseFactory: databaseFactory);
+    _songRepository = widget.testSongRepository ?? SongRepository(database: _databaseService);
+    _playlistRepository = widget.testPlaylistRepository ?? PlaylistRepository(database: _databaseService);
     
     try {
       if (widget.isFavoritesPlaylist) {
@@ -147,7 +157,6 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
             const SizedBox(width: 8),
           ],
         ),
-        // --- FIX: Wrapped body in Center and ConstrainedBox for tablet layouts ---
         body: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 700),
@@ -236,6 +245,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                         if (didUpdate == true) _loadPlaylistSongs();
                                       }
                                     },
+                                    // --- FIX: Wrapped all Text items in Expanded ---
                                     itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
                                       PopupMenuItem<String>(
                                         value: 'toggle_favorite',
@@ -243,7 +253,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                           children: [
                                             Icon(song.favorite ? Icons.favorite : Icons.favorite_border, color: Colors.red, size: 20),
                                             const SizedBox(width: 12),
-                                            Text(song.favorite ? 'Remove from Favorites' : 'Add to Favorites'),
+                                            Expanded(child: Text(song.favorite ? 'Remove from Favorites' : 'Add to Favorites')),
                                           ],
                                         ),
                                       ),
@@ -253,7 +263,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                           children: [
                                             Icon(Icons.playlist_add, size: 20),
                                             const SizedBox(width: 12),
-                                            Text('Add to Playlist...'),
+                                            Expanded(child: Text('Add to Playlist...')),
                                           ],
                                         ),
                                       ),
@@ -264,26 +274,26 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                             children: [
                                               Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error, size: 20),
                                               const SizedBox(width: 12),
-                                              Text('Remove from this playlist', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                                              Expanded(child: Text('Remove from this playlist', style: TextStyle(color: Theme.of(context).colorScheme.error))),
                                             ],
                                           ),
                                         ),
                                       const PopupMenuDivider(),
                                       const PopupMenuItem<String>(
                                         value: 'artist',
-                                        child: Row(children: [Icon(Icons.person_outline, size: 20), SizedBox(width: 12), Text('Go to artist')]),
+                                        child: Row(children: [Icon(Icons.person_outline, size: 20), SizedBox(width: 12), Expanded(child: Text('Go to artist'))]),
                                       ),
                                       const PopupMenuItem<String>(
                                         value: 'album',
-                                        child: Row(children: [Icon(Icons.album_outlined, size: 20), SizedBox(width: 12), Text('Go to album')]),
+                                        child: Row(children: [Icon(Icons.album_outlined, size: 20), SizedBox(width: 12), Expanded(child: Text('Go to album'))]),
                                       ),
                                       const PopupMenuItem<String>(
                                         value: 'edit',
-                                        child: Row(children: [Icon(Icons.edit_outlined, size: 20), SizedBox(width: 12), Text('Edit song info')]),
+                                        child: Row(children: [Icon(Icons.edit_outlined, size: 20), SizedBox(width: 12), Expanded(child: Text('Edit song info'))]),
                                       ),
                                       const PopupMenuItem<String>(
                                         value: 'lyrics',
-                                        child: Row(children: [Icon(Icons.lyrics_outlined, size: 20), SizedBox(width: 12), Text('Show lyrics')]),
+                                        child: Row(children: [Icon(Icons.lyrics_outlined, size: 20), SizedBox(width: 12), Expanded(child: Text('Show lyrics'))]),
                                       ),
                                     ],
                                   ),

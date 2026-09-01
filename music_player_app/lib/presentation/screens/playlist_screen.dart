@@ -7,7 +7,14 @@ import 'package:music_player_app/presentation/screens/playlistdetail_screen.dart
 import 'package:music_player_app/presentation/screens/manage_playlist_songs_screen.dart'; 
 
 class PlaylistScreen extends StatefulWidget {
-  const PlaylistScreen({super.key});
+  final SongRepository? testSongRepository;
+  final PlaylistRepository? testPlaylistRepository;
+
+  const PlaylistScreen({
+    super.key,
+    this.testSongRepository,
+    this.testPlaylistRepository,
+  });
 
   @override
   State<PlaylistScreen> createState() => _PlaylistScreenState();
@@ -31,9 +38,15 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-    final databaseService = DatabaseService(databaseFactory: databaseFactory);
-    _songRepository = SongRepository(database: databaseService);
-    _playlistRepository = PlaylistRepository(database: databaseService);
+    
+    if (widget.testSongRepository != null && widget.testPlaylistRepository != null) {
+      _songRepository = widget.testSongRepository!;
+      _playlistRepository = widget.testPlaylistRepository!;
+    } else {
+      final databaseService = DatabaseService(databaseFactory: databaseFactory);
+      _songRepository = SongRepository(database: databaseService);
+      _playlistRepository = PlaylistRepository(database: databaseService);
+    }
 
     try {
       final songResult = await _songRepository.getSongs();
@@ -60,21 +73,19 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       builder: (context) {
         return AlertDialog(
           scrollable: true,
-          // --- FIX: Compress vertical padding and allow the dialog to expand closer to screen edges ---
           insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           titlePadding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
           contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
           actionsPadding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
           
           title: const Text('New Playlist'),
-          // --- FIX: Force the dialog to be wider using a constrained SizedBox ---
           content: SizedBox(
             width: MediaQuery.of(context).size.width * 0.8,
             child: TextField(
               controller: _playlistNameController,
               decoration: const InputDecoration(
                 hintText: 'Enter playlist name',
-                isDense: true, // Shrinks the text field's internal height
+                isDense: true, 
               ),
               autofocus: true,
             ),
@@ -177,7 +188,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                                 children: [
                                   Icon(Icons.checklist, size: 20),
                                   SizedBox(width: 12),
-                                  Text('Add / Remove songs'),
+                                  Expanded(child: Text('Add / Remove songs')),
                                 ],
                               ),
                             ),
@@ -241,7 +252,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                                     children: [
                                       Icon(Icons.checklist, size: 20),
                                       SizedBox(width: 12),
-                                      Text('Add / Remove songs'),
+                                      Expanded(child: Text('Add / Remove songs')),
                                     ],
                                   ),
                                 ),
@@ -251,7 +262,12 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                                     children: [
                                       Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error, size: 20),
                                       const SizedBox(width: 12),
-                                      Text('Delete playlist', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                                      Expanded(
+                                        child: Text(
+                                          'Delete playlist', 
+                                          style: TextStyle(color: Theme.of(context).colorScheme.error)
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),

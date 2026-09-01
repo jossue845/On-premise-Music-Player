@@ -10,12 +10,20 @@ class ManagePlaylistSongsScreen extends StatefulWidget {
   final String playlistTitle;
   final int? playlistId;
   final bool isFavoritesPlaylist;
+  
+  // --- FIX: Added dependencies for testing ---
+  final DatabaseService? testDatabaseService;
+  final SongRepository? testSongRepository;
+  final PlaylistRepository? testPlaylistRepository;
 
   const ManagePlaylistSongsScreen({
     super.key,
     required this.playlistTitle,
     this.playlistId,
     this.isFavoritesPlaylist = false,
+    this.testDatabaseService,
+    this.testSongRepository,
+    this.testPlaylistRepository,
   });
 
   @override
@@ -42,9 +50,11 @@ class _ManagePlaylistSongsScreenState extends State<ManagePlaylistSongsScreen> {
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-    _databaseService = DatabaseService(databaseFactory: databaseFactory);
-    _songRepository = SongRepository(database: _databaseService);
-    _playlistRepository = PlaylistRepository(database: _databaseService);
+    
+    // --- FIX: Use injected dependencies if available ---
+    _databaseService = widget.testDatabaseService ?? DatabaseService(databaseFactory: databaseFactory);
+    _songRepository = widget.testSongRepository ?? SongRepository(database: _databaseService);
+    _playlistRepository = widget.testPlaylistRepository ?? PlaylistRepository(database: _databaseService);
 
     try {
       final allSongsResult = await _songRepository.getSongs();
@@ -122,7 +132,6 @@ class _ManagePlaylistSongsScreenState extends State<ManagePlaylistSongsScreen> {
               ),
         ],
       ),
-      // --- FIX: Wrapped body in Center and ConstrainedBox ---
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 700),

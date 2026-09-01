@@ -8,6 +8,8 @@ import 'package:music_player_app/domain/models/artist/artist.dart';
 import 'package:music_player_app/domain/models/album/album.dart';
 import 'package:music_player_app/domain/models/playlist/playlist.dart';
 import 'package:music_player_app/data/services/database_service.dart';
+import 'package:music_player_app/data/repositories/song_repository.dart';
+import 'package:music_player_app/data/repositories/playlist_repository.dart';
 
 // Screens
 import 'package:music_player_app/presentation/screens/player_screen.dart';
@@ -16,7 +18,17 @@ import 'package:music_player_app/presentation/screens/salbum_screen.dart';
 import 'package:music_player_app/presentation/screens/playlistdetail_screen.dart'; 
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key});
+  // --- FIX: Expand dependencies to pass down to child screens ---
+  final DatabaseService? testDatabaseService;
+  final SongRepository? testSongRepository;
+  final PlaylistRepository? testPlaylistRepository;
+
+  const SearchScreen({
+    super.key,
+    this.testDatabaseService,
+    this.testSongRepository,
+    this.testPlaylistRepository,
+  });
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -24,11 +36,10 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
-  String _selectedFilter = "All"; // Default filter
+  String _selectedFilter = "All"; 
   
   final List<String> _filters = ["All", "Songs", "Artists", "Albums", "Playlists"];
 
-  // State variables to hold our search results
   bool _isLoading = false;
   bool _hasSearched = false;
   
@@ -37,7 +48,6 @@ class _SearchScreenState extends State<SearchScreen> {
   List<Album> _albumResults = [];
   List<Playlist> _playlistResults = [];
 
-  // This function reaches into the database, grabs everything, and filters it
   Future<void> _performSearch() async {
     final query = _searchController.text.trim().toLowerCase();
     
@@ -57,17 +67,17 @@ class _SearchScreenState extends State<SearchScreen> {
       _hasSearched = true;
     });
 
-    final databaseService = DatabaseService(databaseFactory: databaseFactory);
+    final databaseService = widget.testDatabaseService ?? DatabaseService(databaseFactory: databaseFactory);
     if (!databaseService.isOpen()) await databaseService.open();
 
-    // Fetch all data from the database
     final songsResult = await databaseService.getSongs();
     final artistsResult = await databaseService.getArtists();
     final albumsResult = await databaseService.getAlbums();
     final playlistsResult = await databaseService.getPlaylists();
 
+    if (!mounted) return;
+
     setState(() {
-      // Filter Songs
       if (songsResult.isSuccess()) {
         _songResults = songsResult.getOrThrow()
             .where((s) => s.title.toLowerCase().contains(query) || 
@@ -75,21 +85,18 @@ class _SearchScreenState extends State<SearchScreen> {
             .toList();
       }
       
-      // Filter Artists
       if (artistsResult.isSuccess()) {
         _artistResults = artistsResult.getOrThrow()
             .where((a) => a.name.toLowerCase().contains(query))
             .toList();
       }
 
-      // Filter Albums
       if (albumsResult.isSuccess()) {
         _albumResults = albumsResult.getOrThrow()
             .where((a) => a.title.toLowerCase().contains(query))
             .toList();
       }
 
-      // Filter Playlists
       if (playlistsResult.isSuccess()) {
         _playlistResults = playlistsResult.getOrThrow()
             .where((p) => p.title.toLowerCase().contains(query))
@@ -122,10 +129,9 @@ class _SearchScreenState extends State<SearchScreen> {
             children: [
               const SizedBox(height: 10),
               
-              // Search Bar
               TextField(
                 controller: _searchController,
-                textInputAction: TextInputAction.search, // Shows a search icon on the keyboard
+                textInputAction: TextInputAction.search, 
                 decoration: InputDecoration(
                   hintText: 'What can I search?...',
                   prefixIcon: const Icon(Icons.search),
@@ -133,7 +139,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     icon: const Icon(Icons.clear),
                     onPressed: () {
                       _searchController.clear();
-                      _performSearch(); // Clear results when text is cleared
+                      _performSearch(); 
                     },
                   ),
                   border: OutlineInputBorder(
@@ -145,7 +151,6 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
                 onSubmitted: (_) => _performSearch(),
                 onChanged: (_) {
-                  // Performing search while writting
                   _performSearch(); 
                 },
               ),
@@ -177,7 +182,6 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
               const SizedBox(height: 20),
               
-              // Search Results Area
               Expanded(
                 child: _isLoading 
                   ? const Center(child: CircularProgressIndicator())
@@ -195,7 +199,6 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildSearchResults() {
-    // Check if everything is completely empty
     if (_songResults.isEmpty && _artistResults.isEmpty && _albumResults.isEmpty && _playlistResults.isEmpty) {
       return Center(
         child: Text("No results found for '${_searchController.text}'", style: const TextStyle(color: Colors.grey, fontSize: 16)),
@@ -214,7 +217,12 @@ class _SearchScreenState extends State<SearchScreen> {
               subtitle: Text(song.artists.isNotEmpty ? song.artists.first : 'Unknown Artist', maxLines: 1, overflow: TextOverflow.ellipsis),
               onTap: () {
                 Navigator.push(context, MaterialPageRoute(
-                  builder: (context) => PlayerScreen(playlist: _songResults, initialIndex: _songResults.indexOf(song)),
+                  builder: (context) => PlayerScreen(
+                    playlist: _songResults, 
+                    initialIndex: _songResults.indexOf(song),
+                    // --- FIX: Pass down the mock repository ---
+                    testSongRepository: widget.testSongRepository,
+                  ),
                 ));
               },
             )).toList(),
@@ -228,7 +236,11 @@ class _SearchScreenState extends State<SearchScreen> {
               title: Text(artist.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
               onTap: () {
                 Navigator.push(context, MaterialPageRoute(
-                  builder: (context) => ArtistDetailScreen(artistName: artist.name),
+                  builder: (context) => ArtistDetailScreen(
+                    artistName: artist.name,
+                    // --- FIX: Pass down the mock repository ---
+                    testSongRepository: widget.testSongRepository,
+                  ),
                 ));
               },
             )).toList(),
@@ -242,7 +254,11 @@ class _SearchScreenState extends State<SearchScreen> {
               title: Text(album.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
               onTap: () {
                 Navigator.push(context, MaterialPageRoute(
-                  builder: (context) => AlbumDetailScreen(albumName: album.title),
+                  builder: (context) => AlbumDetailScreen(
+                    albumName: album.title,
+                    // --- FIX: Pass down the mock repository ---
+                    testSongRepository: widget.testSongRepository,
+                  ),
                 ));
               },
             )).toList(),
@@ -256,7 +272,15 @@ class _SearchScreenState extends State<SearchScreen> {
               title: Text(playlist.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
               onTap: () {
                 Navigator.push(context, MaterialPageRoute(
-                  builder: (context) => PlaylistDetailScreen(playlistTitle: playlist.title, initialIsPinned: false, playlistId: playlist.id),
+                  builder: (context) => PlaylistDetailScreen(
+                    playlistTitle: playlist.title, 
+                    initialIsPinned: false, 
+                    playlistId: playlist.id,
+                    // --- FIX: Pass down the mock repositories ---
+                    testDatabaseService: widget.testDatabaseService,
+                    testSongRepository: widget.testSongRepository,
+                    testPlaylistRepository: widget.testPlaylistRepository,
+                  ),
                 ));
               },
             )).toList(),
@@ -265,7 +289,6 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  //  build sections headers with lists ---
   Widget _buildResultSection({required String title, required List<Widget> items}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -280,7 +303,6 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  // --- Helper to draw images safely ---
   Widget _buildArtwork(String? path, IconData fallbackIcon) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(6.0),

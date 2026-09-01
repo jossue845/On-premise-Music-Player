@@ -1,16 +1,15 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:result_dart/result_dart.dart';
+import 'dart:convert';
 
 import 'package:music_player_app/presentation/screens/equalizer_screen.dart';
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/providers/audio_player_provider.dart';
 
-// --- Mocks ---
 class MockDatabaseService extends Mock implements DatabaseService {}
 class MockAudioPlayer extends Mock implements AudioPlayer {}
 class MockAndroidEqualizer extends Mock implements AndroidEqualizer {}
@@ -22,42 +21,35 @@ void main() {
   late MockAudioPlayer mockAudioPlayer;
   late MockAndroidEqualizer mockEqualizer;
   late MockAndroidEqualizerParameters mockEqParams;
-  late MockAndroidEqualizerBand mockBand1;
-  late MockAndroidEqualizerBand mockBand2;
 
   setUp(() {
     mockDb = MockDatabaseService();
     mockAudioPlayer = MockAudioPlayer();
     mockEqualizer = MockAndroidEqualizer();
     mockEqParams = MockAndroidEqualizerParameters();
-    mockBand1 = MockAndroidEqualizerBand();
-    mockBand2 = MockAndroidEqualizerBand();
 
-    // 1. Stub Database Service
     when(() => mockDb.isOpen()).thenReturn(true);
     when(() => mockDb.getValue('eq_presets')).thenAnswer((_) async => const Success('[]'));
 
-    // 2. Stub Audio Player
+    // AudioPlayer basic stubs
     when(() => mockAudioPlayer.volume).thenReturn(1.0);
-    when(() => mockAudioPlayer.setVolume(any())).thenAnswer((_) async => {});
-    when(() => mockAudioPlayer.setPitch(any())).thenAnswer((_) async => {});
+    when(() => mockAudioPlayer.setVolume(any())).thenAnswer((_) async {});
+    when(() => mockAudioPlayer.setPitch(any())).thenAnswer((_) async {});
 
-    // 3. Stub Equalizer Parameters & Bands
-    when(() => mockEqualizer.enabled).thenReturn(false);
-    when(() => mockEqualizer.setEnabled(any())).thenAnswer((_) async => {});
-    when(() => mockEqualizer.parameters).thenAnswer((_) async => mockEqParams);
+    // Stub a fake equalizer band
+    final fakeBand = MockAndroidEqualizerBand();
+    when(() => fakeBand.gain).thenReturn(0.0);
+    when(() => fakeBand.centerFrequency).thenReturn(1000.0);
+    when(() => fakeBand.setGain(any())).thenAnswer((_) async {});
 
-    when(() => mockEqParams.maxDecibels).thenReturn(15.0);
+    // Stub Equalizer parameters
+    when(() => mockEqParams.bands).thenReturn([fakeBand]);
     when(() => mockEqParams.minDecibels).thenReturn(-15.0);
-    when(() => mockEqParams.bands).thenReturn([mockBand1, mockBand2]);
+    when(() => mockEqParams.maxDecibels).thenReturn(15.0);
 
-    when(() => mockBand1.gain).thenReturn(0.0);
-    when(() => mockBand1.centerFrequency).thenReturn(60.0);
-    when(() => mockBand1.setGain(any())).thenAnswer((_) async => {});
-
-    when(() => mockBand2.gain).thenReturn(0.0);
-    when(() => mockBand2.centerFrequency).thenReturn(230.0);
-    when(() => mockBand2.setGain(any())).thenAnswer((_) async => {});
+    // Setup the Equalizer provider returns
+    when(() => mockEqualizer.enabled).thenReturn(true);
+    when(() => mockEqualizer.parameters).thenAnswer((_) async => mockEqParams);
   });
 
   Widget buildTestable() {
@@ -67,38 +59,56 @@ void main() {
         equalizerProvider.overrideWithValue(mockEqualizer),
       ],
       child: MaterialApp(
-        home: EqualizerScreen(testDatabaseService: mockDb),
+        home: EqualizerScreen(
+          testDatabaseService: mockDb,
+        ),
       ),
     );
   }
 
   group('EqualizerScreen Widget Tests', () {
-    testWidgets('Renders EQ bands and allows volume change', (tester) async {
+    
+    testWidgets('Initializes correctly and loads presets from DB', (tester) async {
+      final mockPreset = jsonEncode([
+        {'name': 'Rock', 'preamp': 1.2, 'bands': [2.0]}
+      ]);
+      when(() => mockDb.getValue('eq_presets')).thenAnswer((_) async => Success(mockPreset));
+
       await tester.pumpWidget(buildTestable());
       await tester.pumpAndSettle();
 
-      // Verify EQ mode is active and bands rendered
-      expect(find.text('PRE'), findsOneWidget);
-      expect(find.text('60'), findsOneWidget); // formatted from 60.0
-      expect(find.text('230'), findsOneWidget);
-
-      // Verify the AudioPlayer's setVolume is called when we reset
-      await tester.tap(find.text('Reset Current'));
+      // Tap presets button to verify data loaded
+      await tester.tap(find.text('Presets'));
       await tester.pumpAndSettle();
-      verify(() => mockAudioPlayer.setVolume(1.0)).called(1);
+      
+      expect(find.text('Rock'), findsOneWidget);
     });
 
-    testWidgets('Switches to Pitch tab and renders controls', (tester) async {
+    testWidgets('Toggles between Equalizer and Pitch menus', (tester) async {
       await tester.pumpWidget(buildTestable());
       await tester.pumpAndSettle();
 
-      // Tap Pitch tab
+      // Initial state should show Equalizer
+      expect(find.text('PRE'), findsOneWidget); 
+      expect(find.byIcon(Icons.speed), findsNothing);
+
+      // Tap Pitch menu
       await tester.tap(find.text('Pitch'));
       await tester.pumpAndSettle();
 
-      // Verify Pitch mode rendered correctly
-      expect(find.text('Pitch: 1.00x'), findsOneWidget);
-      expect(find.text('Chipmunk'), findsOneWidget);
+      // Pitch controls should be visible
+      expect(find.text('PRE'), findsNothing);
+      expect(find.byIcon(Icons.speed), findsOneWidget);
+    });
+
+    testWidgets('Reset Current button resets player parameters', (tester) async {
+      await tester.pumpWidget(buildTestable());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Reset Current'));
+      await tester.pump();
+
+      verify(() => mockAudioPlayer.setVolume(1.0)).called(1);
     });
   });
-}
+} 

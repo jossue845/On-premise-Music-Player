@@ -11,13 +11,25 @@ import 'package:sqflite/sqflite.dart';
 import 'package:music_player_app/data/providers/sync_provider.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
-  const SettingsScreen({super.key});
+  // --- FIX: Added dependencies for headless testing ---
+  final DatabaseService? testDatabaseService;
+  final FilesystemService? testFilesystemService;
+  final MusicFolderRepository? testMusicFolderRepository;
+  final SongRepository? testSongRepository;
+
+  const SettingsScreen({
+    super.key,
+    this.testDatabaseService,
+    this.testFilesystemService,
+    this.testMusicFolderRepository,
+    this.testSongRepository,
+  });
 
   @override
   ConsumerState createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends ConsumerState {
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _isScanning = false;
   bool _isFetchingArt = false;
   bool _isBatchValidating = false;
@@ -33,9 +45,10 @@ class _SettingsScreenState extends ConsumerState {
   @override
   void initState() {
     super.initState();
-    _databaseService = DatabaseService(databaseFactory: databaseFactory);
-    _filesystemService = FilesystemService();
-    _musicFolderRepository = MusicFolderRepository(
+    // --- FIX: Use injected dependencies if available ---
+    _databaseService = widget.testDatabaseService ?? DatabaseService(databaseFactory: databaseFactory);
+    _filesystemService = widget.testFilesystemService ?? FilesystemService();
+    _musicFolderRepository = widget.testMusicFolderRepository ?? MusicFolderRepository(
       database: _databaseService,
       fs: _filesystemService,
     );
@@ -63,36 +76,42 @@ class _SettingsScreenState extends ConsumerState {
           _isScanning = false;
           _scanStatus = 'Scan completed successfully!';
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Music scan completed!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Music scan completed!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       } else {
         final error = result.exceptionOrNull();
         setState(() {
           _isScanning = false;
           _scanStatus = 'Error: ${error?.toString() ?? 'Unknown error'}';
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Scan failed: ${error?.toString() ?? 'Unknown error'}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Scan failed: ${error?.toString() ?? 'Unknown error'}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       setState(() {
         _isScanning = false;
         _scanStatus = 'Error: $e';
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Unexpected error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Unexpected error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -101,36 +120,42 @@ class _SettingsScreenState extends ConsumerState {
       final result = await _musicFolderRepository.setMusicFolder();
       
       if (result.isSuccess()) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Music folder set successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Music folder set successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       } else {
         final error = result.exceptionOrNull();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: ${error?.toString() ?? 'Unknown error'}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${error?.toString() ?? 'Unknown error'}'),
+            content: Text('Error: $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
   }
 
   Future _scanForMissingArtwork() async {
     setState(() => _isFetchingArt = true);
     
-    final databaseService = DatabaseService(databaseFactory: databaseFactory);
-    final songRepo = SongRepository(database: databaseService);
+    // --- FIX: Use injected repository ---
+    final songRepo = widget.testSongRepository ?? SongRepository(database: _databaseService);
     
     try {
       final result = await songRepo.getSongs();
@@ -162,8 +187,8 @@ class _SettingsScreenState extends ConsumerState {
       _validationProgress = 'Starting validation...';
     });
 
-    final databaseService = DatabaseService(databaseFactory: databaseFactory);
-    final songRepo = SongRepository(database: databaseService);
+    // --- FIX: Use injected repository ---
+    final songRepo = widget.testSongRepository ?? SongRepository(database: _databaseService);
 
     final updatedCount = await songRepo.validateAndFixAllSongs(
       onProgress: (current, total) {
@@ -200,7 +225,6 @@ class _SettingsScreenState extends ConsumerState {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              // --- FIX: Moved Tilt Toggle to the Top ---
               Padding(
                 padding: const EdgeInsets.only(left: 25.0, top: 25),
                 child: SwitchListTile(
@@ -292,7 +316,10 @@ class _SettingsScreenState extends ConsumerState {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const EqualizerScreen(),
+                        builder: (context) => EqualizerScreen(
+                          // --- FIX: Pass the injected database down the navigation stack ---
+                          testDatabaseService: widget.testDatabaseService,
+                        ),
                       ),
                     ); 
                   },

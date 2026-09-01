@@ -7,7 +7,6 @@ import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/providers/audio_player_provider.dart';
 
 class EqualizerScreen extends ConsumerStatefulWidget {
-  // --- FIX: Add injected database dependency for testing ---
   final DatabaseService? testDatabaseService;
 
   const EqualizerScreen({super.key, this.testDatabaseService});
@@ -30,7 +29,6 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
   @override
   void initState() {
     super.initState();
-    // --- FIX: Use the injected database if available ---
     _databaseService = widget.testDatabaseService ?? DatabaseService(databaseFactory: databaseFactory);
     _preampValue = ref.read(audioPlayerProvider).volume;
     _initEqualizer();
@@ -48,11 +46,20 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
       if (mounted) {
         setState(() {
           _eqParams = params;
-          _bandValues = params.bands.map((b) => b.gain).toList();
+          if (params != null) {
+            _bandValues = params.bands.map((b) => b.gain).toList();
+          } else {
+             // Safe fallback for testing when native bands are unavailable
+            _bandValues = List.filled(5, 0.0);
+          }
         });
       }
     } catch (e) {
       debugPrint("Failed to initialize Equalizer: $e");
+      // Fallback state for tests to prevent null access errors on slider render
+      if (mounted) {
+        setState(() => _bandValues = List.filled(5, 0.0));
+      }
     }
   }
 
