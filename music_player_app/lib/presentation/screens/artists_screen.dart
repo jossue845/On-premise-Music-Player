@@ -6,7 +6,10 @@ import 'package:music_player_app/presentation/screens/sartist_screen.dart';
 import 'package:sqflite/sqflite.dart';
 
 class ArtistsScreen extends StatefulWidget {
-  const ArtistsScreen({super.key});
+  // --- FIX: Add dependency injection ---
+  final SongRepository? testSongRepository;
+
+  const ArtistsScreen({super.key, this.testSongRepository});
 
   @override
   State<ArtistsScreen> createState() => _ArtistsScreenState();
@@ -27,8 +30,14 @@ class _ArtistsScreenState extends State<ArtistsScreen> {
 
   Future<void> _loadArtists() async {
     setState(() => _isLoading = true);
-    final databaseService = DatabaseService(databaseFactory: databaseFactory);
-    _songRepository = SongRepository(database: databaseService);
+    
+    // --- FIX: Use the injected repository if available ---
+    if (widget.testSongRepository != null) {
+      _songRepository = widget.testSongRepository!;
+    } else {
+      final databaseService = DatabaseService(databaseFactory: databaseFactory);
+      _songRepository = SongRepository(database: databaseService);
+    }
 
     try {
       final result = await _songRepository.getSongs();
@@ -76,7 +85,6 @@ class _ArtistsScreenState extends State<ArtistsScreen> {
               ? const Center(child: Text('No artists found. Scan for music in Settings.'))
               : LayoutBuilder(
                   builder: (context, constraints) {
-                    // Adjust column count based on width
                     final int columns = constraints.maxWidth >= 600 ? 4 : 2;
                     
                     return GridView.builder(
@@ -100,7 +108,11 @@ class _ArtistsScreenState extends State<ArtistsScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => ArtistDetailScreen(artistName: artistName),
+                                  builder: (context) => ArtistDetailScreen(
+                                    artistName: artistName,
+                                    // --- FIX: Pass the test repository down the navigation chain ---
+                                    testSongRepository: _songRepository,
+                                  ),
                                 ),
                               );
                             },

@@ -7,8 +7,16 @@ import 'package:music_player_app/data/services/audiodb_service.dart';
 
 class EditSongScreen extends StatefulWidget {
   final Song song;
+  // --- FIX: Add injected dependencies for testing ---
+  final SongRepository? testSongRepository;
+  final AudioDbService? testAudioDbService;
 
-  const EditSongScreen({super.key, required this.song});
+  const EditSongScreen({
+    super.key, 
+    required this.song, 
+    this.testSongRepository,
+    this.testAudioDbService,
+  });
 
   @override
   State<EditSongScreen> createState() => _EditSongScreenState();
@@ -40,8 +48,13 @@ class _EditSongScreenState extends State<EditSongScreen> {
     _yearController = TextEditingController(text: _currentSong.year?.toString() ?? '');
     _trackNumberController = TextEditingController(text: _currentSong.trackNumber?.toString() ?? '');
 
-    final databaseService = DatabaseService(databaseFactory: databaseFactory);
-    _songRepository = SongRepository(database: databaseService);
+    // --- FIX: Use injected repository if available ---
+    if (widget.testSongRepository != null) {
+      _songRepository = widget.testSongRepository!;
+    } else {
+      final databaseService = DatabaseService(databaseFactory: databaseFactory);
+      _songRepository = SongRepository(database: databaseService);
+    }
   }
 
   @override
@@ -62,13 +75,16 @@ class _EditSongScreenState extends State<EditSongScreen> {
       const SnackBar(content: Text('Searching TheAudioDB for metadata...')),
     );
 
-    final adbService = AudioDbService();
+    final adbService = widget.testAudioDbService ?? AudioDbService();
     final artistName = _artistController.text.isNotEmpty ? _artistController.text : 'Unknown Artist';
     
     final searchResult = await adbService.searchTrack(_titleController.text, artistName);
 
     if (!mounted) return;
     setState(() => _isSearching = false);
+
+    // --- FIX: Instantly hide the "Searching..." SnackBar so the result can show ---
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
     if (searchResult.isSuccess()) {
       final data = searchResult.getOrThrow();

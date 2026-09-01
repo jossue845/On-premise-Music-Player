@@ -266,7 +266,13 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                           subtitle: song.artists.isNotEmpty ? song.artists.first : 'Unknown',
                           imagePath: song.imagePath,
                           isRound: false,
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PlayerScreen(playlist: activeTopSongs, initialIndex: index))),
+                          onTap: () => Navigator.push(
+                            context, 
+                            MaterialPageRoute(builder: (_) => PlayerScreen(
+                              playlist: activeTopSongs, 
+                              initialIndex: index,
+                              testSongRepository: widget.testSongRepository
+                              ))),
                         );
                       }
                     );
@@ -297,6 +303,7 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                               MaterialPageRoute(
                                 builder: (context) => ArtistDetailScreen(
                                   artistName: artist['name'],
+                                  testSongRepository: widget.testSongRepository,
                                 ),
                               ),
                             );
@@ -331,6 +338,7 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                               MaterialPageRoute(
                                 builder: (context) => AlbumDetailScreen(
                                   albumName: album['name'],
+                                  testSongRepository: widget.testSongRepository,
                                 ),
                               ),
                             );

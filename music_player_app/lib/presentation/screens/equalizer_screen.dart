@@ -7,7 +7,10 @@ import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/providers/audio_player_provider.dart';
 
 class EqualizerScreen extends ConsumerStatefulWidget {
-  const EqualizerScreen({super.key});
+  // --- FIX: Add injected database dependency for testing ---
+  final DatabaseService? testDatabaseService;
+
+  const EqualizerScreen({super.key, this.testDatabaseService});
 
   @override
   ConsumerState<EqualizerScreen> createState() => _EqualizerScreenState();
@@ -16,20 +19,19 @@ class EqualizerScreen extends ConsumerStatefulWidget {
 class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
   late DatabaseService _databaseService;
 
-  // --- EQ State ---
   AndroidEqualizerParameters? _eqParams;
   List<double> _bandValues = [];
   double _preampValue = 1.0; 
   List<Map<String, dynamic>> _presets = []; 
 
-  // --- Menu & Pitch State ---
   String _activeMenu = 'Equalizer';
   double _pitchValue = 1.0; 
 
   @override
   void initState() {
     super.initState();
-    _databaseService = DatabaseService(databaseFactory: databaseFactory);
+    // --- FIX: Use the injected database if available ---
+    _databaseService = widget.testDatabaseService ?? DatabaseService(databaseFactory: databaseFactory);
     _preampValue = ref.read(audioPlayerProvider).volume;
     _initEqualizer();
     _loadPresets();
@@ -122,7 +124,6 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
                   const Text('Equalizer Presets', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
                   const SizedBox(height: 20),
                   
-                  // Save New Preset Field
                   Row(
                     children: [
                       Expanded(

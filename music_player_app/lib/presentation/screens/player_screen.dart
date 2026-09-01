@@ -18,17 +18,14 @@ import 'package:music_player_app/presentation/screens/equalizer_screen.dart';
 class PlayerScreen extends ConsumerStatefulWidget {
   final List<Song> playlist;
   final int initialIndex;
-  
-  // --- NEW: Testing Parameters ---
-  final DatabaseService? testDatabaseService;
-  final SongRepository? testSongRepository;
+  // --- NEW: Accept the mock repository for testing ---
+  final SongRepository? testSongRepository; 
 
   const PlayerScreen({
     super.key, 
     required this.playlist, 
     required this.initialIndex,
-    this.testDatabaseService,
-    this.testSongRepository,
+    this.testSongRepository, 
   });
 
   @override
@@ -68,9 +65,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     
     _pageController = PageController(initialPage: widget.initialIndex);
     
-    // --- FIX: Use injected mock database if provided ---
-    final databaseService = widget.testDatabaseService ?? DatabaseService(databaseFactory: databaseFactory);
-    _songRepository = widget.testSongRepository ?? SongRepository(database: databaseService);
+    // --- FIX: Use the injected test repository if provided, otherwise use real DB ---
+    if (widget.testSongRepository != null) {
+      _songRepository = widget.testSongRepository!;
+    } else {
+      final databaseService = DatabaseService(databaseFactory: databaseFactory);
+      _songRepository = SongRepository(database: databaseService);
+    }
     
     _setupStreams();
     _initPlayer();

@@ -4,14 +4,21 @@ import 'package:sqflite/sqflite.dart';
 
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
-// --- FIX: Imported PlaylistRepository ---
+
 import 'package:music_player_app/data/repositories/playlist_repository.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
 import 'package:music_player_app/presentation/screens/player_screen.dart';
 import 'package:music_player_app/presentation/screens/edit_song_screen.dart';
 
 class AllSongsScreen extends StatefulWidget {
-  const AllSongsScreen({super.key});
+  final SongRepository? songRepository;
+  final PlaylistRepository? playlistRepository;
+
+  const AllSongsScreen({
+    super.key,
+    this.songRepository,
+    this.playlistRepository,
+  });
 
   @override
   State<AllSongsScreen> createState() => _AllSongsScreenState();
@@ -19,7 +26,7 @@ class AllSongsScreen extends StatefulWidget {
 
 class _AllSongsScreenState extends State<AllSongsScreen> {
   late SongRepository _songRepository;
-  late PlaylistRepository _playlistRepository; // Added repository
+  late PlaylistRepository _playlistRepository;
   List<Song> _songs = [];
   bool _isLoading = true;
 
@@ -31,11 +38,15 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
 
   Future<void> _initializeRepositoryAndLoad() async {
     setState(() => _isLoading = true);
-    
-    final databaseService = DatabaseService(databaseFactory: databaseFactory);
-    _songRepository = SongRepository(database: databaseService);
-    _playlistRepository = PlaylistRepository(database: databaseService); // Initialized repository
-    
+
+    if (widget.songRepository != null && widget.playlistRepository != null) {
+      _songRepository = widget.songRepository!;
+      _playlistRepository = widget.playlistRepository!;
+    } else {
+      final databaseService = DatabaseService(databaseFactory: databaseFactory);
+      _songRepository = SongRepository(database: databaseService);
+      _playlistRepository = PlaylistRepository(database: databaseService);
+    }
     try {
       final result = await _songRepository.getSongs();
       if (result.isSuccess()) {
@@ -59,7 +70,6 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
     }
   }
 
-  // --- NEW: Reused Add to Playlist Dialog ---
   Future<void> _showAddToPlaylistDialog(Song song) async {
     final result = await _playlistRepository.getPlaylists();
     if (result.isSuccess()) {
@@ -183,14 +193,19 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
             }
           },
           itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-            // --- NEW: Add to Playlist Option ---
+            // --- FIX: Wrapped Text in Expanded to prevent overflow ---
             const PopupMenuItem<String>(
               value: 'add_to_playlist',
               child: Row(
                 children: [
                   Icon(Icons.playlist_add, size: 20),
                   SizedBox(width: 12),
-                  Text('Add to Playlist...'),
+                  Expanded(
+                    child: Text(
+                      'Add to Playlist...',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -201,7 +216,12 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
                 children: [
                   Icon(Icons.edit_outlined, size: 20),
                   SizedBox(width: 12),
-                  Text('Edit song info'),
+                  Expanded(
+                    child: Text(
+                      'Edit song info',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
             ),

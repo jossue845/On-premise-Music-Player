@@ -23,7 +23,19 @@ import 'package:music_player_app/presentation/screens/settings_screen.dart';
 import 'package:music_player_app/presentation/screens/player_screen.dart';
 
 class MusicDashboard extends ConsumerStatefulWidget {
-  const MusicDashboard({super.key});
+  // --- FIX: Add injected dependencies for safe headless testing ---
+  final DatabaseService? testDatabaseService;
+  final SongRepository? testSongRepository;
+  final Stream<AccelerometerEvent>? testSensorStream;
+  final List<Widget>? testPages;
+
+  const MusicDashboard({
+    super.key,
+    this.testDatabaseService,
+    this.testSongRepository,
+    this.testSensorStream,
+    this.testPages,
+  });
 
   @override
   ConsumerState<MusicDashboard> createState() => _MusicDashboardState();
@@ -31,15 +43,7 @@ class MusicDashboard extends ConsumerStatefulWidget {
 
 class _MusicDashboardState extends ConsumerState<MusicDashboard> {
   int _selectedIndex = 0; 
-
-  final List<Widget> _pages = [
-    const HomeDashboard(),
-    const SearchScreen(),
-    const ArtistsScreen(),
-    const PlaylistScreen(),
-    const AllSongsScreen(),
-    const SettingsScreen(),
-  ];
+  late List<Widget> _pages;
   
   Offset? _panelPosition; 
   Song? _currentActiveSong;
@@ -49,7 +53,6 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
   StreamSubscription? _playerStateSubscription;
   StreamSubscription? _sequenceStateSubscription;
   
-  // --- Sensor State ---
   StreamSubscription<AccelerometerEvent>? _accelSubscription;
   bool _tiltEnabled = false;
   bool _isDragging = false; 
@@ -62,6 +65,16 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
   @override
   void initState() {
     super.initState();
+    // --- FIX: Fallback to real pages if test pages are not provided ---
+    _pages = widget.testPages ?? [
+      const HomeDashboard(),
+      const SearchScreen(),
+      const ArtistsScreen(),
+      const PlaylistScreen(),
+      const AllSongsScreen(),
+      const SettingsScreen(),
+    ];
+
     _loadSongs();
     _setupAudioStreams();
     _loadTiltSetting();
@@ -77,7 +90,8 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
   }
 
   Future<void> _loadTiltSetting() async {
-    final db = DatabaseService(databaseFactory: databaseFactory);
+    // --- FIX: Use injected database ---
+    final db = widget.testDatabaseService ?? DatabaseService(databaseFactory: databaseFactory);
     if (!db.isOpen()) await db.open();
     final res = await db.getValue('tilt_enabled');
     if (res.isSuccess() && mounted) {
@@ -86,8 +100,11 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
   }
 
   void _setupSensors() {
-    _accelSubscription = accelerometerEventStream().listen((AccelerometerEvent event) {
-      if (!mounted) return; // Prevent crashes when reading context in background
+    // --- FIX: Use injected sensor stream to avoid crashing on missing platform channels ---
+    final sensorStream = widget.testSensorStream ?? accelerometerEventStream();
+    
+    _accelSubscription = sensorStream.listen((AccelerometerEvent event) {
+      if (!mounted) return; 
       if (!_tiltEnabled || _isDragging || _currentActiveSong == null) return;
 
       if (DateTime.now().difference(_lastTiltUpdate).inMilliseconds < 150) return;
@@ -96,7 +113,6 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
       final padding = MediaQuery.of(context).padding;
       final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
       
-      // Calculate responsive boundaries
       final bool isTablet = screenSize.width >= 600;
       final double railWidth = isTablet ? 72.0 : 0.0;
       final double effectiveWidth = screenSize.width - railWidth;
@@ -112,7 +128,6 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
       String newTilt = 'none';
       final double activeThreshold = _isManualOverride ? 8.5 : 6.0; 
 
-      // --- FIX: Map physical hardware axes to logical UI axes ---
       double logicalX = event.x;
       double logicalY = event.y;
 
@@ -157,8 +172,9 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
   }
 
   Future<void> _loadSongs() async {
-    final databaseService = DatabaseService(databaseFactory: databaseFactory);
-    final songRepository = SongRepository(database: databaseService);
+    // --- FIX: Use injected database and repository ---
+    final databaseService = widget.testDatabaseService ?? DatabaseService(databaseFactory: databaseFactory);
+    final songRepository = widget.testSongRepository ?? SongRepository(database: databaseService);
     
     try {
       final result = await songRepository.getSongs();
@@ -210,8 +226,9 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
             if (prevTag != null) {
               final prevSong = _allSongs.firstWhere((s) => s.id.toString() == prevTag.id);
               
-              final databaseService = DatabaseService(databaseFactory: databaseFactory);
-              final songRepo = SongRepository(database: databaseService);
+              // --- FIX: Use injected database/repo to prevent background crash on track change ---
+              final databaseService = widget.testDatabaseService ?? DatabaseService(databaseFactory: databaseFactory);
+              final songRepo = widget.testSongRepository ?? SongRepository(database: databaseService);
               songRepo.incrementPlayCount(prevSong.id);
             }
           }
@@ -276,7 +293,6 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
         builder: (context, constraints) {
           final bool showRail = constraints.maxWidth >= 600;
           
-          // Determine the width the stack (main content) occupies
           final double stackWidth = showRail ? constraints.maxWidth - 72.0 : constraints.maxWidth;
           final double topBoundary = padding.top + 5.0; 
           final double bottomNavHeight = showRail ? padding.bottom + 10.0 : padding.bottom + 90.0;
@@ -293,10 +309,8 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
           final double currentWidth = isHorizontal ? (showRail ? 350.0 : 260.0) : 70.0;
           final double currentHeight = isHorizontal ? 75.0 : 160.0;
 
-          // Start at top center by default
           _panelPosition ??= Offset((stackWidth - currentWidth) / 2 + 15, topBoundary + 8.0);
 
-          // Constrain coordinates safely within the newly calculated stackWidth
           _panelPosition = Offset(
             _panelPosition!.dx.clamp(0.0, stackWidth - currentWidth),
             _panelPosition!.dy.clamp(topBoundary, constraints.maxHeight - currentHeight - bottomNavHeight), 
@@ -304,7 +318,6 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
 
           return Row(
             children: [
-              // Show NavigationRail on Tablet/Landscape
               if (showRail)
             SingleChildScrollView(
               child: ConstrainedBox(
@@ -331,13 +344,11 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
               ),
             ),
                 
-              // The main page content
               Expanded(
                 child: Stack(
                   children: [
                     _pages[_selectedIndex], 
                     
-                    // Show standard GNav on Phones/Portrait
                     if (!showRail)
                       Positioned(
                         bottom: 0,
@@ -364,8 +375,6 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
                                 color: Theme.of(context).bottomNavigationBarTheme.unselectedItemColor ?? Colors.white70,
                                 activeColor: Theme.of(context).bottomNavigationBarTheme.selectedItemColor,
                                 tabBackgroundColor: (Theme.of(context).bottomNavigationBarTheme.selectedItemColor ?? Colors.cyanAccent).withOpacity(0.1),
-                                
-                                // --- FIX: Force smaller icons and text to guarantee fit on narrow screens ---
                                 iconSize: 20, 
                                 textStyle: TextStyle(
                                   fontSize: 12, 
@@ -374,7 +383,6 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
                                 ),
                                 gap: 4, 
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10), 
-                                
                                 selectedIndex: _selectedIndex, 
                                 onTabChange: _onItemTapped, 
                                 tabs: const [

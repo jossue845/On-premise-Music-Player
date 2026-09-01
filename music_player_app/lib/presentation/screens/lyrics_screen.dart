@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
-import 'package:music_player_app/data/services/database_service.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
 
 class LyricsScreen extends StatefulWidget {
@@ -35,11 +33,9 @@ class _LyricsScreenState extends State<LyricsScreen> {
       return;
     }
 
-    final databaseService = DatabaseService(databaseFactory: databaseFactory);
-    final songRepo = SongRepository(database: databaseService);
-
+    // --- FIX: Removed local database creation and used the injected repository directly ---
     try {
-      final result = await songRepo.fetchAndSaveLyrics(widget.song);
+      final result = await widget.songRepository.fetchAndSaveLyrics(widget.song);
 
       if (mounted) {
         setState(() {

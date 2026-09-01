@@ -21,18 +21,41 @@ class MockDatabaseService extends Mock implements DatabaseService {}
 class MockSongRepository extends Mock implements SongRepository {}
 class MockAudioPlayer extends Mock implements AudioPlayer {}
 
+// Fallback value for complex arguments
+class FakeAudioSource extends Fake implements AudioSource {}
+
 void main() {
   late MockDatabaseService mockDb;
   late MockSongRepository mockRepo;
   late MockAudioPlayer mockAudioPlayer;
+
+  // Register the fallback value before tests run
+  setUpAll(() {
+    registerFallbackValue(FakeAudioSource());
+  });
 
   setUp(() {
     mockDb = MockDatabaseService();
     mockRepo = MockSongRepository();
     mockAudioPlayer = MockAudioPlayer();
 
-    // Prevent the audio player from crashing the test by returning an empty stream
+    // Provide all the streams and properties PlayerScreen asks for
     when(() => mockAudioPlayer.playerStateStream).thenAnswer((_) => const Stream.empty());
+    when(() => mockAudioPlayer.currentIndexStream).thenAnswer((_) => const Stream.empty());
+    when(() => mockAudioPlayer.positionStream).thenAnswer((_) => const Stream.empty());
+    when(() => mockAudioPlayer.durationStream).thenAnswer((_) => const Stream.empty());
+    when(() => mockAudioPlayer.loopMode).thenReturn(LoopMode.all);
+    when(() => mockAudioPlayer.sequenceState).thenReturn(null);
+    
+    // Provide the missing property getters to prevent StateErrors on initialization
+    when(() => mockAudioPlayer.playing).thenReturn(false);
+    when(() => mockAudioPlayer.currentIndex).thenReturn(0);
+
+    // Stub the async playback commands so the player doesn't crash
+    when(() => mockAudioPlayer.setAudioSource(any(), initialIndex: any(named: 'initialIndex')))
+        .thenAnswer((_) async => Duration.zero);
+    when(() => mockAudioPlayer.play()).thenAnswer((_) async {});
+    when(() => mockAudioPlayer.seek(any(), index: any(named: 'index'))).thenAnswer((_) async {});
 
     // Provide default successful mock data for the dashboard to load
     when(() => mockDb.isOpen()).thenReturn(true);
@@ -143,47 +166,43 @@ void main() {
     testWidgets('Tapping a Top Artist navigates to Artist Detail Screen', (WidgetTester tester) async {
       await tester.pumpWidget(createHomeScreen());
       
-      await tester.pump();
-      await tester.pump(const Duration(seconds: 1));
+      // Wait for the initial UI and database loads to completely finish
+      await tester.pumpAndSettle();
 
-      // Scroll down to the Top Artists section
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, -600));
+      // 1. Target the completely unique subtitle that ONLY exists on the artist card
+      final artistCard = find.text('5 plays');
+
+      // 2. Scroll until that exact card is physically visible on the screen
+      await tester.dragUntilVisible(
+        artistCard,
+        find.byType(CustomScrollView),
+        const Offset(0, -300),
+      );
       
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
 
-      final artistCard = find.text('Test Artist');
-      // We expect 2 widgets because it appears in Top Tracks and Top Artists
-      expect(artistCard, findsWidgets); 
-
-      // Tap the one in the Top Artists row (the last one found on screen)
-      await tester.tap(artistCard.last); 
-      
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(artistCard);
+      await tester.pumpAndSettle(); 
 
       expect(find.byType(ArtistDetailScreen), findsOneWidget);
     });
 
     testWidgets('Tapping a Top Album navigates to Album Detail Screen', (WidgetTester tester) async {
       await tester.pumpWidget(createHomeScreen());
-      
-      await tester.pump();
-      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
 
-      // Scroll down to the Top Albums section
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, -800));
-      
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-
+      // The album name is already unique, so this is safe
       final albumCard = find.text('Test Album');
-      expect(albumCard, findsOneWidget);
 
-      await tester.tap(albumCard);
+      await tester.dragUntilVisible(
+        albumCard,
+        find.byType(CustomScrollView),
+        const Offset(0, -300),
+      );
       
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+      await tester.tap(albumCard);
+      await tester.pumpAndSettle(); 
 
       expect(find.byType(AlbumDetailScreen), findsOneWidget);
     });
