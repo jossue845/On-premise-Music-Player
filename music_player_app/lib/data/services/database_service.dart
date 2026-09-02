@@ -1065,7 +1065,7 @@ class DatabaseService {
                 (queue.songIds.indexOf(id) == queue.currentSongIndex) ? 1 : 0,
           });
         }
-        batch.commit();
+        await batch.commit();
       });
       return Success(unit);
     } on Exception catch (e) {

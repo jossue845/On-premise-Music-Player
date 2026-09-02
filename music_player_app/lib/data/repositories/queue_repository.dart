@@ -74,20 +74,34 @@ class QueueRepository {
   }
 
   /// Removes the song at [index] in the [queue]'s song list and returns it.
-  ///
-  /// If the current song is removed, the next song in queue will be set as current; if it also was the last song, the new last song is set as current.
-  ///
-  /// If [index] is out of bounds, its value is clamped.
   Result<SongQueue> removeSong(SongQueue queue, int index) {
     try {
+      // 1. Safety check: If the queue is already empty, do nothing.
+      if (queue.songIds.isEmpty) {
+        return Success(queue);
+      }
+
       List<int> newSongList = List.of(queue.songIds);
       int newCurrentIndex = queue.currentSongIndex;
 
+      // 2. Safe clamp now that we know length is at least 1
       index = index.clamp(0, queue.songIds.length - 1);
       newSongList.removeAt(index);
 
+      // 3. Safety check: If we just removed the very last song, reset safely and return.
+      if (newSongList.isEmpty) {
+        return Success(
+          SongQueue(
+            songIds: UnmodifiableListView([]),
+            currentSongIndex: 0,
+          ),
+        );
+      }
+
+      // 4. Adjust the currently playing index if necessary
       if (index == queue.currentSongIndex) {
         newCurrentIndex = newCurrentIndex + 1;
+        // Safe clamp because we already checked newSongList.isEmpty
         newCurrentIndex = newCurrentIndex.clamp(0, newSongList.length - 1);
       }
 

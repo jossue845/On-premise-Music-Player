@@ -15,18 +15,23 @@ class FilesystemService {
     "wav",
   ];
 
+  // 1. Add a customizable function for testing
+  final Future<String?> Function(String? dialogTitle) _filePickerFn;
+
+  // 2. Default to the real FilePicker in production
+  FilesystemService({
+    Future<String?> Function(String? dialogTitle)? filePickerFn,
+  }) : _filePickerFn = filePickerFn ?? ((title) => FilePicker.getDirectoryPath(dialogTitle: title));
+
   /// Prompts the user to select the directory containing their music files.
-  ///
-  /// Returns the path to the directory.
   Future<Result<String>> getDirectoryPath() async {
     try {
       if (!(await getStoragePermission())) {
         throw Exception("Storage permission not granted");
       }
 
-      String? selectedDirectoryPath = await FilePicker.getDirectoryPath(
-        dialogTitle: "Select the music directory",
-      );
+      // 3. Use the injected function instead of the hardcoded static method
+      String? selectedDirectoryPath = await _filePickerFn("Select the music directory");
 
       if (selectedDirectoryPath == null) {
         throw Exception("No directory selected");
@@ -46,6 +51,12 @@ class FilesystemService {
       }
 
       final directory = Directory(directoryPath);
+      
+      // 4. Explicitly check if the directory exists before the stream swallows the error
+      if (!await directory.exists()) {
+        throw const FileSystemException("Directory does not exist");
+      }
+
       final List<String> paths = [];
 
       final stream = directory.list(recursive: true, followLinks: false);
@@ -70,23 +81,17 @@ class FilesystemService {
   }
 
   /// Prompts the user to grant the permission to read audio files.
-  ///
-  /// Returns whether the permission is granted.
   Future<bool> getStoragePermission() async {
     if (Platform.isAndroid) {
-      // 1. Request All Files Access (Required for Directory.list() to work on modern Android)
       final manageStatus = await Permission.manageExternalStorage.request();
       if (manageStatus.isGranted) return true;
 
-      // 2. Fallback for older Android versions
       final storageStatus = await Permission.storage.request();
       if (storageStatus.isGranted) return true;
 
-      // 3. Fallback for strict audio permissions
       final audioStatus = await Permission.audio.request();
       if (audioStatus.isGranted) return true;
 
-      // If everything fails, send them to settings
       if (manageStatus.isPermanentlyDenied || storageStatus.isPermanentlyDenied) {
         print('🔑 Permanently denied — opening settings');
         await openAppSettings();
@@ -95,6 +100,6 @@ class FilesystemService {
       return false;
     }
     
-    return true; // Default to true for non-Android platforms during dev
+    return true; 
   }
 }

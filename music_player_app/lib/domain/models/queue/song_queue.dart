@@ -13,7 +13,5 @@ class SongQueue with SongQueueMappable {
     required UnmodifiableListView<int> songIds,
     required int currentSongIndex,
   }) : this.songIds = songIds,
-       this.currentSongIndex = currentSongIndex
-           .clamp(0, songIds.length - 1)
-           .toInt();
+       this.currentSongIndex = currentSongIndex = songIds.isEmpty ? 0 : currentSongIndex.clamp(0, songIds.length - 1);
 }
