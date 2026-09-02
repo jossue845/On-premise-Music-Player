@@ -3,10 +3,12 @@ import 'package:flutter/foundation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../data/services/last_fm_service.dart';
 import '../../data/repositories/scrobble_repository.dart';
+import '../models/scrobble/scrobble.dart'; 
 
 class SyncManager {
   final LastFmService lastFmService;
   final ScrobbleRepository scrobbleRepository;
+  final Connectivity _connectivity; 
   
   String? _sessionKey;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
@@ -15,21 +17,18 @@ class SyncManager {
   SyncManager({
     required this.lastFmService,
     required this.scrobbleRepository,
-  });
+    Connectivity? connectivity,
+  }) : _connectivity = connectivity ?? Connectivity();
 
-  /// Call this when the user logs in or out
   void updateSessionKey(String? sessionKey) {
     _sessionKey = sessionKey;
-    // Attempt a sync immediately if we just logged in and have a connection
     if (_sessionKey != null) {
       forceSync();
     }
   }
 
-  /// Starts listening to device network state changes
   void startListening() {
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
-      // Trigger sync if the device connects to Mobile Data or WiFi
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
       if (results.contains(ConnectivityResult.mobile) || results.contains(ConnectivityResult.wifi)) {
          forceSync();
       }
@@ -44,12 +43,16 @@ class SyncManager {
     // Prevent overlapping sync processes or syncing without authentication
     if (_sessionKey == null || _isSyncing) return;
 
-    // Double-check the current connection status before starting
-    final results = await Connectivity().checkConnectivity();
-    if (results.contains(ConnectivityResult.none)) return;
+    _isSyncing = true; // 1. Lock immediately before the async gap!
 
-    _isSyncing = true;
     try {
+      // Double-check the current connection status before starting
+      final results = await _connectivity.checkConnectivity();
+      if (results.contains(ConnectivityResult.none)) {
+        _isSyncing = false; // 2. Unlock safely if we abort early
+        return;
+      }
+
       // 1. Fetch all unsynced scrobbles from the local SQLite cache
       final unsyncedScrobbles = await scrobbleRepository.getUnsyncedScrobbles();
       if (unsyncedScrobbles.isEmpty) {
