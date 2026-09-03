@@ -88,6 +88,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
   }
 
+  // Fix: adedd didupdatewidget to force the UI to sncy when the parent changes the track index
+  @override
+  void didUpdateWidget(PlayerScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.playlist != oldWidget.playlist) {
+      _localPlaylist = List.from(widget.playlist);
+    }
+    if (widget.initialIndex != oldWidget.initialIndex) {
+      if (_currentIndex != widget.initialIndex) {
+        setState(() => _currentIndex = widget.initialIndex);
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(widget.initialIndex);
+        }
+      }
+    }
+  }
+
   Future<void> _initPlayer() async {
     if (_localPlaylist.isEmpty) return;
     
@@ -460,7 +477,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       ],
     );
 
-    // Universal Side Panel Layout
     if (widget.isSidePanel) {
       return Container(
         width: 340,
@@ -486,7 +502,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         const SizedBox(height: 8),
                         albumText,
                         const SizedBox(height: 24),
-                        // --- FIX: Moved playback controls inside the card so they hug the artwork ---
                         progressRow,
                         sliderWidget,
                         mainControls,
@@ -504,7 +519,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       );
     }
 
-    // Original Full Screen layout for Smartphones
     return Scaffold(
       body: SafeArea(
         child: Padding(

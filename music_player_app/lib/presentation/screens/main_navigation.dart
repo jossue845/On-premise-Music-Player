@@ -7,13 +7,11 @@ import 'package:just_audio_background/just_audio_background.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
-// Services & Audio Provider
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
 import 'package:music_player_app/data/providers/audio_player_provider.dart';
 
-// Screens
 import 'package:music_player_app/presentation/screens/artists_screen.dart';
 import 'package:music_player_app/presentation/screens/playlist_screen.dart';
 import 'package:music_player_app/presentation/screens/search_screen.dart';
@@ -51,6 +49,7 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
   
   StreamSubscription? _playerStateSubscription;
   StreamSubscription? _sequenceStateSubscription;
+  StreamSubscription? _currentIndexSubscription; // Fix: adedd stream variable to catch track jumps
   
   StreamSubscription<AccelerometerEvent>? _accelSubscription;
   bool _tiltEnabled = false;
@@ -61,7 +60,6 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
   DateTime _lastTiltUpdate = DateTime.now();
   String _currentTilt = 'top'; 
 
-  // Controls the visibility of the tablet right-side player
   bool _isSidePanelOpen = false;
 
   @override
@@ -86,6 +84,7 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
   void dispose() {
     _playerStateSubscription?.cancel();
     _sequenceStateSubscription?.cancel();
+    _currentIndexSubscription?.cancel(); // Fix: canceled the indx subcripcion to avoid leaks
     _accelSubscription?.cancel();
     super.dispose();
   }
@@ -210,24 +209,26 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
   void _setupAudioStreams() {
     final audioPlayer = ref.read(audioPlayerProvider);
 
-    _sequenceStateSubscription = audioPlayer.sequenceStateStream.listen((sequence) {
-      if (sequence?.currentSource != null) {
-        final tag = sequence!.currentSource!.tag as MediaItem;
+    // Fix: helpre function to snyc the UI properly when selecting a new track
+    void updateActiveSong() {
+      if (audioPlayer.sequenceState?.currentSource != null) {
+        final tag = audioPlayer.sequenceState!.currentSource!.tag as MediaItem;
         try {
           final activeSong = _allSongs.firstWhere((s) => s.id.toString() == tag.id);
-          
-          if (mounted) {
+          if (mounted && _currentActiveSong?.id != activeSong.id) {
             setState(() => _currentActiveSong = activeSong);
           }
-        } catch (_) {
-          _loadSongs().then((_) {
-            try {
-              final updatedSong = _allSongs.firstWhere((s) => s.id.toString() == tag.id);
-              if (mounted) setState(() => _currentActiveSong = updatedSong);
-            } catch (_) {}
-          });
-        }
+        } catch (_) {}
       }
+    }
+
+    _sequenceStateSubscription = audioPlayer.sequenceStateStream.listen((_) {
+      updateActiveSong();
+    });
+
+    // Fix: lstens to index changes to update the panle immediatly
+    _currentIndexSubscription = audioPlayer.currentIndexStream.listen((_) {
+      updateActiveSong();
     });
 
     _playerStateSubscription = audioPlayer.playerStateStream.listen((state) {
@@ -451,7 +452,6 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
             ),
           ),
 
-          // Universal Animated Side Panel for Tablets
           AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeOutCubic,
