@@ -117,6 +117,44 @@ void main() {
       expect(find.text('Mock Search Index'), findsOneWidget);
     });
 
+    testWidgets('Floating buttons shift position when accelerometer events are received', (tester) async {
+      when(() => mockDb.getValue('tilt_enabled')).thenAnswer((_) async => const Success('true'));
+
+      await tester.pumpWidget(buildTestable());
+      await tester.pumpAndSettle();
+
+      final floatingWidgetFinder = find.text('Floating Track');
+      expect(floatingWidgetFinder, findsOneWidget);
+
+      final positionedFinder = find.ancestor(
+        of: floatingWidgetFinder,
+        matching: find.byType(AnimatedPositioned),
+      ).first;
+
+      final initialWidget = tester.widget<AnimatedPositioned>(positionedFinder);
+      final initialLeft = initialWidget.left;
+      final initialTop = initialWidget.top;
+
+      // 1. Physically pause the test runner to bypass the DateTime.now() throttle
+      await tester.runAsync(() async {
+        await Future.delayed(const Duration(milliseconds: 200));
+      });
+
+      // 2. Trigger a strict horizontal tilt
+      sensorController.add(AccelerometerEvent(50.0, 0.0, 0.0, DateTime.now()));
+      
+      // 3. Flush the stream and tick the virtual UI clock
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final newWidget = tester.widget<AnimatedPositioned>(positionedFinder);
+      final newLeft = newWidget.left;
+      final newTop = newWidget.top;
+
+      expect(initialLeft == newLeft && initialTop == newTop, isFalse, 
+          reason: 'The AnimatedPositioned coordinates should have changed after the tilt event.');
+    });
+
     testWidgets('Renders the floating MiniPlayer when a song is loaded', (tester) async {
       await tester.pumpWidget(buildTestable());
       
@@ -129,4 +167,5 @@ void main() {
       expect(find.byIcon(Icons.play_circle_fill), findsOneWidget);
     });
   });
+  
 }

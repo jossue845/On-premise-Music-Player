@@ -46,15 +46,22 @@ class MusicFolderRepository {
       final List<String> pathsOfSongsToBeDeleted = [];
 
       for (final filePath in filePaths) {
-        Tag? tag = await AudioTags.read(filePath);
+        Tag? tag;
+        try {
+          tag = await AudioTags.read(filePath);
+        } catch (e) {
+          print('Skipping corrupted tags for $filePath: $e');
+        }
 
-        // If the tag is null, don't skip, just extract the filename from the path.
-        String? title =
-            tag?.title ??
-            filePath
-                .split('/')
-                .last
-                .replaceAll(RegExp(r"\.([A-Za-z0-9]+)$"), '');
+        // --- FIX: Safely fallback if title is null OR an empty string ---
+        String? title = tag?.title;
+        if (title == null || title.trim().isEmpty) {
+          title = filePath
+              .split('/')
+              .last
+              .replaceAll(RegExp(r"\.([A-Za-z0-9]+)$"), '');
+          if (title.trim().isEmpty) title = 'Unknown Title';
+        }
 
         String? trackArtistRaw = tag?.trackArtist;
         String? album = tag?.album;
@@ -70,25 +77,23 @@ class MusicFolderRepository {
             ? (await TagUtils.storePicture(pictures.first.bytes)).getOrThrow()
             : null;
 
-        // It isn't required to check the existance of the title
-        // because in the worst case it will use the filename as the title
-
-        if (trackArtistRaw == null || trackArtistRaw.isEmpty) {
+        if (trackArtistRaw == null || trackArtistRaw.trim().isEmpty) {
           trackArtists = ["Unknown Artist"];
         } else {
           trackArtists = TagUtils.parseArtists(trackArtistRaw);
         }
 
-        if (albumArtistRaw == null || albumArtistRaw.isEmpty) {
+        if (albumArtistRaw == null || albumArtistRaw.trim().isEmpty) {
           albumArtists = trackArtists;
         } else {
           albumArtists = TagUtils.parseArtists(albumArtistRaw);
         }
 
-        if (album == null) {
-          album = "Unknown Album"; // Give it a default album name if missing
+        // --- FIX: Check for empty strings as well as nulls ---
+        if (album == null || album.trim().isEmpty) {
+          album = "Unknown Album"; 
           albumArtists = [
-            "Unknown Artist", // Default album artist to group all the albumless songs under a single "Unknown Album".
+            "Unknown Artist", 
           ];
         }
 

@@ -16,30 +16,32 @@ class Song with SongMappable {
   final String path;
   final String? imagePath;
   final bool favorite;
-  final int playCount; // Tracks how many times the song has been played
+  final int playCount; 
   final String? lyrics;
 
   Song({
     required this.id,
-    required this.title,
+    required String title,
     required this.artists,
-    required this.album,
+    required String album,
     required this.albumId,
     this.genre,
     this.year,
     this.trackNumber,
-    required this.path,
+    required String path,
     this.imagePath,
     required this.favorite,
-    this.playCount = 0, // Defaults to 0 in new songs
+    this.playCount = 0, 
     this.lyrics,
-  });
+  })  : title = title.trim().isEmpty ? 'Unknown Title' : title,
+        album = album.trim().isEmpty ? 'Unknown Album' : album,
+        path = path.trim().isEmpty ? '/' : path;
 
   Map<String, dynamic> toDbMap() {
     return {
       'id': id,
       'title': title,
-      'artists': artists.join(','), // Flattens List<String> to a single comma-separated String
+      'artists': artists.join(','), 
       'album': album,
       'albumId': albumId,
       'genre': genre,
@@ -47,10 +49,9 @@ class Song with SongMappable {
       'trackNumber': trackNumber,
       'path': path,
       'imagePath': imagePath,
-      'favorite': favorite ? 1 : 0, // Flattens boolean to an integer (SQLite does not have a native boolean type)
+      'favorite': favorite ? 1 : 0, 
       'playCount': playCount,
       'lyrics': lyrics,
     };
   }
 }
-
