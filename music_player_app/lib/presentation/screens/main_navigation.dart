@@ -23,7 +23,6 @@ import 'package:music_player_app/presentation/screens/settings_screen.dart';
 import 'package:music_player_app/presentation/screens/player_screen.dart';
 
 class MusicDashboard extends ConsumerStatefulWidget {
-  // --- FIX: Add injected dependencies for safe headless testing ---
   final DatabaseService? testDatabaseService;
   final SongRepository? testSongRepository;
   final Stream<AccelerometerEvent>? testSensorStream;
@@ -62,10 +61,12 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
   DateTime _lastTiltUpdate = DateTime.now();
   String _currentTilt = 'top'; 
 
+  // Controls the visibility of the tablet right-side player
+  bool _isSidePanelOpen = false;
+
   @override
   void initState() {
     super.initState();
-    // --- FIX: Fallback to real pages if test pages are not provided ---
     _pages = widget.testPages ?? [
       const HomeDashboard(),
       const SearchScreen(),
@@ -90,7 +91,6 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
   }
 
   Future<void> _loadTiltSetting() async {
-    // --- FIX: Use injected database ---
     final db = widget.testDatabaseService ?? DatabaseService(databaseFactory: databaseFactory);
     if (!db.isOpen()) await db.open();
     final res = await db.getValue('tilt_enabled');
@@ -100,7 +100,6 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
   }
 
   void _setupSensors() {
-    // --- FIX: Use injected sensor stream to avoid crashing on missing platform channels ---
     final sensorStream = widget.testSensorStream ?? accelerometerEventStream();
     
     _accelSubscription = sensorStream.listen((AccelerometerEvent event) {
@@ -113,17 +112,20 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
       final padding = MediaQuery.of(context).padding;
       final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
       
-      final bool isTablet = screenSize.width >= 600;
+      final bool isTablet = screenSize.shortestSide >= 600;
+      final double scale = isTablet ? 1.5 : 1.0;
       final double railWidth = isTablet ? 72.0 : 0.0;
-      final double effectiveWidth = screenSize.width - railWidth;
+      
+      final double panelWidth = (isTablet && _isSidePanelOpen) ? 340.0 : 0.0;
+      final double effectiveWidth = screenSize.width - railWidth - panelWidth;
       
       final double topBoundary = padding.top + 5.0; 
       final double bottomNavHeight = isTablet ? padding.bottom + 10.0 : padding.bottom + 90.0;
 
-      final double hWidth = isTablet ? 350.0 : 260.0;
-      final double hHeight = 75.0;
-      final double vWidth = 70.0;
-      final double vHeight = 160.0;
+      final double hWidth = 260.0 * scale;
+      final double hHeight = 75.0 * scale;
+      final double vWidth = 70.0 * scale;
+      final double vHeight = 160.0 * scale;
 
       String newTilt = 'none';
       final double activeThreshold = _isManualOverride ? 8.5 : 6.0; 
@@ -172,7 +174,6 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
   }
 
   Future<void> _loadSongs() async {
-    // --- FIX: Use injected database and repository ---
     final databaseService = widget.testDatabaseService ?? DatabaseService(databaseFactory: databaseFactory);
     final songRepository = widget.testSongRepository ?? SongRepository(database: databaseService);
     
@@ -207,7 +208,6 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
   }
 
   void _setupAudioStreams() {
-    int? lastProcessedIndex;
     final audioPlayer = ref.read(audioPlayerProvider);
 
     _sequenceStateSubscription = audioPlayer.sequenceStateStream.listen((sequence) {
@@ -219,26 +219,26 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
           if (mounted) {
             setState(() => _currentActiveSong = activeSong);
           }
-
-          if (lastProcessedIndex != null && lastProcessedIndex != sequence.currentIndex) {
-            final previousSource = sequence.sequence[lastProcessedIndex!];
-            final prevTag = previousSource.tag as MediaItem?;
-            if (prevTag != null) {
-              final prevSong = _allSongs.firstWhere((s) => s.id.toString() == prevTag.id);
-              
-              // --- FIX: Use injected database/repo to prevent background crash on track change ---
-              final databaseService = widget.testDatabaseService ?? DatabaseService(databaseFactory: databaseFactory);
-              final songRepo = widget.testSongRepository ?? SongRepository(database: databaseService);
-              songRepo.incrementPlayCount(prevSong.id);
-            }
-          }
-          lastProcessedIndex = sequence.currentIndex;
-        } catch (_) {}
+        } catch (_) {
+          _loadSongs().then((_) {
+            try {
+              final updatedSong = _allSongs.firstWhere((s) => s.id.toString() == tag.id);
+              if (mounted) setState(() => _currentActiveSong = updatedSong);
+            } catch (_) {}
+          });
+        }
       }
     });
 
     _playerStateSubscription = audioPlayer.playerStateStream.listen((state) {
-      if (mounted) setState(() => _isPlaying = state.playing);
+      if (mounted) {
+        setState(() {
+          if (!_isPlaying && state.playing) {
+            _isSidePanelOpen = true; 
+          }
+          _isPlaying = state.playing;
+        });
+      }
     });
   }
 
@@ -272,7 +272,42 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
   @override
   Widget build(BuildContext context) {
     final padding = MediaQuery.of(context).padding;
+    final size = MediaQuery.of(context).size;
     
+    final bool isTablet = size.shortestSide >= 600;
+    final bool showRail = isTablet;
+
+    final bool showSidePanel = isTablet && _isSidePanelOpen && _currentActiveSong != null;
+    final bool showMiniPlayer = _currentActiveSong != null && (!isTablet || !_isSidePanelOpen);
+
+    final double scale = isTablet ? 1.5 : 1.0;
+    
+    double stackWidth = size.width;
+    if (showRail) stackWidth -= 72.0;
+    if (showSidePanel) stackWidth -= 340.0;
+    
+    final double topBoundary = padding.top + 5.0; 
+    final double bottomNavHeight = showRail ? padding.bottom + 10.0 : padding.bottom + 90.0;
+
+    bool isHorizontal = true; 
+    if (_panelPosition != null) {
+      if (_panelPosition!.dy < topBoundary + 60 || _panelPosition!.dy > size.height - bottomNavHeight - 180 * scale) {
+        isHorizontal = true;
+      } else {
+        isHorizontal = false;
+      }
+    }
+
+    final double currentWidth = isHorizontal ? 260.0 * scale : 70.0 * scale;
+    final double currentHeight = isHorizontal ? 75.0 * scale : 160.0 * scale;
+
+    _panelPosition ??= Offset((stackWidth - currentWidth) / 2 + 15, topBoundary + 8.0);
+
+    _panelPosition = Offset(
+      _panelPosition!.dx.clamp(0.0, (stackWidth - currentWidth) > 0 ? stackWidth - currentWidth : 0.0),
+      _panelPosition!.dy.clamp(topBoundary, size.height - currentHeight - bottomNavHeight), 
+    );
+
     return Scaffold(
       extendBody: true,
       extendBodyBehindAppBar: true,
@@ -284,44 +319,20 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
             Navigator.push(
               context, 
               MaterialPageRoute(builder: (context) => const SettingsScreen()),
-            ).then((_) => _loadTiltSetting()); 
-          }, 
+            ).then((_) {
+              _loadTiltSetting();
+              _loadSongs(); 
+            }); 
+          },  
           icon: const Icon(Icons.settings) 
         ),
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final bool showRail = constraints.maxWidth >= 600;
-          
-          final double stackWidth = showRail ? constraints.maxWidth - 72.0 : constraints.maxWidth;
-          final double topBoundary = padding.top + 5.0; 
-          final double bottomNavHeight = showRail ? padding.bottom + 10.0 : padding.bottom + 90.0;
-
-          bool isHorizontal = true; 
-          if (_panelPosition != null) {
-            if (_panelPosition!.dy < topBoundary + 60 || _panelPosition!.dy > constraints.maxHeight - bottomNavHeight - 180) {
-              isHorizontal = true;
-            } else {
-              isHorizontal = false;
-            }
-          }
-
-          final double currentWidth = isHorizontal ? (showRail ? 350.0 : 260.0) : 70.0;
-          final double currentHeight = isHorizontal ? 75.0 : 160.0;
-
-          _panelPosition ??= Offset((stackWidth - currentWidth) / 2 + 15, topBoundary + 8.0);
-
-          _panelPosition = Offset(
-            _panelPosition!.dx.clamp(0.0, stackWidth - currentWidth),
-            _panelPosition!.dy.clamp(topBoundary, constraints.maxHeight - currentHeight - bottomNavHeight), 
-          );
-
-          return Row(
-            children: [
-              if (showRail)
+      body: Row(
+        children: [
+          if (showRail)
             SingleChildScrollView(
               child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                constraints: BoxConstraints(minHeight: size.height),
                 child: IntrinsicHeight(
                   child: NavigationRail(
                     backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -343,116 +354,140 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
                 ),
               ),
             ),
+            
+          Expanded(
+            child: Stack(
+              children: [
+                _pages[_selectedIndex], 
                 
-              Expanded(
-                child: Stack(
-                  children: [
-                    _pages[_selectedIndex], 
-                    
-                    if (!showRail)
-                      Positioned(
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        child: Align(
-                          alignment: Alignment.bottomCenter,
-                          child: SafeArea(
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 10.0),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.bottomCenter,
-                                  end: Alignment.topCenter,
-                                  colors: [
-                                    Theme.of(context).scaffoldBackgroundColor.withOpacity(0.95),
-                                    Theme.of(context).scaffoldBackgroundColor.withOpacity(0.0),
-                                  ],
-                                ),
-                              ),
-                              child: GNav(
-                                backgroundColor: Colors.transparent,
-                                color: Theme.of(context).bottomNavigationBarTheme.unselectedItemColor ?? Colors.white70,
-                                activeColor: Theme.of(context).bottomNavigationBarTheme.selectedItemColor,
-                                tabBackgroundColor: (Theme.of(context).bottomNavigationBarTheme.selectedItemColor ?? Colors.cyanAccent).withOpacity(0.1),
-                                iconSize: 20, 
-                                textStyle: TextStyle(
-                                  fontSize: 12, 
-                                  fontWeight: FontWeight.bold, 
-                                  color: Theme.of(context).bottomNavigationBarTheme.selectedItemColor,
-                                ),
-                                gap: 4, 
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10), 
-                                selectedIndex: _selectedIndex, 
-                                onTabChange: _onItemTapped, 
-                                tabs: const [
-                                  GButton(icon: Icons.home, text: 'Home'),
-                                  GButton(icon: Icons.search, text: 'Search'),
-                                  GButton(icon: Icons.person, text: 'Artist'),
-                                  GButton(icon: Icons.queue_music, text: 'Playlists'),
-                                  GButton(icon: Icons.library_music_rounded, text: 'Songs'), 
-                                ],
-                              )
+                if (!showRail)
+                  Positioned(
+                    bottom: 0, left: 0, right: 0,
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: SafeArea(
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 10.0),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.bottomCenter,
+                              end: Alignment.topCenter,
+                              colors: [
+                                Theme.of(context).scaffoldBackgroundColor.withOpacity(0.95),
+                                Theme.of(context).scaffoldBackgroundColor.withOpacity(0.0),
+                              ],
                             ),
                           ),
+                          child: GNav(
+                            backgroundColor: Colors.transparent,
+                            color: Theme.of(context).bottomNavigationBarTheme.unselectedItemColor ?? Colors.white70,
+                            activeColor: Theme.of(context).bottomNavigationBarTheme.selectedItemColor,
+                            tabBackgroundColor: (Theme.of(context).bottomNavigationBarTheme.selectedItemColor ?? Colors.cyanAccent).withOpacity(0.1),
+                            iconSize: 20, 
+                            textStyle: TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.bold, 
+                              color: Theme.of(context).bottomNavigationBarTheme.selectedItemColor,
+                            ),
+                            gap: 4, 
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10), 
+                            selectedIndex: _selectedIndex, 
+                            onTabChange: _onItemTapped, 
+                            tabs: const [
+                              GButton(icon: Icons.home, text: 'Home'),
+                              GButton(icon: Icons.search, text: 'Search'),
+                              GButton(icon: Icons.person, text: 'Artist'),
+                              GButton(icon: Icons.queue_music, text: 'Playlists'),
+                              GButton(icon: Icons.library_music_rounded, text: 'Songs'), 
+                            ],
+                          )
                         ),
                       ),
+                    ),
+                  ),
 
-                    if (_currentActiveSong != null)
-                      AnimatedPositioned(
-                        duration: _isDragging ? Duration.zero : const Duration(milliseconds: 400),
-                        curve: Curves.easeOutCubic,
-                        left: _panelPosition!.dx,
-                        top: _panelPosition!.dy,
-                        child: GestureDetector(
-                          onPanStart: (_) => setState(() => _isDragging = true),
-                          onPanEnd: (_) {
-                            setState(() {
-                              _isDragging = false;
-                              _isManualOverride = true; 
-                              _ignoredAxis = _currentTilt; 
-                            });
-                          },
-                          onPanUpdate: (details) {
-                            setState(() {
-                              _panelPosition = _panelPosition! + details.delta;
-                            });
-                          },
-                          onTap: () {
-                            final songIndex = _allSongs.indexOf(_currentActiveSong!);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => PlayerScreen(
-                                  playlist: List<Song>.from(_allSongs),
-                                  initialIndex: songIndex != -1 ? songIndex : 0,
-                                ),
+                if (showMiniPlayer)
+                  AnimatedPositioned(
+                    duration: _isDragging ? Duration.zero : const Duration(milliseconds: 400),
+                    curve: Curves.easeOutCubic,
+                    left: _panelPosition!.dx,
+                    top: _panelPosition!.dy,
+                    child: GestureDetector(
+                      onPanStart: (_) => setState(() => _isDragging = true),
+                      onPanEnd: (_) {
+                        setState(() {
+                          _isDragging = false;
+                          _isManualOverride = true; 
+                          _ignoredAxis = _currentTilt; 
+                        });
+                      },
+                      onPanUpdate: (details) {
+                        setState(() {
+                          _panelPosition = _panelPosition! + details.delta;
+                        });
+                      },
+                      onTap: () {
+                        if (isTablet) {
+                          setState(() => _isSidePanelOpen = true);
+                        } else {
+                          final songIndex = _allSongs.indexOf(_currentActiveSong!);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PlayerScreen(
+                                playlist: List<Song>.from(_allSongs),
+                                initialIndex: songIndex != -1 ? songIndex : 0,
                               ),
-                            );
-                          },
-                          child: isHorizontal 
-                              ? _buildHorizontalMiniPlayer(currentWidth, currentHeight)
-                              : _buildVerticalMiniPlayer(currentWidth, currentHeight),
-                        ),
-                      ),
-                  ],
-                ),
+                            ),
+                          );
+                        }
+                      },
+                      child: isHorizontal 
+                          ? _buildHorizontalMiniPlayer(currentWidth, currentHeight, scale)
+                          : _buildVerticalMiniPlayer(currentWidth, currentHeight, scale),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // Universal Animated Side Panel for Tablets
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
+            width: showSidePanel ? 340.0 : 0.0,
+            child: ClipRect(
+              child: OverflowBox(
+                alignment: Alignment.centerLeft,
+                minWidth: 340.0,
+                maxWidth: 340.0,
+                child: _currentActiveSong != null 
+                    ? PlayerScreen(
+                        playlist: List<Song>.from(_allSongs),
+                        initialIndex: _allSongs.indexOf(_currentActiveSong!) != -1 
+                            ? _allSongs.indexOf(_currentActiveSong!) 
+                            : 0,
+                        testSongRepository: widget.testSongRepository,
+                        isSidePanel: true,
+                        onClose: () => setState(() => _isSidePanelOpen = false),
+                      )
+                    : const SizedBox.shrink(),
               ),
-            ],
-          );
-        },
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildVerticalMiniPlayer(double width, double height) {
+  Widget _buildVerticalMiniPlayer(double width, double height, double scale) {
     return Container(
       width: width,
       height: height,
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
+      padding: EdgeInsets.symmetric(vertical: 12.0 * scale),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(35),
+        borderRadius: BorderRadius.circular(35 * scale),
         boxShadow: const [
           BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))
         ],
@@ -461,14 +496,14 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(25),
+            borderRadius: BorderRadius.circular(25 * scale),
             child: Container(
-              width: 50,
-              height: 50,
+              width: 50 * scale,
+              height: 50 * scale,
               color: Theme.of(context).primaryColor.withOpacity(0.2),
               child: _currentActiveSong!.imagePath != null
                   ? Image.file(File(_currentActiveSong!.imagePath!), fit: BoxFit.cover)
-                  : Icon(Icons.music_note, color: Theme.of(context).primaryColor),
+                  : Icon(Icons.music_note, color: Theme.of(context).primaryColor, size: 24 * scale),
             ),
           ),
           Padding(
@@ -478,13 +513,13 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10 * scale),
             ),
           ),
           IconButton(
             icon: Icon(
               _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
-              size: 36,
+              size: 36 * scale,
               color: Theme.of(context).primaryColor,
             ),
             onPressed: _togglePlayback,
@@ -494,14 +529,14 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
     );
   }
 
-  Widget _buildHorizontalMiniPlayer(double width, double height) {
+  Widget _buildHorizontalMiniPlayer(double width, double height, double scale) {
     return Container(
       width: width,
       height: height,
-      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+      padding: EdgeInsets.symmetric(horizontal: 12.0 * scale),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(35),
+        borderRadius: BorderRadius.circular(35 * scale),
         boxShadow: const [
           BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))
         ],
@@ -509,17 +544,17 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
       child: Row(
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(25),
+            borderRadius: BorderRadius.circular(25 * scale),
             child: Container(
-              width: 50,
-              height: 50,
+              width: 50 * scale,
+              height: 50 * scale,
               color: Theme.of(context).primaryColor.withOpacity(0.2),
               child: _currentActiveSong!.imagePath != null
                   ? Image.file(File(_currentActiveSong!.imagePath!), fit: BoxFit.cover)
-                  : Icon(Icons.music_note, color: Theme.of(context).primaryColor),
+                  : Icon(Icons.music_note, color: Theme.of(context).primaryColor, size: 24 * scale),
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12 * scale),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -529,13 +564,13 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
                   _currentActiveSong!.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13 * scale),
                 ),
                 Text(
                   _currentActiveSong!.artists.isNotEmpty ? _currentActiveSong!.artists.first : 'Unknown Artist',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 11, color: Colors.white70),
+                  style: TextStyle(fontSize: 11 * scale, color: Colors.white70),
                 ),
               ],
             ),
@@ -543,7 +578,7 @@ class _MusicDashboardState extends ConsumerState<MusicDashboard> {
           IconButton(
             icon: Icon(
               _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
-              size: 36,
+              size: 36 * scale,
               color: Theme.of(context).primaryColor,
             ),
             onPressed: _togglePlayback,

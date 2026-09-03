@@ -18,14 +18,17 @@ import 'package:music_player_app/presentation/screens/equalizer_screen.dart';
 class PlayerScreen extends ConsumerStatefulWidget {
   final List<Song> playlist;
   final int initialIndex;
-  // --- NEW: Accept the mock repository for testing ---
   final SongRepository? testSongRepository; 
+  final bool isSidePanel;
+  final VoidCallback? onClose;
 
   const PlayerScreen({
     super.key, 
     required this.playlist, 
     required this.initialIndex,
     this.testSongRepository, 
+    this.isSidePanel = false,
+    this.onClose,
   });
 
   @override
@@ -65,7 +68,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     
     _pageController = PageController(initialPage: widget.initialIndex);
     
-    // --- FIX: Use the injected test repository if provided, otherwise use real DB ---
     if (widget.testSongRepository != null) {
       _songRepository = widget.testSongRepository!;
     } else {
@@ -74,7 +76,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
     
     _setupStreams();
-    _initPlayer();
+    
+    if (!widget.isSidePanel) {
+      _initPlayer();
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(widget.initialIndex);
+        }
+      });
+    }
   }
 
   Future<void> _initPlayer() async {
@@ -339,14 +350,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             final song = _localPlaylist[index];
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 5.0),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  width: double.infinity,
-                  color: Theme.of(context).cardTheme.color,
-                  child: song.imagePath != null
-                      ? Image.file(File(song.imagePath!), fit: BoxFit.cover)
-                      : const Icon(Icons.album, size: 100),
+              child: Center(
+                child: AspectRatio(
+                  aspectRatio: 1.0,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      color: Theme.of(context).cardTheme.color,
+                      child: song.imagePath != null
+                          ? Image.file(File(song.imagePath!), fit: BoxFit.cover)
+                          : const Icon(Icons.album, size: 100),
+                    ),
+                  ),
                 ),
               ),
             );
@@ -437,6 +452,59 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       ),
     );
 
+    Widget panelHeader = Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Text('Now Playing', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        IconButton(icon: const Icon(Icons.close), onPressed: widget.onClose),
+      ],
+    );
+
+    // Universal Side Panel Layout
+    if (widget.isSidePanel) {
+      return Container(
+        width: 340,
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          border: const Border(left: BorderSide(color: Colors.white24, width: 1)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+        child: SafeArea(
+          child: Column(
+            children: [
+              panelHeader,
+              const SizedBox(height: 20),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: PlayerSettings(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        buildAlbumArt(280),
+                        const SizedBox(height: 15),
+                        songInfo,
+                        const SizedBox(height: 8),
+                        albumText,
+                        const SizedBox(height: 24),
+                        // --- FIX: Moved playback controls inside the card so they hug the artwork ---
+                        progressRow,
+                        sliderWidget,
+                        mainControls,
+                        const SizedBox(height: 30),
+                        lyricsButton,
+                        const SizedBox(height: 10),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Original Full Screen layout for Smartphones
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -492,22 +560,24 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                           const SizedBox(width: 20),
                           Expanded(
                             flex: 6,
-                            child: SingleChildScrollView(
-                              child: PlayerSettings(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    songInfo,
-                                    const SizedBox(height: 8),
-                                    albumText,
-                                    const SizedBox(height: 20),
-                                    progressRow,
-                                    sliderWidget,
-                                    mainControls,
-                                    const SizedBox(height: 20),
-                                    lyricsButton,
-                                    const SizedBox(height: 10),
-                                  ],
+                            child: Center(
+                              child: SingleChildScrollView(
+                                child: PlayerSettings(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      songInfo,
+                                      const SizedBox(height: 8),
+                                      albumText,
+                                      const SizedBox(height: 20),
+                                      progressRow,
+                                      sliderWidget,
+                                      mainControls,
+                                      const SizedBox(height: 20),
+                                      lyricsButton,
+                                      const SizedBox(height: 10),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),

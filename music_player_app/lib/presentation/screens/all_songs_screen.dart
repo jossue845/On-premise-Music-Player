@@ -1,16 +1,19 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 import 'package:sqflite/sqflite.dart';
 
+import 'package:music_player_app/data/providers/audio_player_provider.dart';
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/repositories/song_repository.dart';
-
 import 'package:music_player_app/data/repositories/playlist_repository.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
-import 'package:music_player_app/presentation/screens/player_screen.dart';
 import 'package:music_player_app/presentation/screens/edit_song_screen.dart';
 
-class AllSongsScreen extends StatefulWidget {
+// --- FIX: Converted to ConsumerStatefulWidget to access Riverpod ---
+class AllSongsScreen extends ConsumerStatefulWidget {
   final SongRepository? songRepository;
   final PlaylistRepository? playlistRepository;
 
@@ -21,10 +24,10 @@ class AllSongsScreen extends StatefulWidget {
   });
 
   @override
-  State<AllSongsScreen> createState() => _AllSongsScreenState();
+  ConsumerState<AllSongsScreen> createState() => _AllSongsScreenState();
 }
 
-class _AllSongsScreenState extends State<AllSongsScreen> {
+class _AllSongsScreenState extends ConsumerState<AllSongsScreen> {
   late SongRepository _songRepository;
   late PlaylistRepository _playlistRepository;
   List<Song> _songs = [];
@@ -193,7 +196,6 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
             }
           },
           itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-            // --- FIX: Wrapped Text in Expanded to prevent overflow ---
             const PopupMenuItem<String>(
               value: 'add_to_playlist',
               child: Row(
@@ -249,16 +251,25 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => PlayerScreen(
-                playlist: _songs,
-                initialIndex: index,
-              ), 
+        onTap: () async {
+          // --- FIX: Push directly to the background service instead of opening a route ---
+          final audioPlayer = ref.read(audioPlayerProvider);
+          final audioSources = _songs.map((s) => AudioSource.uri(
+            Uri.file(s.path),
+            tag: MediaItem(
+              id: s.id.toString(),
+              title: s.title,
+              artist: s.artists.isNotEmpty ? s.artists.first : 'Unknown Artist',
+              album: s.album,
+              artUri: s.imagePath != null ? Uri.file(s.imagePath!) : null,
             ),
-          ).then((_) => _initializeRepositoryAndLoad()); 
+          )).toList();
+          
+          await audioPlayer.setAudioSource(
+            ConcatenatingAudioSource(children: audioSources), 
+            initialIndex: index
+          );
+          await audioPlayer.play();
         },
       ),
     );
