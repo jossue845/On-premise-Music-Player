@@ -1,5 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+
+// Fix: imprted flutter foundation so debugPrint is recognized
+import 'package:flutter/foundation.dart';
 
 import 'package:audiotags/audiotags.dart';
 import 'package:http/http.dart' as http;
@@ -9,6 +13,7 @@ import 'package:music_player_app/utils/tag_utils.dart';
 import 'package:result_dart/result_dart.dart';
 import 'package:music_player_app/data/services/audiodb_service.dart';
 import 'package:music_player_app/data/services/lrclib_service.dart';
+
 
 class SongRepository {
   final DatabaseService _database;
@@ -41,6 +46,42 @@ class SongRepository {
     );
   }
 
+  Future<String?> _fetchItunesArtworkFallback(String title, String artist) async {
+    try {
+      final safeTitle = title.replaceAll(RegExp(r'\(.*\)'), '').trim();
+      final safeArtist = artist.replaceAll(RegExp(r'feat\..*|ft\..*'), '').trim();
+      
+      final query = Uri.encodeComponent('$safeTitle $safeArtist');
+      final url = Uri.parse('https://itunes.apple.com/search?term=$query&entity=song&limit=1');
+      
+      // Fix: added logs so we can actualy see what itunes is doing behind the secnes
+      debugPrint("🍏 ITUNES SEARCH URL: $url");
+      
+      // Fix: adedd user agent header cause apple sometimes blocks deafult dart http requests
+      final response = await _httpClient.get(url, headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko)'
+      });
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['resultCount'] > 0) {
+          final String artwork = data['results'][0]['artworkUrl100'];
+          
+          debugPrint("🍏 ITUNES SUCCESS: Found artwork for $safeTitle");
+          return artwork.replaceAll('100x100bb', '500x500bb');
+        } else {
+          debugPrint("🍎 ITUNES RETURNED 0 RESULTS FOR: $safeTitle");
+        }
+      } else {
+        debugPrint("🍎 ITUNES API ERROR: ${response.statusCode}");
+      }
+    } catch (e) {
+      debugPrint("🍎 ITUNES CRASH: $e");
+      return null;
+    }
+    return null;
+  }
+
   Future<Result<Song>> fetchAndSaveMissingArtwork(Song song) async {
     if (song.imagePath != null && song.imagePath!.isNotEmpty) {
       return Success(song);
@@ -52,19 +93,24 @@ class SongRepository {
     }
 
     try {
-      final searchResult = await _audioDbService.searchAlbum(song.album, artistName);
-      if (searchResult.isError()) return Failure(searchResult.exceptionOrNull()!);
-
-      final data = searchResult.getOrThrow();
-      final albums = data['album'] as List?;
+      String? artUrl;
       
-      if (albums == null || albums.isEmpty) {
-        return Failure(Exception("No matching album found on TheAudioDB."));
+      final searchResult = await _audioDbService.searchAlbum(song.album, artistName);
+      if (searchResult.isSuccess()) {
+        final data = searchResult.getOrThrow();
+        final albums = data['album'] as List?;
+        if (albums != null && albums.isNotEmpty) {
+          artUrl = albums.first['strAlbumThumb'] as String?;
+        }
       }
 
-      final artUrl = albums.first['strAlbumThumb'] as String?;
       if (artUrl == null || artUrl.isEmpty) {
-        return Failure(Exception("No artwork image found for this album."));
+        // Fix: reqesting the artwork from apple if audiodb comes up emty
+        artUrl = await _fetchItunesArtworkFallback(song.title, artistName);
+      }
+
+      if (artUrl == null || artUrl.isEmpty) {
+        return Failure(Exception("No artwork image found for this track."));
       }
 
       final response = await _httpClient.get(Uri.parse(artUrl));
@@ -203,7 +249,6 @@ class SongRepository {
     try {
       await AudioTags.write(oldSong.path, tag);
     } catch (e) { 
-      // stderr.writeln(e); // Optional: you can comment this out to keep test logs clean
       return Failure(Exception("Failed to edit song tags."));
     }
 
@@ -246,7 +291,7 @@ class SongRepository {
         updatedCount++;
       }
       
-      await Future.delayed(const Duration(milliseconds: 10)); // Minimized for testing speed
+      await Future.delayed(const Duration(milliseconds: 10)); 
     }
 
     return updatedCount;
@@ -260,40 +305,47 @@ class SongRepository {
     }
 
     try {
-      final searchResult = await _audioDbService.searchTrack(currentSong.title, artistName);
-      if (searchResult.isError()) return Failure(searchResult.exceptionOrNull()!);
-
-      final data = searchResult.getOrThrow();
-      final tracks = data['track'] as List?;
-
-      if (tracks == null || tracks.isEmpty) {
-        return Failure(Exception("No matching track found on TheAudioDB."));
-      }
-
-      final match = tracks.first;
-      final newTitle = match['strTrack'] as String? ?? currentSong.title;
-      final newArtist = match['strArtist'] as String? ?? artistName;
-      final newAlbum = match['strAlbum'] as String? ?? currentSong.album;
-      final newGenre = match['strGenre'] as String?;
-
+      String newTitle = currentSong.title;
+      String newArtist = artistName;
+      String newAlbum = currentSong.album;
+      String? newGenre;
       Uint8List? pictureBytes;
       String? artUrl;
-      
-      final albumIdStr = match['idAlbum'] as String?;
-      
-      if (albumIdStr != null && albumIdStr.isNotEmpty) {
-        final albumResult = await _audioDbService.searchAlbum(newAlbum, newArtist);
-        if (albumResult.isSuccess()) {
-           final albumData = albumResult.getOrThrow();
-           final albums = albumData['album'] as List?;
-           if (albums != null && albums.isNotEmpty) {
-             final targetAlbum = albums.firstWhere(
-                (a) => a['idAlbum'] == albumIdStr, 
-                orElse: () => albums.first
-             );
-             artUrl = targetAlbum['strAlbumThumb'] as String?;
-           }
+
+      final searchResult = await _audioDbService.searchTrack(currentSong.title, artistName);
+      if (searchResult.isSuccess()) {
+        final data = searchResult.getOrThrow();
+        final tracks = data['track'] as List?;
+
+        if (tracks != null && tracks.isNotEmpty) {
+          final match = tracks.first;
+          newTitle = match['strTrack'] as String? ?? currentSong.title;
+          newArtist = match['strArtist'] as String? ?? artistName;
+          newAlbum = match['strAlbum'] as String? ?? currentSong.album;
+          newGenre = match['strGenre'] as String?;
+          
+          final albumIdStr = match['idAlbum'] as String?;
+          
+          if (albumIdStr != null && albumIdStr.isNotEmpty) {
+            final albumResult = await _audioDbService.searchAlbum(newAlbum, newArtist);
+            if (albumResult.isSuccess()) {
+               final albumData = albumResult.getOrThrow();
+               final albums = albumData['album'] as List?;
+               if (albums != null && albums.isNotEmpty) {
+                 final targetAlbum = albums.firstWhere(
+                    (a) => a['idAlbum'] == albumIdStr, 
+                    orElse: () => albums.first
+                 );
+                 artUrl = targetAlbum['strAlbumThumb'] as String?;
+               }
+            }
+          }
         }
+      }
+
+      if (artUrl == null || artUrl.isEmpty) {
+        // Fix: dont abbort if audiodb is empty, continue directly to ituness
+        artUrl = await _fetchItunesArtworkFallback(newTitle, newArtist);
       }
 
       if (artUrl != null && artUrl.isNotEmpty) {

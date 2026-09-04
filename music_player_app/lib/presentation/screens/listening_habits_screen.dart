@@ -30,7 +30,6 @@ class _ListeningHabitsScreenState extends State<ListeningHabitsScreen> {
     final db = _databaseService;
     if (!db.isOpen()) await db.open();
 
-    // 1. Fetch Heatmap Grid Data
     final heatmapResult = await db.getHeatmapData();
     if (heatmapResult.isSuccess()) {
       final data = heatmapResult.getOrThrow();
@@ -42,7 +41,6 @@ class _ListeningHabitsScreenState extends State<ListeningHabitsScreen> {
       }
     }
 
-    // 2. Fetch Peak Time & Top Day
     final habitsResult = await db.getListeningHabits();
     if (habitsResult.isSuccess()) {
       final data = habitsResult.getOrThrow();
@@ -53,7 +51,6 @@ class _ListeningHabitsScreenState extends State<ListeningHabitsScreen> {
       _peakTime = 'Not enough data';
     }
 
-    // 3. Fetch Lifetime Total Time
     final timeResult = await db.getValue('total_time_listened');
     if (timeResult.isSuccess()) {
       final seconds = int.tryParse(timeResult.getOrThrow()) ?? 0;
@@ -98,10 +95,111 @@ class _ListeningHabitsScreenState extends State<ListeningHabitsScreen> {
   @override
   Widget build(BuildContext context) {
     final List<String> dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-    
-    // --- FIX: Detect screen orientation ---
     final isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
-    
+
+    // Fix: creatd a separete widget for the heatmap to easily arange it later
+    final heatmapWidget = ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 650),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 24), 
+                    ...List.generate(24, (hour) {
+                      final bool showLabel = hour % 4 == 0;
+                      final String label = hour == 0 ? '12 AM' : (hour < 12 ? '$hour AM' : (hour == 12 ? '12 PM' : '${hour - 12} PM'));
+                      
+                      return Container(
+                        height: 20,
+                        margin: const EdgeInsets.only(bottom: 4.0),
+                        alignment: Alignment.centerRight,
+                        width: 45,
+                        child: Text(
+                          showLabel ? label : '',
+                          style: const TextStyle(fontSize: 10, color: Colors.white60),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+                const SizedBox(width: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: List.generate(7, (dayIndex) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                      child: Column(
+                        children: [
+                          Container(
+                            height: 20,
+                            alignment: Alignment.center,
+                            child: Text(
+                              dayLabels[dayIndex], 
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          ...List.generate(24, (hourIndex) {
+                            final count = _heatmapData['$dayIndex-$hourIndex'] ?? 0;
+                            
+                            double intensity = (count * 3.5) / 60.0;
+                            intensity = intensity.clamp(0.0, 1.0);
+                            
+                            if (count > 0 && intensity < 0.2) intensity = 0.2;
+
+                            return Container(
+                              height: 20,
+                              width: 22,
+                              margin: const EdgeInsets.only(bottom: 4.0),
+                              decoration: BoxDecoration(
+                                color: count == 0 
+                                    ? const Color(0xFF1F2E54) 
+                                    : Theme.of(context).primaryColor.withOpacity(intensity),
+                                borderRadius: BorderRadius.circular(4.0),
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
+                    );
+                  }),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // Fix: separete sumary widget to drop it on the right side on landscape
+    final summaryWidget = ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 650),
+      child: Column(
+        crossAxisAlignment: isPortrait ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+        children: [
+          const Text('Summary', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 16.0,
+            runSpacing: 16.0,
+            alignment: isPortrait ? WrapAlignment.center : WrapAlignment.start,
+            children: [
+              _buildStatCard(context, 'Peak Time', _peakTime, Icons.access_time),
+              _buildStatCard(context, 'Top Day', _topDay, Icons.calendar_today),
+              _buildStatCard(context, 'Lifetime', _formattedTime, Icons.timer),
+            ],
+          ),
+        ],
+      ),
+    );
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Listening Habits'),
@@ -109,126 +207,29 @@ class _ListeningHabitsScreenState extends State<ListeningHabitsScreen> {
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator())
         : Align(
-            // --- FIX: Center in portrait, top-left in landscape ---
-            alignment: isPortrait ? Alignment.topCenter : Alignment.topLeft,
+            alignment: Alignment.topCenter,
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
-              child: Column(
-                // --- FIX: Align children dynamically ---
-                crossAxisAlignment: isPortrait ? CrossAxisAlignment.center : CrossAxisAlignment.start,
-                children: [
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 650),
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Y-Axis: Hours
-                              Column(
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                children: [
-                                  const SizedBox(height: 24), 
-                                  ...List.generate(24, (hour) {
-                                    final bool showLabel = hour % 4 == 0;
-                                    final String label = hour == 0 ? '12 AM' : (hour < 12 ? '$hour AM' : (hour == 12 ? '12 PM' : '${hour - 12} PM'));
-                                    
-                                    return Container(
-                                      height: 20,
-                                      margin: const EdgeInsets.only(bottom: 4.0),
-                                      alignment: Alignment.centerRight,
-                                      width: 45,
-                                      child: Text(
-                                        showLabel ? label : '',
-                                        style: const TextStyle(fontSize: 10, color: Colors.white60),
-                                      ),
-                                    );
-                                  }),
-                                ],
-                              ),
-                              const SizedBox(width: 12),
-                              
-                              // X-Axis & Grid: Days and Heatmap Cells
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                children: List.generate(7, (dayIndex) {
-                                  return Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                                    child: Column(
-                                      children: [
-                                        Container(
-                                          height: 20,
-                                          alignment: Alignment.center,
-                                          child: Text(
-                                            dayLabels[dayIndex], 
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        
-                                        ...List.generate(24, (hourIndex) {
-                                          final count = _heatmapData['$dayIndex-$hourIndex'] ?? 0;
-                                          
-                                          double intensity = (count * 3.5) / 60.0;
-                                          intensity = intensity.clamp(0.0, 1.0);
-                                          
-                                          if (count > 0 && intensity < 0.2) intensity = 0.2;
-
-                                          return Container(
-                                            height: 20,
-                                            width: 22,
-                                            margin: const EdgeInsets.only(bottom: 4.0),
-                                            decoration: BoxDecoration(
-                                              color: count == 0 
-                                                  ? const Color(0xFF1F2E54) 
-                                                  : Theme.of(context).primaryColor.withOpacity(intensity),
-                                              borderRadius: BorderRadius.circular(4.0),
-                                            ),
-                                          );
-                                        }),
-                                      ],
-                                    ),
-                                  );
-                                }),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 30),
-                  
-                  // Summary Statistics Section
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 650),
-                    child: Column(
-                      // --- FIX: Align summary text dynamically ---
-                      crossAxisAlignment: isPortrait ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+              // Fix: swap betwen colum and row based on screen ortientation to fill empty space
+              child: isPortrait
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        const Text('Summary', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 16.0,
-                          runSpacing: 16.0,
-                          // --- FIX: Center the wrapped cards in portrait mode ---
-                          alignment: isPortrait ? WrapAlignment.center : WrapAlignment.start,
-                          children: [
-                            _buildStatCard(context, 'Peak Time', _peakTime, Icons.access_time),
-                            _buildStatCard(context, 'Top Day', _topDay, Icons.calendar_today),
-                            _buildStatCard(context, 'Lifetime', _formattedTime, Icons.timer),
-                          ],
-                        ),
+                        heatmapWidget,
+                        const SizedBox(height: 30),
+                        summaryWidget,
+                        const SizedBox(height: 40),
+                      ],
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Expanded(flex: 5, child: heatmapWidget),
+                        const SizedBox(width: 32),
+                        Expanded(flex: 4, child: summaryWidget),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 40), 
-                ],
-              ),
             ),
           ),
     );

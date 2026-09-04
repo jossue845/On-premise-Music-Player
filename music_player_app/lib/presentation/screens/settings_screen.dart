@@ -273,22 +273,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   trailing: const Icon(Icons.folder),
                 ),
               ),
-          
-              Padding(
-                padding: const EdgeInsets.only(left: 25.0, top: 25),
-                child: ListTile(
-                  title: const Text('Fetch Missing Album Art'),
-                  subtitle: const Text('Searches audioDB & Cover Art Archive'),
-                  onTap: _isFetchingArt ? null : _scanForMissingArtwork,
-                  trailing: _isFetchingArt 
-                      ? const SizedBox(
-                          width: 24, 
-                          height: 24, 
-                          child: CircularProgressIndicator(strokeWidth: 2)
-                        ) 
-                      : const Icon(Icons.image_search),
-                ),
-              ),
+        
 
               Padding(
                 padding: const EdgeInsets.only(left: 25.0, top: 25),

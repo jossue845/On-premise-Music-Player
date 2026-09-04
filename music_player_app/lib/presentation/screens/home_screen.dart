@@ -18,10 +18,10 @@ import 'package:music_player_app/presentation/screens/salbum_screen.dart';
 class HomeDashboard extends ConsumerStatefulWidget {
   final DatabaseService? testDatabaseService;
   final SongRepository? testSongRepository;
-  
+
   const HomeDashboard({
-    super.key, 
-    this.testDatabaseService, 
+    super.key,
+    this.testDatabaseService,
     this.testSongRepository
   });
 
@@ -32,11 +32,11 @@ class HomeDashboard extends ConsumerStatefulWidget {
 class _HomeDashboardState extends ConsumerState<HomeDashboard> {
   late DatabaseService _databaseService;
   late SongRepository _songRepository;
-  List<Song> _allSongs = []; 
+  List<Song> _allSongs = [];
   bool _isLoading = false;
 
   bool _isPlaying = false;
-  
+
   int _secondsListened = 0;
   int _favoritesCount = 0;
   int _playlistCount = 0;
@@ -59,7 +59,7 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
     _initializeServices();
     _loadSongs();
     _loadPlaylists();
-    _loadTotalTime(); 
+    _loadTotalTime();
     _loadListeningHabits();
     _setupAudioStreams();
   }
@@ -86,6 +86,9 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
 
   Future<void> _loadListeningHabits() async {
     try {
+      if (!_databaseService.isOpen()) {
+        await _databaseService.open();
+      }
       final result = await _databaseService.getListeningHabits();
       if (result.isSuccess()) {
         final data = result.getOrThrow();
@@ -118,6 +121,9 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
   Future<void> _loadSongs() async {
     setState(() => _isLoading = true);
     try {
+      if (!_databaseService.isOpen()) {
+        await _databaseService.open();
+      }
       final result = await _songRepository.getSongs();
       if (result.isSuccess()) {
         final songs = result.getOrThrow();
@@ -145,7 +151,7 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
           _isPlaying = state.playing;
           _isPlaying ? _startTimer() : _stopTimer();
         });
-        if (state.processingState == ProcessingState.completed) _loadSongs(); 
+        if (state.processingState == ProcessingState.completed) _loadSongs();
       }
     });
 
@@ -183,11 +189,11 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
         artistsData[artist] = {'name': artist, 'plays': 0, 'image': song.imagePath};
       }
       artistsData[artist]!['plays'] += song.playCount;
-      artistsData[artist]!['image'] ??= song.imagePath; 
+      artistsData[artist]!['image'] ??= song.imagePath;
     }
-    
+
     final sorted = artistsData.values.toList()..sort((a, b) => (b['plays'] as int).compareTo(a['plays'] as int));
-    return sorted.where((a) => (a['plays'] as int) > 0).toList();
+    return sorted.toList();
   }
 
   List<Map<String, dynamic>> get _topAlbums {
@@ -202,9 +208,9 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
       albumsData[album]!['plays'] += song.playCount;
       albumsData[album]!['image'] ??= song.imagePath;
     }
-    
+
     final sorted = albumsData.values.toList()..sort((a, b) => (b['plays'] as int).compareTo(a['plays'] as int));
-    return sorted.where((a) => (a['plays'] as int) > 0).toList();
+    return sorted.toList();
   }
 
   String get _formattedTime {
@@ -217,7 +223,7 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
   @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom + 100.0;
-    
+
     final bool isTablet = MediaQuery.of(context).size.width >= 600;
 
     final statCards = [
@@ -233,8 +239,8 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
         slivers: [
           const SliverAppBar(
             backgroundColor: Colors.transparent,
-            floating: true, 
-            snap: true, 
+            floating: true,
+            snap: true,
             elevation: 0,
             toolbarHeight: 10,
           ),
@@ -242,10 +248,10 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
             padding: EdgeInsets.only(bottom: bottomPadding, left: 16.0, right: 16.0, top: 8.0),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                
+
                 const Text('Quick Stats', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
-                isTablet 
+                isTablet
                   ? Wrap(
                       spacing: 16.0,
                       runSpacing: 16.0,
@@ -253,7 +259,7 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                     )
                   : SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
-                      clipBehavior: Clip.none, 
+                      clipBehavior: Clip.none,
                       child: Row(
                         children: statCards.map((card) => Padding(
                           padding: const EdgeInsets.only(right: 16.0),
@@ -268,7 +274,8 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                 Builder(
                   builder: (context) {
                     final topPlayedSongs = List<Song>.from(_allSongs)..sort((a, b) => b.playCount.compareTo(a.playCount));
-                    final activeTopSongs = topPlayedSongs.where((s) => s.playCount > 0).toList();
+                    // Fix: onyl grabing 8 items for the traks so it doesnt cluter
+                    final activeTopSongs = topPlayedSongs.take(8).toList();
                     return _buildResponsiveScroller(
                       isTablet: isTablet,
                       items: activeTopSongs,
@@ -282,7 +289,6 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                           imagePath: song.imagePath,
                           isRound: false,
                           onTap: () async {
-                            // --- FIX: Play song directly without pushing an overlay ---
                             final audioPlayer = ref.read(audioPlayerProvider);
                             final audioSources = activeTopSongs.map((s) => AudioSource.uri(
                               Uri.file(s.path),
@@ -294,9 +300,9 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                                 artUri: s.imagePath != null ? Uri.file(s.imagePath!) : null,
                               ),
                             )).toList();
-                            
+
                             await audioPlayer.setAudioSource(
-                              ConcatenatingAudioSource(children: audioSources), 
+                              ConcatenatingAudioSource(children: audioSources),
                               initialIndex: index
                             );
                             await audioPlayer.play();
@@ -312,7 +318,8 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                 const SizedBox(height: 10),
                 Builder(
                   builder: (context) {
-                    final topArtists = _topArtists;
+                    // Fix: limitting artist list to 8
+                    final topArtists = _topArtists.take(8).toList();
                     return _buildResponsiveScroller(
                       isTablet: isTablet,
                       items: topArtists,
@@ -324,7 +331,7 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                           title: artist['name'],
                           subtitle: '${artist['plays']} plays',
                           imagePath: artist['image'],
-                          isRound: true, 
+                          isRound: true,
                           onTap: () {
                             Navigator.push(
                               context,
@@ -335,7 +342,7 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                                 ),
                               ),
                             );
-                          }, 
+                          },
                         );
                       }
                     );
@@ -347,7 +354,8 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                 const SizedBox(height: 10),
                 Builder(
                   builder: (context) {
-                    final topAlbums = _topAlbums;
+                    // Fix: cut down to 8 max albums here to
+                    final topAlbums = _topAlbums.take(8).toList();
                     return _buildResponsiveScroller(
                       isTablet: isTablet,
                       items: topAlbums,
@@ -370,7 +378,7 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                                 ),
                               ),
                             );
-                          }, 
+                          },
                         );
                       }
                     );
@@ -381,12 +389,12 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                 const Text('Listening Habits', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
                 Align(
-                  alignment: Alignment.centerLeft, 
+                  alignment: Alignment.centerLeft,
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 500), 
+                    constraints: const BoxConstraints(maxWidth: 500),
                     child: Card(
                       child: InkWell(
-                        borderRadius: BorderRadius.circular(16), 
+                        borderRadius: BorderRadius.circular(16),
                         onTap: () {
                           Navigator.push(
                             context,
@@ -409,7 +417,7 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                                   const Text('Peak Time: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                                   Expanded(
                                     child: Text(
-                                      _peakTime, 
+                                      _peakTime,
                                       style: const TextStyle(fontSize: 16),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -425,7 +433,7 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
                                   const Text('Top Day: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                                   Expanded(
                                     child: Text(
-                                      _topDay, 
+                                      _topDay,
                                       style: const TextStyle(fontSize: 16),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -466,8 +474,8 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
 
   Widget _buildSquareCard(BuildContext context, {required String title, required String subtitle, String? imagePath, required bool isRound, required VoidCallback onTap}) {
     return Card(
-      margin: EdgeInsets.zero, 
-      clipBehavior: Clip.antiAlias, 
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(isRound ? 16 : 8)),
       child: InkWell(
         onTap: onTap,
@@ -522,17 +530,19 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
         spacing: 16.0,
         runSpacing: 16.0,
         children: List.generate(
-          items.length.clamp(0, 10), 
+          // Fix: cap at 8 insted of 10
+          items.length.clamp(0, 8),
           (index) => itemBuilder(context, index)
         ),
       );
     }
 
     return SizedBox(
-      height: 140, 
+      height: 140,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: items.length.clamp(0, 10),
+        // Fix: cap at 8 insted of 10 here to
+        itemCount: items.length.clamp(0, 8),
         separatorBuilder: (context, index) => const SizedBox(width: 12),
         itemBuilder: itemBuilder,
       ),
@@ -543,7 +553,7 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 140, maxWidth: 200),
       child: Card(
-        margin: EdgeInsets.zero, 
+        margin: EdgeInsets.zero,
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -551,7 +561,7 @@ class _HomeDashboardState extends ConsumerState<HomeDashboard> {
               Icon(icon, color: Theme.of(context).primaryColor),
               const SizedBox(height: 8),
               Text(
-                value, 
+                value,
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
