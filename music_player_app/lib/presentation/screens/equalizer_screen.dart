@@ -112,8 +112,7 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
 
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true, 
-      backgroundColor: Colors.blueGrey.shade900,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20))
       ),
@@ -128,7 +127,7 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Equalizer Presets', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                  const Text('Equalizer Presets', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 20),
                   
                   Row(
@@ -136,7 +135,6 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
                       Expanded(
                         child: TextField(
                           controller: presetNameController,
-                          style: const TextStyle(color: Colors.white),
                           decoration: InputDecoration(
                             hintText: 'New preset name...',
                             hintStyle: TextStyle(color: Colors.grey.shade500),
@@ -191,12 +189,8 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
                                 context: context,
                                 builder: (dialogContext) {
                                   return AlertDialog(
-                                    backgroundColor: Colors.blueGrey.shade800,
-                                    title: const Text('Duplicate Preset', style: TextStyle(color: Colors.white)),
-                                    content: Text(
-                                      duplicateMessage,
-                                      style: TextStyle(color: Colors.grey.shade300),
-                                    ),
+                                    title: const Text('Duplicate Preset'),
+                                    content: Text(duplicateMessage),
                                     actions: [
                                       TextButton(
                                         onPressed: () => Navigator.pop(dialogContext),
@@ -241,7 +235,7 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
                         itemBuilder: (context, index) {
                           final preset = _presets[index];
                           return ListTile(
-                            title: Text(preset['name'], style: const TextStyle(color: Colors.white)),
+                            title: Text(preset['name']),
                             onTap: () {
                               _applyPreset(preset);
                               Navigator.pop(context);
@@ -278,15 +272,14 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.blueGrey.shade900, 
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Audio Effects', style: TextStyle(color: Colors.white)),
+        title: const Text('Audio Effects'),
       ),
       body: SafeArea(
         child: Padding(
@@ -316,8 +309,7 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
                   OutlinedButton(
                     onPressed: _resetCurrentEffect,
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white54)
+                      foregroundColor: Theme.of(context).primaryColor,
                     ),
                     child: const Text('Reset Current'),
                   ),
@@ -326,10 +318,6 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
                     ElevatedButton.icon(
                       onPressed: _showPresetsSheet,
                       icon: const Icon(Icons.list, size: 18),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueGrey.shade700,
-                        foregroundColor: Colors.white,
-                      ),
                       label: const Text('Presets'),
                     ),
                 ],
@@ -365,7 +353,7 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
           
           Container(
             width: 1, 
-            color: Colors.grey.shade700, 
+            color: Theme.of(context).dividerColor, 
             margin: const EdgeInsets.symmetric(horizontal: 10)
           ),
           
@@ -397,14 +385,14 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
         children: [
           const Icon(Icons.speed, size: 80, color: Colors.blueAccent),
           const SizedBox(height: 30),
-          Text('Pitch: ${_pitchValue.toStringAsFixed(2)}x', style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+          Text('Pitch: ${_pitchValue.toStringAsFixed(2)}x', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
           const SizedBox(height: 20),
           Slider(
             min: 0.5,
             max: 2.0, 
             value: _pitchValue,
             activeColor: Colors.blueAccent,
-            inactiveColor: Colors.grey.shade800,
+            inactiveColor: Theme.of(context).disabledColor,
             onChanged: (val) {
               setState(() => _pitchValue = val);
               ref.read(audioPlayerProvider).setPitch(val); 
@@ -441,7 +429,10 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
               size: 18,
             ),
             const SizedBox(width: 6),
-            Text(title, style: TextStyle(color: isActive ? Colors.white : Colors.grey, fontSize: 16)),
+            Text(title, style: TextStyle(
+              color: isActive ? Theme.of(context).textTheme.bodyLarge?.color : Colors.grey, 
+              fontSize: 16
+            )),
           ],
         ),
       ),
@@ -471,8 +462,7 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
               max: max,
               value: value.clamp(min, max),
               activeColor: activeColor,
-              inactiveColor: Colors.grey.shade800,
-              thumbColor: Colors.white,
+              inactiveColor: Theme.of(context).disabledColor,
               onChanged: onChanged,
             ),
           ),
@@ -481,7 +471,7 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
         const SizedBox(height: 8),
         Text(bottomLabel, style: TextStyle(color: Colors.grey.shade500, fontSize: 10)),
         const SizedBox(height: 12),
-        Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+        Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
       ],
     );
   }

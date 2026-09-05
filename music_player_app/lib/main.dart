@@ -21,14 +21,14 @@ Future<void> main() async {
 
     FlutterError.onError = (details) {
       FlutterError.presentError(details);
-      debugPrint('🔴 FLUTTER ERROR: ${details.exception}');
-      debugPrint('🔴 STACK: ${details.stack}');
+      debugPrint('FLUTTER ERROR: ${details.exception}');
+      debugPrint('STACK: ${details.stack}');
     };
 
     // Also catches errors the framework itself reports via the platform channel
     PlatformDispatcher.instance.onError = (error, stack) {
-      debugPrint('🔴 PLATFORM DISPATCHER ERROR: $error');
-      debugPrint('🔴 STACK: $stack');
+      debugPrint('PLATFORM DISPATCHER ERROR: $error');
+      debugPrint('STACK: $stack');
       return true;
     };
  
@@ -39,8 +39,8 @@ Future<void> main() async {
       ),
     );
   }, (error, stack) {
-    debugPrint('🔴 ZONE UNCAUGHT ERROR: $error');
-    debugPrint('🔴 STACK: $stack');
+    debugPrint('ZONE UNCAUGHT ERROR: $error');
+    debugPrint('STACK: $stack');
   });
 }
 

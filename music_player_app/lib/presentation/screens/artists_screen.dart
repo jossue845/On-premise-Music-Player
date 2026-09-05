@@ -6,7 +6,7 @@ import 'package:music_player_app/presentation/screens/sartist_screen.dart';
 import 'package:sqflite/sqflite.dart';
 
 class ArtistsScreen extends StatefulWidget {
-  // --- FIX: Add dependency injection ---
+  // Fix: Add dependency injection to facilitate widget testing
   final SongRepository? testSongRepository;
 
   const ArtistsScreen({super.key, this.testSongRepository});
@@ -28,10 +28,11 @@ class _ArtistsScreenState extends State<ArtistsScreen> {
     _loadArtists();
   }
 
+  // Scans the local database for all available artists and extracts their associated cover art
   Future<void> _loadArtists() async {
     setState(() => _isLoading = true);
     
-    // --- FIX: Use the injected repository if available ---
+    // Fix: Use the injected repository if available
     if (widget.testSongRepository != null) {
       _songRepository = widget.testSongRepository!;
     } else {
@@ -41,20 +42,36 @@ class _ArtistsScreenState extends State<ArtistsScreen> {
 
     try {
       final result = await _songRepository.getSongs();
-      if (result.isSuccess()) {
+      
+      if (result.isSuccess() == true) {
         final songs = result.getOrThrow();
         
         final Set<String> artistSet = {};
         final Map<String, String?> imageMap = {};
 
-        for (final song in songs) {
-          final artists = song.artists.isNotEmpty ? song.artists : ['Unknown Artist'];
+        for (int i = 0; i < songs.length; i++) {
+          var song = songs[i];
+          List<String> artists = [];
           
-          for (final artist in artists) {
+          if (song.artists.isNotEmpty == true) {
+            artists = song.artists;
+          } else {
+            artists = ['Unknown Artist'];
+          }
+          
+          for (int j = 0; j < artists.length; j++) {
+            String artist = artists[j];
             artistSet.add(artist);
             
-            if (song.imagePath != null && !imageMap.containsKey(artist)) {
-              imageMap[artist] = song.imagePath;
+            bool hasImage = false;
+            if (song.imagePath != null) {
+              hasImage = true;
+            }
+            
+            if (hasImage == true) {
+              if (imageMap.containsKey(artist) == false) {
+                imageMap[artist] = song.imagePath;
+              }
             }
           }
         }
@@ -65,11 +82,15 @@ class _ArtistsScreenState extends State<ArtistsScreen> {
           _isLoading = false;
         });
       } else {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+        });
       }
     } catch (e) {
-      debugPrint("Error loading artists: $e");
-      setState(() => _isLoading = false);
+      debugPrint("Error loading artists: " + e.toString());
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -110,7 +131,7 @@ class _ArtistsScreenState extends State<ArtistsScreen> {
                                 MaterialPageRoute(
                                   builder: (context) => ArtistDetailScreen(
                                     artistName: artistName,
-                                    // --- FIX: Pass the test repository down the navigation chain ---
+                                    // Fix: Pass the test repository down the navigation chain
                                     testSongRepository: _songRepository,
                                   ),
                                 ),

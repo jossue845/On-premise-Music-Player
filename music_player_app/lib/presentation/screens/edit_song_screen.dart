@@ -7,7 +7,7 @@ import 'package:music_player_app/data/services/audiodb_service.dart';
 
 class EditSongScreen extends StatefulWidget {
   final Song song;
-  // --- FIX: Add injected dependencies for testing ---
+  // Fix: Add injected dependencies for testing
   final SongRepository? testSongRepository;
   final AudioDbService? testAudioDbService;
 
@@ -40,15 +40,19 @@ class _EditSongScreenState extends State<EditSongScreen> {
     super.initState();
     _currentSong = widget.song;
     _titleController = TextEditingController(text: _currentSong.title);
-    _artistController = TextEditingController(
-      text: _currentSong.artists.isNotEmpty ? _currentSong.artists.join('; ') : '',
-    );
+    
+    String artistText = '';
+    if (_currentSong.artists.isNotEmpty == true) {
+      artistText = _currentSong.artists.join('; ');
+    }
+    _artistController = TextEditingController(text: artistText);
+    
     _albumController = TextEditingController(text: _currentSong.album);
     _genreController = TextEditingController(text: _currentSong.genre ?? '');
     _yearController = TextEditingController(text: _currentSong.year?.toString() ?? '');
     _trackNumberController = TextEditingController(text: _currentSong.trackNumber?.toString() ?? '');
 
-    // --- FIX: Use injected repository if available ---
+    // Fix: Use injected repository if available
     if (widget.testSongRepository != null) {
       _songRepository = widget.testSongRepository!;
     } else {
@@ -68,6 +72,7 @@ class _EditSongScreenState extends State<EditSongScreen> {
     super.dispose();
   }
 
+  // Fetches metadata from TheAudioDB and auto-fills the text fields
   Future<void> _autoFixMetadata() async {
     setState(() => _isSearching = true);
 
@@ -83,10 +88,10 @@ class _EditSongScreenState extends State<EditSongScreen> {
     if (!mounted) return;
     setState(() => _isSearching = false);
 
-    // --- FIX: Instantly hide the "Searching..." SnackBar so the result can show ---
+    // Fix: Instantly hide the "Searching..." SnackBar so the result can show
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
-    if (searchResult.isSuccess()) {
+    if (searchResult.isSuccess() == true) {
       final data = searchResult.getOrThrow();
       final tracks = data['track'] as List?;
 
@@ -124,14 +129,19 @@ class _EditSongScreenState extends State<EditSongScreen> {
     }
   }
 
+  // Parses user input and saves the updated ID3 tags to the file and database
   Future<void> _saveChanges() async {
     setState(() => _isLoading = true);
 
-    final newArtists = _artistController.text
-        .split(';')
-        .map((a) => a.trim())
-        .where((a) => a.isNotEmpty)
-        .toList();
+    List<String> rawArtists = _artistController.text.split(';');
+    List<String> newArtists = [];
+    
+    for (int i = 0; i < rawArtists.length; i++) {
+      String trimmed = rawArtists[i].trim();
+      if (trimmed != '') {
+        newArtists.add(trimmed);
+      }
+    }
 
     final result = await _songRepository.editTags(
       oldSong: _currentSong,
@@ -147,7 +157,7 @@ class _EditSongScreenState extends State<EditSongScreen> {
     if (mounted) {
       setState(() => _isLoading = false);
 
-      if (result.isSuccess()) {
+      if (result.isSuccess() == true) {
         Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(

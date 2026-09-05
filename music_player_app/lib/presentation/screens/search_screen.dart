@@ -18,7 +18,7 @@ import 'package:music_player_app/presentation/screens/salbum_screen.dart';
 import 'package:music_player_app/presentation/screens/playlistdetail_screen.dart'; 
 
 class SearchScreen extends StatefulWidget {
-  // --- FIX: Expand dependencies to pass down to child screens ---
+  // Fix: Expand dependencies to pass down to child screens
   final DatabaseService? testDatabaseService;
   final SongRepository? testSongRepository;
   final PlaylistRepository? testPlaylistRepository;
@@ -48,6 +48,7 @@ class _SearchScreenState extends State<SearchScreen> {
   List<Album> _albumResults = [];
   List<Playlist> _playlistResults = [];
 
+  // Executes the search query across all local database tables
   Future<void> _performSearch() async {
     final query = _searchController.text.trim().toLowerCase();
     
@@ -77,32 +78,35 @@ class _SearchScreenState extends State<SearchScreen> {
 
     if (!mounted) return;
 
+    List<Song> tempSongs = [];
+    if (songsResult.isSuccess() == true) {
+      final allSongs = songsResult.getOrThrow();
+      for (int i = 0; i < allSongs.length; i++) {
+        var s = allSongs[i];
+        bool matchesTitle = s.title.toLowerCase().contains(query);
+        bool matchesArtist = false;
+        
+        if (s.artists.isNotEmpty == true) {
+          if (s.artists.first.toLowerCase().contains(query) == true) {
+            matchesArtist = true;
+          }
+        }
+        
+        if (matchesTitle == true || matchesArtist == true) {
+          tempSongs.add(s);
+        }
+      }
+    }
+
+    final tempArtists = artistsResult.isSuccess() ? artistsResult.getOrThrow().where((a) => a.name.toLowerCase().contains(query)).toList() : <Artist>[];
+    final tempAlbums = albumsResult.isSuccess() ? albumsResult.getOrThrow().where((a) => a.title.toLowerCase().contains(query)).toList() : <Album>[];
+    final tempPlaylists = playlistsResult.isSuccess() ? playlistsResult.getOrThrow().where((p) => p.title.toLowerCase().contains(query)).toList() : <Playlist>[];
+
     setState(() {
-      if (songsResult.isSuccess()) {
-        _songResults = songsResult.getOrThrow()
-            .where((s) => s.title.toLowerCase().contains(query) || 
-                         (s.artists.isNotEmpty && s.artists.first.toLowerCase().contains(query)))
-            .toList();
-      }
-      
-      if (artistsResult.isSuccess()) {
-        _artistResults = artistsResult.getOrThrow()
-            .where((a) => a.name.toLowerCase().contains(query))
-            .toList();
-      }
-
-      if (albumsResult.isSuccess()) {
-        _albumResults = albumsResult.getOrThrow()
-            .where((a) => a.title.toLowerCase().contains(query))
-            .toList();
-      }
-
-      if (playlistsResult.isSuccess()) {
-        _playlistResults = playlistsResult.getOrThrow()
-            .where((p) => p.title.toLowerCase().contains(query))
-            .toList();
-      }
-
+      _songResults = tempSongs;
+      _artistResults = tempArtists;
+      _albumResults = tempAlbums;
+      _playlistResults = tempPlaylists;
       _isLoading = false;
     });
   }
@@ -111,6 +115,26 @@ class _SearchScreenState extends State<SearchScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  // Returns the appropriate icon widget based on whether the input string has data
+  Widget _buildArtwork(String? path, IconData fallbackIcon) {
+    Widget childWidget;
+    if (path != null) {
+      childWidget = Image.file(File(path), fit: BoxFit.cover);
+    } else {
+      childWidget = Icon(fallbackIcon);
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6.0),
+      child: Container(
+        width: 50,
+        height: 50,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        child: childWidget,
+      ),
+    );
   }
 
   @override
@@ -147,12 +171,10 @@ class _SearchScreenState extends State<SearchScreen> {
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: Colors.grey.withOpacity(0.1),
+                  fillColor: Theme.of(context).dividerColor.withOpacity(0.1),
                 ),
                 onSubmitted: (_) => _performSearch(),
-                onChanged: (_) {
-                  _performSearch(); 
-                },
+                onChanged: (_) => _performSearch(),
               ),
               const SizedBox(height: 20),
               
@@ -164,20 +186,14 @@ class _SearchScreenState extends State<SearchScreen> {
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
-                  children: _filters.map((filter) {
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8.0),
-                      child: ChoiceChip(
-                        label: Text(filter),
-                        selected: _selectedFilter == filter,
-                        onSelected: (bool selected) {
-                          setState(() {
-                            _selectedFilter = filter;
-                          });
-                        },
-                      ),
-                    );
-                  }).toList(),
+                  children: _filters.map((filter) => Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: ChoiceChip(
+                      label: Text(filter),
+                      selected: _selectedFilter == filter,
+                      onSelected: (bool selected) => setState(() => _selectedFilter = filter),
+                    ),
+                  )).toList(),
                 ),
               ),
               const SizedBox(height: 20),
@@ -186,9 +202,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 child: _isLoading 
                   ? const Center(child: CircularProgressIndicator())
                   : !_hasSearched
-                    ? const Center(
-                        child: Text("Enter a search term to find your music", style: TextStyle(color: Colors.grey, fontSize: 16))
-                      )
+                    ? Center(child: Text("Enter a search term to find your music", style: TextStyle(color: Theme.of(context).disabledColor, fontSize: 16)))
                     : _buildSearchResults(),
               ),
             ],
@@ -198,10 +212,11 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  // Renders the list of results broken down by category based on the active filter
   Widget _buildSearchResults() {
     if (_songResults.isEmpty && _artistResults.isEmpty && _albumResults.isEmpty && _playlistResults.isEmpty) {
       return Center(
-        child: Text("No results found for '${_searchController.text}'", style: const TextStyle(color: Colors.grey, fontSize: 16)),
+        child: Text("No results found for '${_searchController.text}'", style: TextStyle(color: Theme.of(context).disabledColor, fontSize: 16)),
       );
     }
 
@@ -215,16 +230,14 @@ class _SearchScreenState extends State<SearchScreen> {
               leading: _buildArtwork(song.imagePath, Icons.music_note),
               title: Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
               subtitle: Text(song.artists.isNotEmpty ? song.artists.first : 'Unknown Artist', maxLines: 1, overflow: TextOverflow.ellipsis),
-              onTap: () {
-                Navigator.push(context, MaterialPageRoute(
-                  builder: (context) => PlayerScreen(
-                    playlist: _songResults, 
-                    initialIndex: _songResults.indexOf(song),
-                    // --- FIX: Pass down the mock repository ---
-                    testSongRepository: widget.testSongRepository,
-                  ),
-                ));
-              },
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (context) => PlayerScreen(
+                  playlist: _songResults, 
+                  initialIndex: _songResults.indexOf(song),
+                  // Fix: Pass down the mock repository
+                  testSongRepository: widget.testSongRepository,
+                ),
+              )),
             )).toList(),
           ),
 
@@ -234,15 +247,13 @@ class _SearchScreenState extends State<SearchScreen> {
             items: _artistResults.map((artist) => ListTile(
               leading: const CircleAvatar(child: Icon(Icons.person)),
               title: Text(artist.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
-              onTap: () {
-                Navigator.push(context, MaterialPageRoute(
-                  builder: (context) => ArtistDetailScreen(
-                    artistName: artist.name,
-                    // --- FIX: Pass down the mock repository ---
-                    testSongRepository: widget.testSongRepository,
-                  ),
-                ));
-              },
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (context) => ArtistDetailScreen(
+                  artistName: artist.name,
+                  // Fix: Pass down the mock repository
+                  testSongRepository: widget.testSongRepository,
+                ),
+              )),
             )).toList(),
           ),
 
@@ -252,15 +263,13 @@ class _SearchScreenState extends State<SearchScreen> {
             items: _albumResults.map((album) => ListTile(
               leading: const Icon(Icons.album, size: 40), 
               title: Text(album.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
-              onTap: () {
-                Navigator.push(context, MaterialPageRoute(
-                  builder: (context) => AlbumDetailScreen(
-                    albumName: album.title,
-                    // --- FIX: Pass down the mock repository ---
-                    testSongRepository: widget.testSongRepository,
-                  ),
-                ));
-              },
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (context) => AlbumDetailScreen(
+                  albumName: album.title,
+                  // Fix: Pass down the mock repository
+                  testSongRepository: widget.testSongRepository,
+                ),
+              )),
             )).toList(),
           ),
 
@@ -270,19 +279,17 @@ class _SearchScreenState extends State<SearchScreen> {
             items: _playlistResults.map((playlist) => ListTile(
               leading: const Icon(Icons.queue_music, size: 40),
               title: Text(playlist.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
-              onTap: () {
-                Navigator.push(context, MaterialPageRoute(
-                  builder: (context) => PlaylistDetailScreen(
-                    playlistTitle: playlist.title, 
-                    initialIsPinned: false, 
-                    playlistId: playlist.id,
-                    // --- FIX: Pass down the mock repositories ---
-                    testDatabaseService: widget.testDatabaseService,
-                    testSongRepository: widget.testSongRepository,
-                    testPlaylistRepository: widget.testPlaylistRepository,
-                  ),
-                ));
-              },
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (context) => PlaylistDetailScreen(
+                  playlistTitle: playlist.title, 
+                  initialIsPinned: false, 
+                  playlistId: playlist.id,
+                  // Fix: Pass down the mock repositories
+                  testDatabaseService: widget.testDatabaseService,
+                  testSongRepository: widget.testSongRepository,
+                  testPlaylistRepository: widget.testPlaylistRepository,
+                ),
+              )),
             )).toList(),
           ),
       ],
@@ -295,25 +302,11 @@ class _SearchScreenState extends State<SearchScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-          child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
+          child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).disabledColor)),
         ),
         ...items,
         const SizedBox(height: 16),
       ],
-    );
-  }
-
-  Widget _buildArtwork(String? path, IconData fallbackIcon) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(6.0),
-      child: Container(
-        width: 50,
-        height: 50,
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        child: path != null
-            ? Image.file(File(path), fit: BoxFit.cover)
-            : Icon(fallbackIcon),
-      ),
     );
   }
 }

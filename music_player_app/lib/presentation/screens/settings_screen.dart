@@ -11,7 +11,6 @@ import 'package:sqflite/sqflite.dart';
 import 'package:music_player_app/data/providers/sync_provider.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
-  // --- FIX: Added dependencies for headless testing ---
   final DatabaseService? testDatabaseService;
   final FilesystemService? testFilesystemService;
   final MusicFolderRepository? testMusicFolderRepository;
@@ -45,7 +44,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    // --- FIX: Use injected dependencies if available ---
     _databaseService = widget.testDatabaseService ?? DatabaseService(databaseFactory: databaseFactory);
     _filesystemService = widget.testFilesystemService ?? FilesystemService();
     _musicFolderRepository = widget.testMusicFolderRepository ?? MusicFolderRepository(
@@ -55,72 +53,58 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _loadTiltSetting();
   }
 
+  // Loads the user preference for the tilt control feature
   Future _loadTiltSetting() async {
     final res = await _databaseService.getValue('tilt_enabled');
-    if (res.isSuccess() && mounted) {
-      setState(() => _tiltEnabled = res.getOrThrow() == 'true');
+    if (res.isSuccess() == true) {
+      if (mounted == true) {
+        String stringValue = res.getOrThrow();
+        if (stringValue == 'true') {
+          setState(() {
+            _tiltEnabled = true;
+          });
+        } else {
+          setState(() {
+            _tiltEnabled = false;
+          });
+        }
+      }
     }
   }
 
+  // Scans the local filesystem for new audio files
   Future _scanMusic() async {
-    setState(() {
-      _isScanning = true;
-      _scanStatus = 'Scanning for music...';
-    });
-
+    setState(() { _isScanning = true; _scanStatus = 'Scanning for music...'; });
     try {
       final result = await _musicFolderRepository.scanFolder();
+      final isSuccess = result.isSuccess();
+      final errMsg = result.exceptionOrNull()?.toString() ?? 'Unknown error';
       
-      if (result.isSuccess()) {
+      if (mounted) {
         setState(() {
           _isScanning = false;
-          _scanStatus = 'Scan completed successfully!';
+          _scanStatus = isSuccess ? 'Scan completed successfully!' : 'Error: $errMsg';
         });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Music scan completed!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } else {
-        final error = result.exceptionOrNull();
-        setState(() {
-          _isScanning = false;
-          _scanStatus = 'Error: ${error?.toString() ?? 'Unknown error'}';
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Scan failed: ${error?.toString() ?? 'Unknown error'}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(isSuccess ? 'Music scan completed!' : 'Scan failed: $errMsg'),
+          backgroundColor: isSuccess ? Colors.green : Colors.red,
+        ));
       }
     } catch (e) {
-      setState(() {
-        _isScanning = false;
-        _scanStatus = 'Error: $e';
-      });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Unexpected error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        setState(() { _isScanning = false; _scanStatus = 'Error: $e'; });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Unexpected error: $e'), backgroundColor: Colors.red));
       }
     }
   }
 
+  // Fix: Added explicit error handling and null checks for the set folder operation
   Future _setSongsFolder() async {
     try {
       final result = await _musicFolderRepository.setMusicFolder();
       
-      if (result.isSuccess()) {
-        if (mounted) {
+      if (result.isSuccess() == true) {
+        if (mounted == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Music folder set successfully!'),
@@ -130,20 +114,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         }
       } else {
         final error = result.exceptionOrNull();
-        if (mounted) {
+        String errorMessage = 'Unknown error';
+        if (error != null) {
+          errorMessage = error.toString();
+        }
+        
+        if (mounted == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error: ${error?.toString() ?? 'Unknown error'}'),
+              content: Text('Error: ' + errorMessage),
               backgroundColor: Colors.red,
             ),
           );
         }
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text('Error: ' + e.toString()),
             backgroundColor: Colors.red,
           ),
         );
@@ -151,27 +140,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  // Checks all songs in the library to see if they need album art downloaded
   Future _scanForMissingArtwork() async {
-    setState(() => _isFetchingArt = true);
+    setState(() {
+      _isFetchingArt = true;
+    });
     
-    // --- FIX: Use injected repository ---
     final songRepo = widget.testSongRepository ?? SongRepository(database: _databaseService);
     
     try {
       final result = await songRepo.getSongs();
-      if (result.isSuccess()) {
+      if (result.isSuccess() == true) {
         final songs = result.getOrThrow();
         
-        for (var song in songs) {
-          if (song.imagePath == null || song.imagePath!.isEmpty) {
+        for (int i = 0; i < songs.length; i++) {
+          var song = songs[i];
+          bool needsArtwork = false;
+          
+          if (song.imagePath == null) {
+            needsArtwork = true;
+          } else if (song.imagePath == '') {
+            needsArtwork = true;
+          }
+          
+          if (needsArtwork == true) {
             await songRepo.fetchAndSaveMissingArtwork(song);
           }
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      // Ignored catch block
+    }
     
-    if (mounted) {
-      setState(() => _isFetchingArt = false);
+    if (mounted == true) {
+      setState(() {
+        _isFetchingArt = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Finished scanning for missing artwork!'),
@@ -181,37 +185,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  // Fix: Optimized progress callback to only update when the widget is still mounted
   Future _batchValidateTags() async {
-    setState(() {
-      _isBatchValidating = true;
-      _validationProgress = 'Starting validation...';
-    });
-
-    // --- FIX: Use injected repository ---
+    setState(() { _isBatchValidating = true; _validationProgress = 'Starting validation...'; });
     final songRepo = widget.testSongRepository ?? SongRepository(database: _databaseService);
-
+    
     final updatedCount = await songRepo.validateAndFixAllSongs(
-      onProgress: (current, total) {
-        if (mounted) {
-          setState(() {
-            _validationProgress = 'Validating $current of $total songs...';
-          });
-        }
-      },
+      onProgress: (current, total) => mounted ? setState(() => _validationProgress = 'Validating $current of $total songs...') : null,
     );
 
     if (mounted) {
-      setState(() {
-        _isBatchValidating = false;
-        _validationProgress = '';
-      });
+      setState(() { _isBatchValidating = false; _validationProgress = ''; });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Batch validation complete! Updated $updatedCount tracks.'),
+        backgroundColor: Colors.green,
+      ));
+    }
+  }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Batch validation complete! Updated $updatedCount tracks.'),
-          backgroundColor: Colors.green,
-        ),
+  // Returns the correct trailing icon based on the current scan state
+  Widget _getTrailingIconForScan() {
+    if (_isScanning == true) {
+      return const SizedBox(
+        width: 24,
+        height: 24,
+        child: CircularProgressIndicator(strokeWidth: 2),
       );
+    } else {
+      return const Icon(Icons.music_note);
     }
   }
   
@@ -232,8 +233,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   subtitle: const Text("Use device gyroscope to move the floating player"),
                   value: _tiltEnabled,
                   activeColor: Colors.cyanAccent,
+                  // Saves the tilt setting to the database when toggled
                   onChanged: (val) async {
-                    setState(() => _tiltEnabled = val);
+                    setState(() {
+                      _tiltEnabled = val;
+                    });
                     await _databaseService.insertKVPair('tilt_enabled', val.toString());
                   },
                   secondary: const Icon(Icons.screen_rotation),
@@ -245,22 +249,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: ListTile(
                   title: const Text("Look for new music"), 
                   subtitle: _scanStatus.isNotEmpty 
-                      ? Text(
-                          _scanStatus,
-                          style: TextStyle(
-                            color: _scanStatus.contains('Error') ? Colors.red : Colors.green,
-                          ),
-                        )
+                      ? Text(_scanStatus, style: TextStyle(color: _scanStatus.contains('Error') ? Colors.red : Colors.green)) 
                       : null,
+                  // Fix: Prevented onTap execution if a scan is already running
                   onTap: _isScanning ? null : _scanMusic,
                   enabled: !_isScanning,
-                  trailing: _isScanning
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.music_note),
+                  trailing: _getTrailingIconForScan(),
                 ),
               ),
               
@@ -274,7 +268,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
         
-
               Padding(
                 padding: const EdgeInsets.only(left: 25.0, top: 25),
                 child: ListTile(
@@ -284,11 +277,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       : const Text('Batch validate all track tags with TheAudioDB'),
                   onTap: _isBatchValidating ? null : _batchValidateTags,
                   trailing: _isBatchValidating
-                      ? const SizedBox(
-                          width: 24, 
-                          height: 24, 
-                          child: CircularProgressIndicator(strokeWidth: 2)
-                        )
+                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.auto_fix_high, color: Colors.orangeAccent),
                 ),
               ),
@@ -297,17 +286,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 padding: const EdgeInsets.only(left: 25.0, top: 25),
                 child: ListTile(
                   title: const Text("Equalizer"),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => EqualizerScreen(
-                          // --- FIX: Pass the injected database down the navigation stack ---
-                          testDatabaseService: widget.testDatabaseService,
-                        ),
-                      ),
-                    ); 
-                  },
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => EqualizerScreen(testDatabaseService: widget.testDatabaseService))),
                   trailing: const Icon(Icons.equalizer),
                 ),
               ),
@@ -317,14 +296,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: ListTile(
                   title: const Text("Last.fm Login"),
                   subtitle: const Text("Connect your Last.fm account"),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LastFmAuthScreen(),
-                      ),
-                    );
-                  },
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const LastFmAuthScreen())),
                   trailing: const Icon(Icons.login),
                 ),
               ),
@@ -334,38 +306,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: ListTile(
                   title: const Text("Force Sync Last.fm"),
                   subtitle: const Text("Manually push offline scrobbles to your account"),
+                  // Pushes all cached offline scrobbles to the user's Last.fm profile
                   onTap: _isSyncingLastFm ? null : () async {
                     setState(() => _isSyncingLastFm = true);
-
                     try {
                       await ref.read(syncManagerProvider).forceSync();
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Offline sync cycle completed.'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      }
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Offline sync cycle completed.'), backgroundColor: Colors.green));
                     } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Sync Failed: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Sync Failed: $e'), backgroundColor: Colors.red));
                     } finally {
                       if (mounted) setState(() => _isSyncingLastFm = false);
                     }
                   },
                   trailing: _isSyncingLastFm
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
+                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.sync, color: Colors.green),
                 ),
               ),

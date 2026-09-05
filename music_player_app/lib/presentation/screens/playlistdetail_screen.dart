@@ -17,7 +17,7 @@ class PlaylistDetailScreen extends StatefulWidget {
   final int? playlistId; 
   final bool isFavoritesPlaylist; 
   
-  // --- FIX: Added dependencies for testing ---
+  // Fix: Added dependencies for testing isolated widgets
   final DatabaseService? testDatabaseService;
   final SongRepository? testSongRepository;
   final PlaylistRepository? testPlaylistRepository;
@@ -53,40 +53,55 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     _loadPlaylistSongs();
   }
 
+  // Refreshes the local songs list based on the active playlist ID or favorites flag
   Future<void> _loadPlaylistSongs() async {
     setState(() => _isLoading = true);
     
-    // --- FIX: Use injected repositories if available ---
+    // Fix: Use injected repositories if available to prevent opening multiple DB connections
     _databaseService = widget.testDatabaseService ?? DatabaseService(databaseFactory: databaseFactory);
     _songRepository = widget.testSongRepository ?? SongRepository(database: _databaseService);
     _playlistRepository = widget.testPlaylistRepository ?? PlaylistRepository(database: _databaseService);
     
     try {
-      if (widget.isFavoritesPlaylist) {
+      if (widget.isFavoritesPlaylist == true) {
         final result = await _songRepository.getSongs();
-        if (result.isSuccess()) {
+        if (result.isSuccess() == true) {
+          final allSongs = result.getOrThrow();
+          List<Song> favSongs = [];
+          
+          for (int i = 0; i < allSongs.length; i++) {
+            if (allSongs[i].favorite == true) {
+              favSongs.add(allSongs[i]);
+            }
+          }
+          
           setState(() {
-            _songs = result.getOrThrow().where((song) => song.favorite).toList();
+            _songs = favSongs;
             _isLoading = false;
           });
         }
       } 
       else if (widget.playlistId != null) {
         final result = await _songRepository.getSongs(playlistId: widget.playlistId);
-        if (result.isSuccess()) {
+        if (result.isSuccess() == true) {
           setState(() {
             _songs = result.getOrThrow();
             _isLoading = false;
           });
         }
       } else {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+        });
       }
     } catch (e) {
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
+  // Opens a dialog to add the selected track to another existing playlist
   Future<void> _showAddToPlaylistDialog(Song song) async {
     final result = await _playlistRepository.getPlaylists();
     if (result.isSuccess()) {
@@ -95,39 +110,38 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       
       showDialog(
         context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: const Text('Add to Playlist'),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: playlists.isEmpty 
-                ? const Text('No custom playlists available. Create one first!')
-                : ListView.builder(
-                shrinkWrap: true,
-                itemCount: playlists.length,
-                itemBuilder: (context, index) {
-                  final pl = playlists[index];
-                  return ListTile(
-                    leading: const Icon(Icons.queue_music),
-                    title: Text(pl.title),
-                    onTap: () async {
-                      await _playlistRepository.addSongsToPlaylist(pl.id, [song.id]);
-                      if (mounted) {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Added to ${pl.title}', style: const TextStyle(color: Colors.white)), backgroundColor: Colors.green),
-                        );
-                      }
-                    },
-                  );
-                },
-              ),
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            ],
-          );
-        }
+        builder: (context) => AlertDialog(
+          title: const Text('Add to Playlist'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: playlists.isEmpty 
+              ? const Text('No custom playlists available. Create one first!')
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: playlists.length,
+                  itemBuilder: (context, index) {
+                    final pl = playlists[index];
+                    return ListTile(
+                      leading: const Icon(Icons.queue_music),
+                      title: Text(pl.title),
+                      onTap: () async {
+                        await _playlistRepository.addSongsToPlaylist(pl.id, [song.id]);
+                        if (mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text('Added to ${pl.title}', style: const TextStyle(color: Colors.white)), 
+                            backgroundColor: Colors.green
+                          ));
+                        }
+                      },
+                    );
+                  },
+                ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ],
+        )
       );
     }
   }
@@ -219,10 +233,12 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                         _showAddToPlaylistDialog(song);
                                       } 
                                       else if (choice == 'remove') {
-                                        if (widget.isFavoritesPlaylist) {
+                                        if (widget.isFavoritesPlaylist == true) {
                                           await _databaseService.setFavoriteStatus(song.id, false);
-                                        } else if (widget.playlistId != null) {
-                                          await _playlistRepository.removeSongsFromPlaylist(widget.playlistId!, [song.id]);
+                                        } else {
+                                          if (widget.playlistId != null) {
+                                            await _playlistRepository.removeSongsFromPlaylist(widget.playlistId!, [song.id]);
+                                          }
                                         }
                                         _loadPlaylistSongs();
                                       } 
@@ -245,7 +261,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                         if (didUpdate == true) _loadPlaylistSongs();
                                       }
                                     },
-                                    // --- FIX: Wrapped all Text items in Expanded ---
+                                    // Fix: Wrapped all Text items in Expanded widgets to avoid text overflow errors on narrow screens
                                     itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
                                       PopupMenuItem<String>(
                                         value: 'toggle_favorite',

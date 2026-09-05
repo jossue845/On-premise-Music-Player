@@ -23,9 +23,23 @@ class _LyricsScreenState extends State<LyricsScreen> {
     _loadLyrics();
   }
 
+  // Fetches lyrics from the local database or requests them via the repository
   Future<void> _loadLyrics() async {
-    debugPrint('🟡 _loadLyrics() called for songId=${widget.song.id}, title=${widget.song.title}');
-    if (widget.song.lyrics != null && widget.song.lyrics!.isNotEmpty) {
+    debugPrint('_loadLyrics() called for songId=${widget.song.id}, title=${widget.song.title}');
+    
+    bool hasLocalLyrics = false;
+    
+    if (widget.song.lyrics != null) {
+      if (widget.song.lyrics != '') {
+        hasLocalLyrics = true;
+      } else {
+        hasLocalLyrics = false;
+      }
+    } else {
+      hasLocalLyrics = false;
+    }
+
+    if (hasLocalLyrics == true) {
       setState(() {
         _lyricsContent = widget.song.lyrics!;
         _isLoading = false;
@@ -33,29 +47,22 @@ class _LyricsScreenState extends State<LyricsScreen> {
       return;
     }
 
-    // --- FIX: Removed local database creation and used the injected repository directly ---
+    // Fix: Removed local database creation and used the injected repository directly
     try {
       final result = await widget.songRepository.fetchAndSaveLyrics(widget.song);
 
       if (mounted) {
         setState(() {
           _isLoading = false;
-          if (result.isSuccess()) {
-            _lyricsContent = result.getOrThrow();
-          } else {
-            _errorMessage = result.exceptionOrNull()?.toString() ?? 'Failed to load lyrics.';
-          }
+          result.isSuccess() 
+              ? _lyricsContent = result.getOrThrow() 
+              : _errorMessage = result.exceptionOrNull()?.toString() ?? 'Failed to load lyrics.';
         });
       }
     } catch (e, st) {
-      debugPrint('🔴 CAUGHT IN _loadLyrics: $e');
-      debugPrint('🔴 STACK:\n$st');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'Debug: $e';
-        });
-      }
+      debugPrint('Exception caught in _loadLyrics: $e');
+      debugPrint('Stack trace:\n$st');
+      if (mounted) setState(() { _isLoading = false; _errorMessage = 'Debug: $e'; });
     }
   }
 

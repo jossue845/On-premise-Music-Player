@@ -12,7 +12,7 @@ import 'package:music_player_app/data/repositories/playlist_repository.dart';
 import 'package:music_player_app/domain/models/song/song.dart';
 import 'package:music_player_app/presentation/screens/edit_song_screen.dart';
 
-// --- FIX: Converted to ConsumerStatefulWidget to access Riverpod ---
+// Fix: Converted to ConsumerStatefulWidget to access Riverpod
 class AllSongsScreen extends ConsumerStatefulWidget {
   final SongRepository? songRepository;
   final PlaylistRepository? playlistRepository;
@@ -39,10 +39,22 @@ class _AllSongsScreenState extends ConsumerState<AllSongsScreen> {
     _initializeRepositoryAndLoad();
   }
 
+  // Initializes dependencies and fetches all songs from the local database
   Future<void> _initializeRepositoryAndLoad() async {
     setState(() => _isLoading = true);
 
-    if (widget.songRepository != null && widget.playlistRepository != null) {
+    bool hasSongRepo = false;
+    bool hasPlaylistRepo = false;
+    
+    if (widget.songRepository != null) {
+      hasSongRepo = true;
+    }
+    
+    if (widget.playlistRepository != null) {
+      hasPlaylistRepo = true;
+    }
+
+    if (hasSongRepo == true && hasPlaylistRepo == true) {
       _songRepository = widget.songRepository!;
       _playlistRepository = widget.playlistRepository!;
     } else {
@@ -50,29 +62,35 @@ class _AllSongsScreenState extends ConsumerState<AllSongsScreen> {
       _songRepository = SongRepository(database: databaseService);
       _playlistRepository = PlaylistRepository(database: databaseService);
     }
+    
     try {
       final result = await _songRepository.getSongs();
-      if (result.isSuccess()) {
+      if (result.isSuccess() == true) {
         final List<Song> fetchedSongs = List<Song>.from(result.getOrThrow());
         
         fetchedSongs.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
         
-        debugPrint("🎵 DATABASE CHECK: Found ${fetchedSongs.length} songs!");
+        debugPrint("DATABASE CHECK: Found ${fetchedSongs.length} songs!");
         
         setState(() {
           _songs = fetchedSongs;
           _isLoading = false;
         });
       } else {
-        debugPrint("🎵 DATABASE ERROR: ${result.exceptionOrNull()}");
-        setState(() => _isLoading = false);
+        debugPrint("DATABASE ERROR: ${result.exceptionOrNull()}");
+        setState(() {
+          _isLoading = false;
+        });
       }
     } catch (e) {
-      debugPrint("🎵 EXCEPTION CAUGHT: $e");
-      setState(() => _isLoading = false);
+      debugPrint("EXCEPTION CAUGHT: $e");
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
+  // Displays a dialog to select a playlist to add the chosen track to
   Future<void> _showAddToPlaylistDialog(Song song) async {
     final result = await _playlistRepository.getPlaylists();
     if (result.isSuccess()) {
@@ -172,6 +190,7 @@ class _AllSongsScreenState extends ConsumerState<AllSongsScreen> {
     );
   }
 
+  // Helper widget to render individual song list items
   Widget _buildSongCard(BuildContext context, int index) {
     final song = _songs[index];
     
@@ -251,19 +270,34 @@ class _AllSongsScreenState extends ConsumerState<AllSongsScreen> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
+        // Fix: Push directly to the background service instead of opening a route
         onTap: () async {
-          // --- FIX: Push directly to the background service instead of opening a route ---
           final audioPlayer = ref.read(audioPlayerProvider);
-          final audioSources = _songs.map((s) => AudioSource.uri(
-            Uri.file(s.path),
-            tag: MediaItem(
+          List<AudioSource> audioSources = [];
+          
+          for (int i = 0; i < _songs.length; i++) {
+            Song s = _songs[i];
+            String artistName = 'Unknown Artist';
+            
+            if (s.artists.isNotEmpty == true) {
+              artistName = s.artists.first;
+            }
+            
+            Uri? artUri;
+            if (s.imagePath != null) {
+              artUri = Uri.file(s.imagePath!);
+            }
+            
+            MediaItem mediaItem = MediaItem(
               id: s.id.toString(),
               title: s.title,
-              artist: s.artists.isNotEmpty ? s.artists.first : 'Unknown Artist',
+              artist: artistName,
               album: s.album,
-              artUri: s.imagePath != null ? Uri.file(s.imagePath!) : null,
-            ),
-          )).toList();
+              artUri: artUri,
+            );
+            
+            audioSources.add(AudioSource.uri(Uri.file(s.path), tag: mediaItem));
+          }
           
           await audioPlayer.setAudioSource(
             ConcatenatingAudioSource(children: audioSources), 

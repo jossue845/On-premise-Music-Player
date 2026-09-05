@@ -11,7 +11,7 @@ class ManagePlaylistSongsScreen extends StatefulWidget {
   final int? playlistId;
   final bool isFavoritesPlaylist;
   
-  // --- FIX: Added dependencies for testing ---
+  // Fix: Added dependencies for testing isolated widgets
   final DatabaseService? testDatabaseService;
   final SongRepository? testSongRepository;
   final PlaylistRepository? testPlaylistRepository;
@@ -48,40 +48,59 @@ class _ManagePlaylistSongsScreenState extends State<ManagePlaylistSongsScreen> {
     _loadData();
   }
 
+  // Refreshes and loads all available songs to display in the management list
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+    });
     
-    // --- FIX: Use injected dependencies if available ---
+    // Fix: Use injected dependencies if available to prevent multiple database connections
     _databaseService = widget.testDatabaseService ?? DatabaseService(databaseFactory: databaseFactory);
     _songRepository = widget.testSongRepository ?? SongRepository(database: _databaseService);
     _playlistRepository = widget.testPlaylistRepository ?? PlaylistRepository(database: _databaseService);
 
     try {
       final allSongsResult = await _songRepository.getSongs();
-      if (allSongsResult.isSuccess()) {
+      if (allSongsResult.isSuccess() == true) {
         _allSongs = allSongsResult.getOrThrow();
       }
 
       List<Song> playlistSongs = [];
-      if (widget.isFavoritesPlaylist) {
-        playlistSongs = _allSongs.where((song) => song.favorite).toList();
-      } else if (widget.playlistId != null) {
-        final playlistSongsResult = await _songRepository.getSongs(playlistId: widget.playlistId);
-        if (playlistSongsResult.isSuccess()) {
-          playlistSongs = playlistSongsResult.getOrThrow();
+      
+      if (widget.isFavoritesPlaylist == true) {
+        for (int i = 0; i < _allSongs.length; i++) {
+          if (_allSongs[i].favorite == true) {
+            playlistSongs.add(_allSongs[i]);
+          }
+        }
+      } else {
+        if (widget.playlistId != null) {
+          final playlistSongsResult = await _songRepository.getSongs(playlistId: widget.playlistId);
+          if (playlistSongsResult.isSuccess() == true) {
+            playlistSongs = playlistSongsResult.getOrThrow();
+          }
         }
       }
 
-      _initialSelectedIds = playlistSongs.map((s) => s.id).toSet();
+      _initialSelectedIds = {};
+      for (int j = 0; j < playlistSongs.length; j++) {
+        _initialSelectedIds.add(playlistSongs[j].id);
+      }
+      
       _currentSelectedIds = Set.from(_initialSelectedIds);
 
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+      });
     } catch (e) {
-      debugPrint("Error loading songs for management: $e");
-      setState(() => _isLoading = false);
+      debugPrint("Error loading songs for management: " + e.toString());
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
+  // Computes set differences and executes batch database updates
   Future<void> _saveChanges() async {
     setState(() => _isSaving = true);
     
@@ -90,27 +109,20 @@ class _ManagePlaylistSongsScreenState extends State<ManagePlaylistSongsScreen> {
       final songsToRemove = _initialSelectedIds.difference(_currentSelectedIds).toList();
 
       if (widget.isFavoritesPlaylist) {
-        for (int id in songsToAdd) {
-          await _databaseService.setFavoriteStatus(id, true);
-        }
-        for (int id in songsToRemove) {
-          await _databaseService.setFavoriteStatus(id, false);
-        }
+        await Future.wait([
+          ...songsToAdd.map((id) => _databaseService.setFavoriteStatus(id, true)),
+          ...songsToRemove.map((id) => _databaseService.setFavoriteStatus(id, false))
+        ]);
       } else if (widget.playlistId != null) {
-        if (songsToAdd.isNotEmpty) {
-          await _playlistRepository.addSongsToPlaylist(widget.playlistId!, songsToAdd);
-        }
-        if (songsToRemove.isNotEmpty) {
-          await _playlistRepository.removeSongsFromPlaylist(widget.playlistId!, songsToRemove);
-        }
+        if (songsToAdd.isNotEmpty) await _playlistRepository.addSongsToPlaylist(widget.playlistId!, songsToAdd);
+        if (songsToRemove.isNotEmpty) await _playlistRepository.removeSongsFromPlaylist(widget.playlistId!, songsToRemove);
       }
 
-      if (mounted) {
-        Navigator.pop(context, true); 
-      }
+      if (mounted) Navigator.pop(context, true); 
     } catch (e) {
       debugPrint("Error saving playlist changes: $e");
-      setState(() => _isSaving = false);
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
