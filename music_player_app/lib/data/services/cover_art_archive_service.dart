@@ -8,7 +8,7 @@ class CoverArtArchiveService {
 
   CoverArtArchiveService({http.Client? client}) : _client = client ?? http.Client();
 
-  /// Fetches the front cover image bytes for a given release-group MBID.
+  // Fetches the front cover image bytes for a given release-group MBID.
   Future<Result<Uint8List>> getFrontCover(String releaseGroupMbid) async {
     // The API endpoint specifically requests the "front" image of the release group
     final url = Uri.parse('$_baseUrl/release-group/$releaseGroupMbid/front');

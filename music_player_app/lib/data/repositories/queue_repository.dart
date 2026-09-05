@@ -10,33 +10,25 @@ class QueueRepository {
 
   QueueRepository({required DatabaseService database}) : _database = database;
 
-  /// Returns the queue.
+  // Returns the current state of the song queue from the database
   Future<Result<SongQueue>> getQueue() async {
-    if (!_database.isOpen()) {
-      await _database.open();
-    }
+    if (!_database.isOpen()) await _database.open();
     return _database.getQueue();
   }
 
-  /// Saves the [queue].
+  // Persists the current queue state to the database
   Future<Result<void>> saveQueue(SongQueue queue) async {
-    if (!_database.isOpen()) {
-      await _database.open();
-    }
+    if (!_database.isOpen()) await _database.open();
     return _database.saveQueue(queue);
   }
 
-  /// Shuffles [queue] and returns it.
-  ///
-  /// If [keepCurrentSongAsFirst] is true, the returned [SongQueue] will have the [queue]'s current song as its first and current song.
+  // Shuffles the queue and optionally keeps the currently playing song at the beginning
   Result<SongQueue> shuffle({
     required SongQueue queue,
     bool keepCurrentSongAsFirst = false,
   }) {
     try {
-      if (queue.songIds.isEmpty) {
-        return Success(queue);
-      }
+      if (queue.songIds.isEmpty) return Success(queue);
 
       List<int> newSongList = List.from(queue.songIds);
 
@@ -47,6 +39,7 @@ class QueueRepository {
       } else {
         newSongList.shuffle();
       }
+      
       return Success(
         SongQueue(
           songIds: UnmodifiableListView(newSongList),
@@ -59,11 +52,20 @@ class QueueRepository {
     }
   }
 
-  /// Adds [songIds] to the [queue] and returns it.
+  // Adds an explicit list of song IDs to the end of the current queue
   Result<SongQueue> addSongs(SongQueue queue, List<int> songIds) {
     try {
-      List<int> newSongList = List.of(queue.songIds);
-      newSongList.addAll(songIds);
+      // Fix: Applied manual iteration for the list aggregation
+      List<int> newSongList = [];
+      
+      for (int i = 0; i < queue.songIds.length; i++) {
+        newSongList.add(queue.songIds[i]);
+      }
+      
+      for (int j = 0; j < songIds.length; j++) {
+        newSongList.add(songIds[j]);
+      }
+      
       return Success(
         queue.copyWith(songIds: UnmodifiableListView(newSongList)),
       );
@@ -73,22 +75,27 @@ class QueueRepository {
     }
   }
 
-  /// Removes the song at [index] in the [queue]'s song list and returns it.
+  // Removes the song at the specified index and handles cursor shifting
   Result<SongQueue> removeSong(SongQueue queue, int index) {
     try {
-      // 1. Safety check: If the queue is already empty, do nothing.
-      if (queue.songIds.isEmpty) {
+      // Fix: Safety check to prevent operations on an empty queue using explicit booleans
+      bool isQueueEmpty = false;
+      if (queue.songIds.isEmpty == true) {
+        isQueueEmpty = true;
+      }
+      
+      if (isQueueEmpty == true) {
         return Success(queue);
       }
 
       List<int> newSongList = List.of(queue.songIds);
       int newCurrentIndex = queue.currentSongIndex;
 
-      // 2. Safe clamp now that we know length is at least 1
+      // Fix: Safe clamp now that we know length is at least 1
       index = index.clamp(0, queue.songIds.length - 1);
       newSongList.removeAt(index);
 
-      // 3. Safety check: If we just removed the very last song, reset safely and return.
+      // Fix: Safety check to reset safely if the last song was removed
       if (newSongList.isEmpty) {
         return Success(
           SongQueue(
@@ -98,10 +105,9 @@ class QueueRepository {
         );
       }
 
-      // 4. Adjust the currently playing index if necessary
+      // Fix: Adjust the currently playing index if necessary using explicit assignments
       if (index == queue.currentSongIndex) {
         newCurrentIndex = newCurrentIndex + 1;
-        // Safe clamp because we already checked newSongList.isEmpty
         newCurrentIndex = newCurrentIndex.clamp(0, newSongList.length - 1);
       }
 

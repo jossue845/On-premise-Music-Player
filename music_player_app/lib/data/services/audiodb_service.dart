@@ -10,7 +10,7 @@ class AudioDbService {
 
   AudioDbService({http.Client? client}) : _client = client ?? http.Client();
 
-  /// Searches for a track by title and artist.
+  // Fix: Removed emojis from debug outputs and applied explicit boolean validation
   Future<Result<Map<String, dynamic>>> searchTrack(String trackTitle, String artistName) async {
     // Aggressive String Cleaning
     String cleanTitle = trackTitle.replaceAll(RegExp(r'\([^)]*\)'), '').trim();
@@ -21,42 +21,52 @@ class AudioDbService {
     cleanArtist = cleanArtist.split(' feat').first.trim();
 
     final url = Uri.parse('$_baseUrl/searchtrack.php?s=${Uri.encodeComponent(cleanArtist)}&t=${Uri.encodeComponent(cleanTitle)}');
-    debugPrint('🔵 THEAUDIODB URL: $url'); 
+    debugPrint('THEAUDIODB URL: $url'); 
 
     try {
       final response = await _client.get(url);
       
+      bool isSuccess = false;
       if (response.statusCode == 200) {
+        isSuccess = true;
+      }
+      
+      if (isSuccess == true) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         final tracks = data['track'] as List?;
         
-        if (tracks != null && tracks.isNotEmpty) {
-          debugPrint('🟢 THEAUDIODB TOP MATCH: ${tracks.first['strTrack']}');
+        bool hasTracks = false;
+        if (tracks != null) {
+          if (tracks.isNotEmpty == true) {
+            hasTracks = true;
+          }
+        }
+        
+        if (hasTracks == true) {
+          debugPrint('THEAUDIODB TOP MATCH: ${tracks!.first['strTrack']}');
         } else {
-          debugPrint('🔴 THEAUDIODB RETURNED 0 RESULTS');
+          debugPrint('THEAUDIODB RETURNED 0 RESULTS');
         }
         
         return Success(data);
       } else {
-        debugPrint('🔴 THEAUDIODB HTTP ERROR: ${response.statusCode}'); 
+        debugPrint('THEAUDIODB HTTP ERROR: ${response.statusCode}'); 
         return Failure(Exception('TheAudioDB API Error: ${response.statusCode}'));
       }
     } catch (e) {
-      debugPrint('🔴 THEAUDIODB EXCEPTION: $e');
+      debugPrint('THEAUDIODB EXCEPTION: $e');
       return Failure(Exception('Failed to reach TheAudioDB: $e'));
     }
   }
 
-  /// Searches for an album to retrieve artwork.
+  // Searches for an album to retrieve artwork using concise ternary logic
   Future<Result<Map<String, dynamic>>> searchAlbum(String albumTitle, String artistName) async {
     final url = Uri.parse('$_baseUrl/searchalbum.php?s=${Uri.encodeComponent(artistName)}&a=${Uri.encodeComponent(albumTitle)}');
     try {
       final response = await _client.get(url);
-      if (response.statusCode == 200) {
-        return Success(jsonDecode(response.body) as Map<String, dynamic>);
-      } else {
-        return Failure(Exception('TheAudioDB API Error: ${response.statusCode}'));
-      }
+      return response.statusCode == 200 
+          ? Success(jsonDecode(response.body) as Map<String, dynamic>) 
+          : Failure(Exception('TheAudioDB API Error: ${response.statusCode}'));
     } catch (e) {
       return Failure(Exception('Failed to reach TheAudioDB: $e'));
     }

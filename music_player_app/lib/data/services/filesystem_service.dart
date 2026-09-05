@@ -23,7 +23,7 @@ class FilesystemService {
     Future<String?> Function(String? dialogTitle)? filePickerFn,
   }) : _filePickerFn = filePickerFn ?? ((title) => FilePicker.getDirectoryPath(dialogTitle: title));
 
-  /// Prompts the user to select the directory containing their music files.
+  // Prompts the user to select the directory containing their music files.
   Future<Result<String>> getDirectoryPath() async {
     try {
       if (!(await getStoragePermission())) {
@@ -43,7 +43,7 @@ class FilesystemService {
     }
   }
 
-  /// Returns the paths to the music files contained in [directoryPath]
+  // Returns the paths to the music files contained in [directoryPath]
   Future<Result<List<String>>> getSongPaths(String directoryPath) async {
     try {
       if (!(await getStoragePermission())) {
@@ -80,7 +80,7 @@ class FilesystemService {
     return _allowedMusicFileExtensions.any((ext) => lower.endsWith(".$ext"));
   }
 
-  /// Prompts the user to grant the permission to read audio files.
+  // Prompts the user to grant the permission to read audio files.
   Future<bool> getStoragePermission() async {
     if (Platform.isAndroid) {
       final manageStatus = await Permission.manageExternalStorage.request();

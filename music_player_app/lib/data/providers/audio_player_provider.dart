@@ -15,7 +15,7 @@ final audioPlayerProvider = Provider<AudioPlayer>((ref) {
     ),
   );
 
-  // --- FIX: Force the player to loop playlists infinitely by default ---
+  // Fix: Force the player to loop playlists infinitely by default ---
   player.setLoopMode(LoopMode.all);
 
   ref.onDispose(() {

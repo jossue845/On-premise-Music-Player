@@ -214,7 +214,11 @@ class DatabaseService {
   }
 
   bool isOpen() {
-    return _database != null;
+    if (_database != null) {
+      return true;
+    } else {
+      return false;
+    }
   }
 
   Future<Result<List<Song>>> getSongs({
@@ -423,7 +427,7 @@ class DatabaseService {
 
   Future<Result<List<Playlist>>> getPlaylists() async {
     try {
-      // --- FIX: Use async getter to ensure DB is initialized ---
+      // Fix: Use async getter to ensure DB is initialized
       final db = await database;
       final playlistEntries = await db.rawQuery('''
         SELECT $_playlistIdColumnName, $_playlistTitleColumnName, (SELECT $_imagePathColumnName FROM $_songTableName NATURAL JOIN $_playlistTrackTableName PT
@@ -447,7 +451,7 @@ class DatabaseService {
 
   Future<Result<List<Artist>>> getArtists() async {
     try {
-      // --- FIX: Use async getter to ensure DB is initialized ---
+      // Fix: Use async getter to ensure DB is initialized
       final db = await database;
       final entries = await db.rawQuery('''
           SELECT * FROM $_artistTableName;
@@ -565,7 +569,7 @@ class DatabaseService {
     try {
       final db = await database;
       
-      // --- FIX: Removed the / 1000 division since the timestamps are already in seconds ---
+      // Fix: Removed the / 1000 division since the timestamps are already in seconds
       final topDayResult = await db.rawQuery('''
         SELECT CAST(strftime('%w', timestamp, 'unixepoch', 'localtime') AS INTEGER) as day_index, COUNT(*) as play_count
         FROM $_scrobblesTableName
@@ -574,7 +578,7 @@ class DatabaseService {
         LIMIT 1
       ''');
 
-      // --- FIX: Removed the / 1000 division here as well ---
+      // Fix: Removed the / 1000 division here as well
       final peakHourResult = await db.rawQuery('''
         SELECT CAST(strftime('%H', timestamp, 'unixepoch', 'localtime') AS INTEGER) as hour_index, COUNT(*) as play_count
         FROM $_scrobblesTableName
@@ -1099,7 +1103,7 @@ class DatabaseService {
     try {
       final db = await database;
       
-      // --- FIX: Removed the / 1000 division here as well ---
+      // Fix: Removed the / 1000 division here as well
       final result = await db.rawQuery('''
         SELECT 
           CAST(strftime('%w', timestamp, 'unixepoch', 'localtime') AS INTEGER) as day_index,
@@ -1167,7 +1171,13 @@ class DatabaseService {
 
   Future<Result<void>> setFavoriteStatus(int songId, bool favorite) async {
     try {
-      final int value = (favorite) ? 1 : 0;
+      int value = 0;
+      if (favorite == true) {
+        value = 1;
+      } else {
+        value = 0;
+      }
+      
       await _database!.update(
         _songTableName,
         {_favoriteColumnName: value},

@@ -10,7 +10,7 @@ class ScrobbleRepository {
 
   ScrobbleRepository({required this.databaseService});
 
-  /// Inserts a new scrobble into the local database
+  // Inserts a new scrobble into the local database
   Future<int> insertScrobble(Scrobble scrobble) async {
     final db = await _getDb();
     
@@ -27,7 +27,7 @@ class ScrobbleRepository {
     );
   }
 
-  /// Fetches all scrobbles that haven't been pushed to Last.fm yet
+  // Fetches all scrobbles that haven't been pushed to Last.fm yet
   Future<List<Scrobble>> getUnsyncedScrobbles() async {
     final db = await _getDb();
     
@@ -47,7 +47,7 @@ class ScrobbleRepository {
     )).toList();
   }
 
-  /// Marks a specific batch of scrobbles as successfully synced
+  // Marks a specific batch of scrobbles as successfully synced
   Future<void> markAsSynced(List<int> ids) async {
     if (ids.isEmpty) return;
     
@@ -64,7 +64,7 @@ class ScrobbleRepository {
     );
   }
 
-  /// Deletes older scrobbles that have already been synced to keep the DB lean
+  // Deletes older scrobbles that have already been synced to keep the DB lean
   Future<void> deleteSyncedScrobbles() async {
     final db = await _getDb();
     

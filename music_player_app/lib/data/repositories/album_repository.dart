@@ -6,9 +6,6 @@ class AlbumRepository {
   final DatabaseService _database;
 
   AlbumRepository({required DatabaseService database}) : _database = database;
-
-  /// Returns all the albums.
-  ///
   /// Returns the albums from the artist identified by [artistId] if it is not null.
   Future<Result<List<Album>>> getAlbums({int? artistId}) async {
     if (!_database.isOpen()) {

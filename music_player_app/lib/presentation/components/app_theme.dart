@@ -6,10 +6,10 @@ class AppTheme {
       // Global Font
       fontFamily: 'Roboto',
       
-      // 1. Scaffold
+      // Scaffold
       scaffoldBackgroundColor: Colors.black,
       
-      // 2. Primary colors
+      // Primary colors
       primaryColor: Colors.cyanAccent, 
       
       appBarTheme: const AppBarTheme(
@@ -25,7 +25,7 @@ class AppTheme {
         ),
       ),
       
-      // 3. Surfaces
+
       cardTheme: CardThemeData(
         color: const Color(0xFF16213E), // Dark blue widget background
         elevation: 8, 
@@ -37,7 +37,6 @@ class AppTheme {
         textColor: Colors.white,
       ),
       
-      // 4. Text
       textTheme: const TextTheme(
         bodyLarge: TextStyle(color: Colors.white, fontSize: 16), 
         bodyMedium: TextStyle(color: Colors.white70, fontSize: 14), 
@@ -48,14 +47,14 @@ class AppTheme {
       
       iconTheme: const IconThemeData(color: Colors.white),
       
-      // 5. Navigation bar
+      // Navigation bar
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: Colors.transparent, 
         selectedItemColor: Colors.cyanAccent, 
         unselectedItemColor: Colors.white70, 
       ),
 
-      // 6. Player screen
+      // Player screen
       sliderTheme: SliderThemeData(
         activeTrackColor: Colors.cyanAccent,
         inactiveTrackColor: const Color(0xFF1F2E54), // Lighter dark blue for empty track
@@ -64,7 +63,6 @@ class AppTheme {
         trackHeight: 4.0,
       ),
 
-      // --- TEXT FIELD THEME ---
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: const Color(0xFF16213E), // Dark blue surface
@@ -77,7 +75,7 @@ class AppTheme {
         ),
       ),
 
-      // --- CHIP THEME ---
+      // Chip theme
       chipTheme: ChipThemeData(
         backgroundColor: const Color(0xFF16213E), // Dark blue surface
         selectedColor: Colors.cyanAccent, 
@@ -91,7 +89,7 @@ class AppTheme {
         ),
       ),
 
-      // --- ELEVATED BUTTON THEME ---
+      // Elevated Button Theme
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.cyanAccent,

@@ -22,7 +22,7 @@ class MusicFolderRepository {
   }) : _database = database,
        _fs = fs;
 
-  /// Scans the filesystem and initializes or updates the database with the found songs.
+  // Scans the filesystem and initializes or updates the database with the found songs.
   Future<Result<void>> scanFolder() async {
     late String dirPath;
 
@@ -53,18 +53,24 @@ class MusicFolderRepository {
           print('Skipping corrupted tags for $filePath: $e');
         }
 
-        // --- FIX: Safely fallback if title is null OR an empty string ---
-        String? title = tag?.title;
-        if (title == null || title.trim().isEmpty) {
-          title = filePath
+        // Fix: Use a nullable raw string, then assign to a non-nullable strictly typed String
+        String? titleRaw = tag?.title;
+        String title;
+        if (titleRaw == null || titleRaw.trim().isEmpty) {
+          String parsedTitle = filePath
               .split('/')
               .last
               .replaceAll(RegExp(r"\.([A-Za-z0-9]+)$"), '');
-          if (title.trim().isEmpty) title = 'Unknown Title';
+          if (parsedTitle.trim().isEmpty) {
+            title = 'Unknown Title';
+          } else {
+            title = parsedTitle;
+          }
+        } else {
+          title = titleRaw;
         }
 
         String? trackArtistRaw = tag?.trackArtist;
-        String? album = tag?.album;
         String? albumArtistRaw = tag?.albumArtist;
         String? genre = tag?.genre;
         int? year = tag?.year;
@@ -89,9 +95,19 @@ class MusicFolderRepository {
           albumArtists = TagUtils.parseArtists(albumArtistRaw);
         }
 
-        // --- FIX: Check for empty strings as well as nulls ---
-        if (album == null || album.trim().isEmpty) {
-          album = "Unknown Album"; 
+        // Fix: Ensure album is strictly a String to satisfy the Song model constructor
+        String? albumRaw = tag?.album;
+        String album;
+        
+        if (albumRaw == null) {
+          album = "Unknown Album";
+        } else if (albumRaw.trim() == "") {
+          album = "Unknown Album";
+        } else {
+          album = albumRaw;
+        }
+
+        if (album == "Unknown Album") {
           albumArtists = [
             "Unknown Artist", 
           ];
@@ -106,6 +122,7 @@ class MusicFolderRepository {
           Album dbAlbum = (await _database.getAlbums(
             songId: dbSong.id,
           )).getOrThrow().first;
+          
           Song foundSong = Song(
             title: title,
             id: dbSong.id,
@@ -177,24 +194,35 @@ class MusicFolderRepository {
       }
 
       final dbPaths = (await _database.getSongPaths()).getOrThrow();
-      for (final song in dbPaths) {
-        if (!filePaths.contains(song)) {
-          pathsOfSongsToBeDeleted.add(song);
+      
+      for (int i = 0; i < dbPaths.length; i++) {
+        String currentPath = dbPaths[i];
+        bool pathExists = false;
+        
+        for (int j = 0; j < filePaths.length; j++) {
+          if (currentPath == filePaths[j]) {
+            pathExists = true;
+          }
+        }
+        
+        if (pathExists == false) {
+          pathsOfSongsToBeDeleted.add(currentPath);
         }
       }
+      
       (await _database.deleteSongs(
         songPaths: pathsOfSongsToBeDeleted,
       )).getOrThrow();
 
       return Success(unit);
     } catch (e, stackTrace) {
-      // --- CHANGED: Now catches all errors and prints the full stack trace ---
-      print('🔴 REAL SCAN ERROR: $e\n$stackTrace');
-      return Failure(Exception(e.toString())); // Sends the real error to the screen!
+      // Fix: Catches all errors and prints the full stack trace
+      print('REAL SCAN ERROR: $e\n$stackTrace');
+      return Failure(Exception(e.toString()));
     }
   }
 
-  /// Prompts the user to select the folder they want to scan for music files.
+  // Prompts the user to select the folder they want to scan for music files.
   Future<Result<void>> setMusicFolder() async {
     try {
       if (!_database.isOpen()) {
@@ -204,9 +232,9 @@ class MusicFolderRepository {
       (await _database.insertKVPair(_musicFolderKeyName, dirPath)).getOrThrow();
       return Success(unit);
     } catch (e, stackTrace) {
-      // --- CHANGED: Now catches all errors ---
-      print('🔴 REAL SET FOLDER ERROR: $e\n$stackTrace');
-      return Failure(Exception(e.toString())); // Sends the real error to the screen!
+      // Fix: Catches all errors
+      print('REAL SET FOLDER ERROR: $e\n$stackTrace');
+      return Failure(Exception(e.toString()));
     }
   }
 }

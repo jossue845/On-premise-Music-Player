@@ -71,8 +71,8 @@ class LastFmService {
     }
   }
 
-  /// Updates the user's Last.fm profile with a "Now Playing" status.
-  /// This should be called immediately when a track starts playing.
+  // Updates the user's Last.fm profile with a "Now Playing" status.
+  // This should be called immediately when a track starts playing.
   Future<void> updateNowPlaying(Scrobble scrobble, String sessionKey) async {
     final params = <String, String>{
       'method': 'track.updateNowPlaying',
@@ -98,8 +98,8 @@ class LastFmService {
     }
   }
 
-  /// Submits completed scrobbles to Last.fm.
-  /// Accepts a list to support batch uploading from the local database cache.
+  // Submits completed scrobbles to Last.fm.
+  // Accepts a list to support batch uploading from the local database cache.
   Future<void> scrobble(List<Scrobble> scrobbles, String sessionKey) async {
     if (scrobbles.isEmpty) return;
 

@@ -5,87 +5,118 @@ import 'package:result_dart/result_dart.dart';
 
 class LrcLibService {
   static const String _baseUrl = 'https://lrclib.net/api';
-  final http.Client _client;
+  late http.Client _client;
 
-  LrcLibService({http.Client? client}) : _client = client ?? http.Client();
+  LrcLibService({http.Client? client}) {
+    if (client != null) {
+      _client = client;
+    } else {
+      _client = http.Client();
+    }
+  }
 
-  // LRCLIB strictly requires a descriptive User-Agent to prevent rate-limiting or 403 blocks.
-  Map<String, String> get _headers => {
-        'Accept': 'application/json',
-        'User-Agent': 'DIMAMusicPlayer/1.0.0',
-      };
+  // Fix: LRCLIB strictly requires a descriptive User-Agent to prevent rate-limiting or 403 blocks.
+  Map<String, String> _getHeaders() {
+    Map<String, String> headers = Map<String, String>();
+    headers['Accept'] = 'application/json';
+    headers['User-Agent'] = 'DIMAMusicPlayer/1.0.0';
+    return headers;
+  }
 
-  /// Attempts an exact match fetch for synced or plain lyrics.
+  // Attempts an exact match fetch for synced or plain lyrics.
   Future<Result<Map<String, dynamic>>> getLyrics(
     String trackName,
     String artistName, {
     String? albumName,
     int? durationInSeconds,
   }) async {
-    debugPrint('🟢 getLyrics() ENTERED: track=$trackName artist=$artistName');
+    debugPrint('getLyrics() ENTERED: track=$trackName artist=$artistName');
 
-    final queryParams = <String, String>{
-      'track_name': trackName,
-      'artist_name': artistName,
-    };
+    Map<String, String> queryParams = Map<String, String>();
+    queryParams['track_name'] = trackName;
+    queryParams['artist_name'] = artistName;
 
-    if (albumName != null && albumName.isNotEmpty && albumName != 'Unknown Album') {
-      queryParams['album_name'] = albumName;
+    bool hasValidAlbum = false;
+    if (albumName != null) {
+      if (albumName != '') {
+        if (albumName != 'Unknown Album') {
+          hasValidAlbum = true;
+        }
+      }
     }
-    if (durationInSeconds != null && durationInSeconds > 0) {
+
+    if (hasValidAlbum == true) {
+      queryParams['album_name'] = albumName!;
+    }
+
+    bool hasValidDuration = false;
+    if (durationInSeconds != null) {
+      if (durationInSeconds > 0) {
+        hasValidDuration = true;
+      }
+    }
+
+    if (hasValidDuration == true) {
       queryParams['duration'] = durationInSeconds.toString();
     }
 
-    final uri = Uri.parse('$_baseUrl/get').replace(queryParameters: queryParams);
+    Uri uri = Uri.parse('$_baseUrl/get');
+    uri = uri.replace(queryParameters: queryParams);
 
-    debugPrint('🟢 About to GET: $uri');
+    debugPrint('About to GET: $uri');
 
     try {
-      final response = await _client
-          .get(uri, headers: _headers)
-          .timeout(const Duration(seconds: 10));
+      http.Response response = await _client.get(uri, headers: _getHeaders()).timeout(const Duration(seconds: 10));
 
-      debugPrint('🟢 Got response: ${response.statusCode}');
+      debugPrint('Got response: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        return Success(jsonDecode(response.body));
-      } else if (response.statusCode == 404) {
-        debugPrint('🟢 404 on exact match, falling back to search');
-        return _searchLyrics(trackName, artistName);
+        Map<String, dynamic> decodedResponse = jsonDecode(response.body);
+        return Success(decodedResponse);
       } else {
-        return Failure(Exception('LRCLIB API Error: ${response.statusCode}'));
+        if (response.statusCode == 404) {
+          debugPrint('404 on exact match, falling back to search');
+          return _searchLyrics(trackName, artistName);
+        } else {
+          return Failure(Exception('LRCLIB API Error: ${response.statusCode}'));
+        }
       }
     } catch (e, st) {
-      debugPrint('🔴 getLyrics() CAUGHT: $e');
-      debugPrint('🔴 STACK:\n$st');
+      debugPrint('getLyrics() CAUGHT: $e');
+      debugPrint('STACK:\n$st');
       return Failure(Exception('Failed to reach LRCLIB: $e'));
     }
   }
 
-  /// Fallback method executing a broad search query if the exact endpoint fails.
+  // Fallback method executing a broad search query if the exact endpoint fails.
   Future<Result<Map<String, dynamic>>> _searchLyrics(String trackName, String artistName) async {
-    debugPrint('🟢 _searchLyrics() ENTERED: track=$trackName artist=$artistName');
+    debugPrint('_searchLyrics() ENTERED: track=$trackName artist=$artistName');
 
-    final queryParams = <String, String>{
-      'track_name': trackName,
-      'artist_name': artistName,
-    };
+    Map<String, String> queryParams = Map<String, String>();
+    queryParams['track_name'] = trackName;
+    queryParams['artist_name'] = artistName;
 
-    final uri = Uri.parse('$_baseUrl/search').replace(queryParameters: queryParams);
+    Uri uri = Uri.parse('$_baseUrl/search');
+    uri = uri.replace(queryParameters: queryParams);
 
-    debugPrint('🟢 About to GET (search): $uri');
+    debugPrint('About to GET (search): $uri');
 
     try {
-      final response = await _client
-          .get(uri, headers: _headers)
-          .timeout(const Duration(seconds: 10));
+      http.Response response = await _client.get(uri, headers: _getHeaders()).timeout(const Duration(seconds: 10));
 
-      debugPrint('🟢 Got search response: ${response.statusCode}');
+      debugPrint('Got search response: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        final List<dynamic> results = jsonDecode(response.body);
-        if (results.isNotEmpty) {
-          return Success(results.first as Map<String, dynamic>);
+        List<dynamic> results = jsonDecode(response.body);
+        
+        bool hasResults = false;
+        if (results.isNotEmpty == true) {
+          hasResults = true;
+        }
+
+        if (hasResults == true) {
+          Map<String, dynamic> firstResult = results[0] as Map<String, dynamic>;
+          return Success(firstResult);
         } else {
           return Failure(Exception('No lyrics found for this track.'));
         }
@@ -93,8 +124,8 @@ class LrcLibService {
         return Failure(Exception('LRCLIB Search API Error: ${response.statusCode}'));
       }
     } catch (e, st) {
-      debugPrint('🔴 _searchLyrics() CAUGHT: $e');
-      debugPrint('🔴 STACK:\n$st');
+      debugPrint('_searchLyrics() CAUGHT: $e');
+      debugPrint('STACK:\n$st');
       return Failure(Exception('Failed to search LRCLIB: $e'));
     }
   }

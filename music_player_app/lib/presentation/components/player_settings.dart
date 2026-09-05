@@ -13,11 +13,11 @@ class PlayerSettings extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        // 1. Base color exactly matches your new dark theme background
+        // Base color exactly matches your new dark theme background
         color: const Color(0xFF121212),
         borderRadius: BorderRadius.circular(16),
         
-        // 2. The Dual-Shadow Neumorphic System
+        // The Dual-Shadow Neumorphic System
         boxShadow: const [
           // Bottom Right: The deep, dark shadow for elevation
           BoxShadow(
