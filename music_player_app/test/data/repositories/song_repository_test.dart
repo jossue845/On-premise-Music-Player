@@ -5,7 +5,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:result_dart/result_dart.dart';
 import 'package:http/http.dart' as http;
 
-// Adjust imports to match your project
+// Fix: Adjust imports to match the project structure
 import 'package:music_player_app/data/repositories/song_repository.dart';
 import 'package:music_player_app/data/services/database_service.dart';
 import 'package:music_player_app/data/services/audiodb_service.dart';
@@ -27,12 +27,16 @@ void main() {
   late MockHttpClient mockHttp;
   late SongRepository repository;
 
-  final dummySong = Song(
+  // Fix: Explicitly create the list before passing it to UnmodifiableListView
+  List<String> testArtists = [];
+  testArtists.add('Test Artist');
+
+  final Song dummySong = Song(
     id: 1,
     title: 'Test Song',
     album: 'Test Album',
     albumId: 1,
-    artists: UnmodifiableListView(['Test Artist']),
+    artists: UnmodifiableListView(testArtists),
     path: '/fake/path/song.mp3',
     favorite: false,
   );
@@ -61,71 +65,153 @@ void main() {
   group('SongRepository - Database Delegation Tests', () {
     test('getSongs delegates correctly to database service', () async {
       when(() => mockDb.getSongs(albumId: any(named: 'albumId'), artistId: null, playlistId: null))
-          .thenAnswer((_) async => Success([dummySong]));
+          .thenAnswer((invocation) async {
+        List<Song> songList = [];
+        songList.add(dummySong);
+        Result<List<Song>> successResult = Success(songList);
+        return successResult;
+      });
 
-      final result = await repository.getSongs(albumId: 5);
+      Result<List<Song>> result = await repository.getSongs(albumId: 5);
 
-      expect(result.isSuccess(), isTrue);
+      bool isSuccess = false;
+      if (result.isSuccess() == true) {
+        isSuccess = true;
+      }
+      expect(isSuccess, true);
+      
       verify(() => mockDb.getSongs(albumId: 5, artistId: null, playlistId: null)).called(1);
     });
 
     test('incrementPlayCount delegates to database', () async {
-      when(() => mockDb.incrementPlayCount(1)).thenAnswer((_) async => const Success(unit));
+      when(() => mockDb.incrementPlayCount(1)).thenAnswer((invocation) async {
+        Result<void> successResult = Success(unit);
+        return successResult;
+      });
 
-      final result = await repository.incrementPlayCount(1);
-      expect(result.isSuccess(), isTrue);
+      Result<void> result = await repository.incrementPlayCount(1);
+      
+      bool isSuccess = false;
+      if (result.isSuccess() == true) {
+        isSuccess = true;
+      }
+      expect(isSuccess, true);
     });
 
     test('setFavoriteStatus delegates to database', () async {
-      when(() => mockDb.setFavoriteStatus(1, true)).thenAnswer((_) async => const Success(unit));
+      when(() => mockDb.setFavoriteStatus(1, true)).thenAnswer((invocation) async {
+        Result<void> successResult = Success(unit);
+        return successResult;
+      });
 
-      final result = await repository.setFavoriteStatus(1, true);
-      expect(result.isSuccess(), isTrue);
+      Result<void> result = await repository.setFavoriteStatus(1, true);
+      
+      bool isSuccess = false;
+      if (result.isSuccess() == true) {
+        isSuccess = true;
+      }
+      expect(isSuccess, true);
     });
   });
 
   group('SongRepository - API Service Logic Tests', () {
     test('fetchAndSaveLyrics updates DB when lyrics are found', () async {
       when(() => mockLrcLib.getLyrics('Test Song', 'Test Artist', albumName: 'Test Album'))
-          .thenAnswer((_) async => const Success({'syncedLyrics': 'Test synced lyrics', 'plainLyrics': null}));
+          .thenAnswer((invocation) async {
+        Map<String, dynamic> fakeResponse = Map<String, dynamic>();
+        fakeResponse['syncedLyrics'] = 'Test synced lyrics';
+        fakeResponse['plainLyrics'] = null;
+        Result<Map<String, dynamic>> successResult = Success(fakeResponse);
+        return successResult;
+      });
       
-      when(() => mockDb.updateSong(any())).thenAnswer((_) async => 1);
+      when(() => mockDb.updateSong(any())).thenAnswer((invocation) async {
+        int updateCount = 1;
+        return updateCount;
+      });
 
-      final result = await repository.fetchAndSaveLyrics(dummySong);
+      Result<String> result = await repository.fetchAndSaveLyrics(dummySong);
 
-      expect(result.isSuccess(), isTrue);
+      bool isSuccess = false;
+      if (result.isSuccess() == true) {
+        isSuccess = true;
+      }
+      expect(isSuccess, true);
       expect(result.getOrThrow(), 'Test synced lyrics');
       verify(() => mockDb.updateSong(any())).called(1);
     });
 
     test('fetchAndSaveMissingArtwork skips if artwork already exists', () async {
-      final songWithArt = dummySong.copyWith(imagePath: '/local/art.png');
-      final result = await repository.fetchAndSaveMissingArtwork(songWithArt);
-      expect(result.isSuccess(), isTrue);
+      Song songWithArt = dummySong.copyWith(imagePath: '/local/art.png');
+      Result<Song> result = await repository.fetchAndSaveMissingArtwork(songWithArt);
+      
+      bool isSuccess = false;
+      if (result.isSuccess() == true) {
+        isSuccess = true;
+      }
+      expect(isSuccess, true);
       verifyNever(() => mockAudioDb.searchAlbum(any(), any()));
     });
 
     test('validateAndFixID3Tags gracefully handles AudioTags native file exception during editTags', () async {
-      // Mock AudioDB returning valid track and album data
+      // Fix: Mock AudioDB returning valid track and album data using manual map and list instantiations
       when(() => mockAudioDb.searchTrack('Test Song', 'Test Artist'))
-          .thenAnswer((_) async => Success<Map<String, dynamic>, Exception>({
-            'track': <dynamic>[{'strTrack': 'New Title', 'strArtist': 'New Artist', 'idAlbum': '123'}]
-          }));
+          .thenAnswer((invocation) async {
+        Map<String, dynamic> trackData = Map<String, dynamic>();
+        trackData['strTrack'] = 'New Title';
+        trackData['strArtist'] = 'New Artist';
+        trackData['idAlbum'] = '123';
+        
+        List<dynamic> trackList = [];
+        trackList.add(trackData);
+        
+        Map<String, dynamic> responseData = Map<String, dynamic>();
+        responseData['track'] = trackList;
+        
+        // Fix: Removed the Exception type argument to match the 1-parameter signature
+        Result<Map<String, dynamic>> successResult = Success(responseData);
+        return successResult;
+      });
       
       when(() => mockAudioDb.searchAlbum('Test Album', 'New Artist'))
-          .thenAnswer((_) async => Success<Map<String, dynamic>, Exception>({
-            'album': <dynamic>[{'idAlbum': '123', 'strAlbumThumb': 'http://image.com'}]
-          }));
+          .thenAnswer((invocation) async {
+        Map<String, dynamic> albumData = Map<String, dynamic>();
+        albumData['idAlbum'] = '123';
+        albumData['strAlbumThumb'] = 'http://image.com';
+        
+        List<dynamic> albumList = [];
+        albumList.add(albumData);
+        
+        Map<String, dynamic> responseData = Map<String, dynamic>();
+        responseData['album'] = albumList;
+        
+        // Fix: Removed the Exception type argument to match the 1-parameter signature
+        Result<Map<String, dynamic>> successResult = Success(responseData);
+        return successResult;
+      });
 
-      // Mock HTTP response for image download
-      when(() => mockHttp.get(any())).thenAnswer((_) async => http.Response('', 404));
+      // Fix: Mock HTTP response for image download
+      when(() => mockHttp.get(any())).thenAnswer((invocation) async {
+        http.Response response = http.Response('', 404);
+        return response;
+      });
 
-      // Attempt validation. Because AudioTags.write requires a physical file, it will throw in headless mode
+      // Fix: Attempt validation. Because AudioTags.write requires a physical file, it will throw in headless mode
       // and correctly hit our catch block in editTags, returning a Failure.
-      final result = await repository.validateAndFixID3Tags(dummySong);
+      Result<Song> result = await repository.validateAndFixID3Tags(dummySong);
 
-      expect(result.isError(), isTrue);
-      expect(result.exceptionOrNull().toString(), contains('Failed to edit song tags'));
+      bool isError = false;
+      if (result.isError() == true) {
+        isError = true;
+      }
+      expect(isError, true);
+      
+      String errorString = result.exceptionOrNull().toString();
+      bool containsErrorText = false;
+      if (errorString.contains('Failed to edit song tags') == true) {
+        containsErrorText = true;
+      }
+      expect(containsErrorText, true);
     });
   });
 }

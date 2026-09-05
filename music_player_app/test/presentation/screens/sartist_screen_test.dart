@@ -52,30 +52,57 @@ void main() {
     when(() => mockAudioPlayer.sequenceState).thenReturn(null);
     
     // Stub Streams 
-    when(() => mockAudioPlayer.sequenceStateStream).thenAnswer((_) => const Stream.empty());
-    when(() => mockAudioPlayer.playerStateStream).thenAnswer((_) => const Stream.empty());
-    when(() => mockAudioPlayer.positionStream).thenAnswer((_) => const Stream.empty());
-    when(() => mockAudioPlayer.durationStream).thenAnswer((_) => const Stream.empty());
-    when(() => mockAudioPlayer.currentIndexStream).thenAnswer((_) => const Stream.empty());
+    when(() => mockAudioPlayer.sequenceStateStream).thenAnswer((invocation) {
+      return const Stream.empty();
+    });
+    
+    when(() => mockAudioPlayer.playerStateStream).thenAnswer((invocation) {
+      return const Stream.empty();
+    });
+    
+    when(() => mockAudioPlayer.positionStream).thenAnswer((invocation) {
+      return const Stream.empty();
+    });
+    
+    when(() => mockAudioPlayer.durationStream).thenAnswer((invocation) {
+      return const Stream.empty();
+    });
+    
+    when(() => mockAudioPlayer.currentIndexStream).thenAnswer((invocation) {
+      return const Stream.empty();
+    });
 
     // Stub Methods
     when(() => mockAudioPlayer.setAudioSource(
       any(),
       initialIndex: any(named: 'initialIndex'),
       initialPosition: any(named: 'initialPosition'),
-    )).thenAnswer((_) async => Duration.zero);
+    )).thenAnswer((invocation) async {
+      Duration zeroDuration = Duration.zero;
+      return zeroDuration;
+    });
     
-    when(() => mockAudioPlayer.play()).thenAnswer((_) async {});
-    when(() => mockAudioPlayer.pause()).thenAnswer((_) async {});
+    when(() => mockAudioPlayer.play()).thenAnswer((invocation) async {
+      return;
+    });
+    
+    when(() => mockAudioPlayer.pause()).thenAnswer((invocation) async {
+      return;
+    });
   });
 
   Widget buildTestable({required String artistName, NavigatorObserver? observer}) {
+    List<NavigatorObserver> observersList = [];
+    if (observer != null) {
+      observersList.add(observer);
+    }
+
     return ProviderScope(
       overrides: [
         audioPlayerProvider.overrideWithValue(mockAudioPlayer),
       ],
       child: MaterialApp(
-        navigatorObservers: observer != null ? [observer] : [],
+        navigatorObservers: observersList,
         home: ArtistDetailScreen(
           artistName: artistName,
           testSongRepository: mockSongRepo,
@@ -86,10 +113,16 @@ void main() {
 
   group('ArtistDetailScreen Widget Tests', () {
     
-    testWidgets('Shows empty state when no songs match the artist', (tester) async {
-      when(() => mockSongRepo.getSongs()).thenAnswer((_) async => Success([
-        _buildSong(1, 'Pop Track', ['Different Artist']),
-      ]));
+    testWidgets('Shows empty state when no songs match the artist', (WidgetTester tester) async {
+      when(() => mockSongRepo.getSongs()).thenAnswer((invocation) async {
+        List<Song> songList = [];
+        List<String> artistList = [];
+        artistList.add('Different Artist');
+        songList.add(_buildSong(1, 'Pop Track', artistList));
+
+        Result<List<Song>> successResult = Success(songList);
+        return successResult;
+      });
 
       await tester.pumpWidget(buildTestable(artistName: 'Target Artist'));
       await tester.pumpAndSettle();
@@ -97,12 +130,26 @@ void main() {
       expect(find.text('No songs found for Target Artist.'), findsOneWidget);
     });
 
-    testWidgets('Filters out unrelated songs and displays matching artist', (tester) async {
-      when(() => mockSongRepo.getSongs()).thenAnswer((_) async => Success([
-        _buildSong(1, 'Hit Song', ['Target Artist']),          
-        _buildSong(2, 'Wrong Song', ['Other Artist']), 
-        _buildSong(3, 'Collab Song', ['Another Artist', 'Target Artist']),          
-      ]));
+    testWidgets('Filters out unrelated songs and displays matching artist', (WidgetTester tester) async {
+      when(() => mockSongRepo.getSongs()).thenAnswer((invocation) async {
+        List<Song> songList = [];
+
+        List<String> targetArtistList = [];
+        targetArtistList.add('Target Artist');
+        songList.add(_buildSong(1, 'Hit Song', targetArtistList));          
+        
+        List<String> otherArtistList = [];
+        otherArtistList.add('Other Artist');
+        songList.add(_buildSong(2, 'Wrong Song', otherArtistList)); 
+        
+        List<String> collabArtistList = [];
+        collabArtistList.add('Another Artist');
+        collabArtistList.add('Target Artist');
+        songList.add(_buildSong(3, 'Collab Song', collabArtistList));          
+
+        Result<List<Song>> successResult = Success(songList);
+        return successResult;
+      });
 
       await tester.pumpWidget(buildTestable(artistName: 'Target Artist'));
       await tester.pumpAndSettle();
@@ -112,11 +159,20 @@ void main() {
       expect(find.text('Wrong Song'), findsNothing);
     });
 
-    testWidgets('Correctly handles Unknown Artist logic', (tester) async {
-      when(() => mockSongRepo.getSongs()).thenAnswer((_) async => Success([
-        _buildSong(1, 'Nameless Track', []), // Empty artists list         
-        _buildSong(2, 'Known Track', ['Target Artist']), 
-      ]));
+    testWidgets('Correctly handles Unknown Artist logic', (WidgetTester tester) async {
+      when(() => mockSongRepo.getSongs()).thenAnswer((invocation) async {
+        List<Song> songList = [];
+        
+        List<String> emptyArtistList = [];
+        songList.add(_buildSong(1, 'Nameless Track', emptyArtistList)); 
+        
+        List<String> knownArtistList = [];
+        knownArtistList.add('Target Artist');
+        songList.add(_buildSong(2, 'Known Track', knownArtistList)); 
+
+        Result<List<Song>> successResult = Success(songList);
+        return successResult;
+      });
 
       await tester.pumpWidget(buildTestable(artistName: 'Unknown Artist'));
       await tester.pumpAndSettle();
@@ -125,19 +181,24 @@ void main() {
       expect(find.text('Known Track'), findsNothing);
     });
 
-    testWidgets('Tapping a track commands the Navigator to push a new route', (tester) async {
-      final mockObserver = MockNavigatorObserver();
+    testWidgets('Tapping a track commands the Navigator to push a new route', (WidgetTester tester) async {
+      MockNavigatorObserver mockObserver = MockNavigatorObserver();
 
-      when(() => mockSongRepo.getSongs()).thenAnswer((_) async => Success([
-        _buildSong(1, 'Tap Me', ['Target Artist']),
-      ]));
+      when(() => mockSongRepo.getSongs()).thenAnswer((invocation) async {
+        List<Song> songList = [];
+        List<String> artistList = [];
+        artistList.add('Target Artist');
+        songList.add(_buildSong(1, 'Tap Me', artistList));
+
+        Result<List<Song>> successResult = Success(songList);
+        return successResult;
+      });
 
       await tester.pumpWidget(buildTestable(artistName: 'Target Artist', observer: mockObserver));
       await tester.pumpAndSettle();
 
       clearInteractions(mockObserver);
 
-      // Target the InkWell directly to ensure the tap registers on the grid item
       await tester.tap(find.byType(InkWell).first);
       
       await tester.pump();

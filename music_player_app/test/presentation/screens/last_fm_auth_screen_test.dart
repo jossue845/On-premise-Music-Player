@@ -7,8 +7,6 @@ import 'package:music_player_app/presentation/screens/lastfm_screen.dart';
 import 'package:music_player_app/data/providers/auth_provider.dart';
 
 // 1. Create a Fake Notifier to control the authentication state during tests.
-// Note: Adjust the extended class (e.g., AsyncNotifier, StateNotifier) based 
-// on exactly how your AuthNotifier is defined in auth_provider.dart.
 class FakeAuthNotifier extends AsyncNotifier<String?> implements AuthNotifier {
   @override
   Future<String?> build() async => null;

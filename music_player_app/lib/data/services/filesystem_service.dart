@@ -15,10 +15,10 @@ class FilesystemService {
     "wav",
   ];
 
-  // 1. Add a customizable function for testing
+  // Add a customizable function for testing
   final Future<String?> Function(String? dialogTitle) _filePickerFn;
 
-  // 2. Default to the real FilePicker in production
+  // Default to the real FilePicker in production
   FilesystemService({
     Future<String?> Function(String? dialogTitle)? filePickerFn,
   }) : _filePickerFn = filePickerFn ?? ((title) => FilePicker.getDirectoryPath(dialogTitle: title));
@@ -30,7 +30,7 @@ class FilesystemService {
         throw Exception("Storage permission not granted");
       }
 
-      // 3. Use the injected function instead of the hardcoded static method
+      // Use the injected function instead of the hardcoded static method
       String? selectedDirectoryPath = await _filePickerFn("Select the music directory");
 
       if (selectedDirectoryPath == null) {
@@ -93,7 +93,7 @@ class FilesystemService {
       if (audioStatus.isGranted) return true;
 
       if (manageStatus.isPermanentlyDenied || storageStatus.isPermanentlyDenied) {
-        print('🔑 Permanently denied — opening settings');
+        print('Permanently denied — opening settings');
         await openAppSettings();
       }
       

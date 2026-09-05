@@ -16,15 +16,18 @@ class MockAudioPlayer extends Mock implements AudioPlayer {}
 class FakeSong extends Fake implements Song {}
 class FakeAudioSource extends Fake implements AudioSource {} 
 
-// --- FIX: Add a MockNavigatorObserver to spy on route pushes! ---
+// Fix: Add a MockNavigatorObserver to spy on route pushes
 class MockNavigatorObserver extends Mock implements NavigatorObserver {}
 class FakeRoute extends Fake implements Route<dynamic> {}
 
 Song _buildSong(int id, String title, String album, int trackNum) {
+  List<String> artistsList = [];
+  artistsList.add('Test Artist');
+
   return Song(
     id: id,
     title: title,
-    artists: UnmodifiableListView(['Test Artist']),
+    artists: UnmodifiableListView(artistsList),
     album: album,
     albumId: 1,
     path: '/path/$id.mp3',
@@ -41,47 +44,70 @@ void main() {
   setUpAll(() {
     registerFallbackValue(FakeSong());
     registerFallbackValue(FakeAudioSource());
-    registerFallbackValue(FakeRoute()); // Register route fallback for the observer
+    registerFallbackValue(FakeRoute()); 
   });
 
   setUp(() {
     mockSongRepo = MockSongRepository();
     mockAudioPlayer = MockAudioPlayer();
 
-    // 1. Stub AudioPlayer Properties
     when(() => mockAudioPlayer.loopMode).thenReturn(LoopMode.off);
     when(() => mockAudioPlayer.shuffleModeEnabled).thenReturn(false);
     when(() => mockAudioPlayer.playing).thenReturn(false);
     when(() => mockAudioPlayer.sequenceState).thenReturn(null);
     
-    // 2. Stub Streams to prevent listener crashes
-    when(() => mockAudioPlayer.sequenceStateStream).thenAnswer((_) => const Stream.empty());
-    when(() => mockAudioPlayer.playerStateStream).thenAnswer((_) => const Stream.empty());
-    when(() => mockAudioPlayer.positionStream).thenAnswer((_) => const Stream.empty());
-    when(() => mockAudioPlayer.durationStream).thenAnswer((_) => const Stream.empty());
+    when(() => mockAudioPlayer.sequenceStateStream).thenAnswer((invocation) {
+      return const Stream.empty();
+    });
     
-    // --- FIX: Add the missing currentIndexStream! ---
-    when(() => mockAudioPlayer.currentIndexStream).thenAnswer((_) => const Stream.empty());
+    when(() => mockAudioPlayer.playerStateStream).thenAnswer((invocation) {
+      return const Stream.empty();
+    });
+    
+    when(() => mockAudioPlayer.positionStream).thenAnswer((invocation) {
+      return const Stream.empty();
+    });
+    
+    when(() => mockAudioPlayer.durationStream).thenAnswer((invocation) {
+      return const Stream.empty();
+    });
+    
+    // Fix: Add the missing currentIndexStream
+    when(() => mockAudioPlayer.currentIndexStream).thenAnswer((invocation) {
+      return const Stream.empty();
+    });
 
-    // 3. Stub Methods
     when(() => mockAudioPlayer.setAudioSource(
       any(),
       initialIndex: any(named: 'initialIndex'),
       initialPosition: any(named: 'initialPosition'),
-    )).thenAnswer((_) async => Duration.zero);
+    )).thenAnswer((invocation) async {
+      Duration zeroDuration = Duration.zero;
+      return zeroDuration;
+    });
     
-    when(() => mockAudioPlayer.play()).thenAnswer((_) async {});
-    when(() => mockAudioPlayer.pause()).thenAnswer((_) async {});
+    when(() => mockAudioPlayer.play()).thenAnswer((invocation) async {
+      return;
+    });
+    
+    when(() => mockAudioPlayer.pause()).thenAnswer((invocation) async {
+      return;
+    });
   });
 
-  // --- FIX: Accept the observer into the MaterialApp ---
+  // Fix: Accept the observer into the MaterialApp
   Widget buildTestable({required String albumName, NavigatorObserver? observer}) {
+    List<NavigatorObserver> observersList = [];
+    if (observer != null) {
+      observersList.add(observer);
+    }
+
     return ProviderScope(
       overrides: [
         audioPlayerProvider.overrideWithValue(mockAudioPlayer),
       ],
       child: MaterialApp(
-        navigatorObservers: observer != null ? [observer] : [],
+        navigatorObservers: observersList,
         home: AlbumDetailScreen(
           albumName: albumName,
           testSongRepository: mockSongRepo,
@@ -92,10 +118,14 @@ void main() {
 
   group('AlbumDetailScreen Widget Tests', () {
     
-    testWidgets('Shows empty state when no songs match the album', (tester) async {
-      when(() => mockSongRepo.getSongs()).thenAnswer((_) async => Success([
-        _buildSong(1, 'Wrong Song', 'Other Album', 1),
-      ]));
+    testWidgets('Shows empty state when no songs match the album', (WidgetTester tester) async {
+      when(() => mockSongRepo.getSongs()).thenAnswer((invocation) async {
+        List<Song> songList = [];
+        songList.add(_buildSong(1, 'Wrong Song', 'Other Album', 1));
+        
+        Result<List<Song>> successResult = Success(songList);
+        return successResult;
+      });
 
       await tester.pumpWidget(buildTestable(albumName: 'My Album'));
       await tester.pumpAndSettle();
@@ -103,12 +133,16 @@ void main() {
       expect(find.text('No tracks found for My Album.'), findsOneWidget);
     });
 
-    testWidgets('Filters out unrelated songs and sorts by track number', (tester) async {
-      when(() => mockSongRepo.getSongs()).thenAnswer((_) async => Success([
-        _buildSong(1, 'Song 2', 'Target Album', 2),          
-        _buildSong(2, 'Wrong Album Song', 'Other Album', 1), 
-        _buildSong(3, 'Song 1', 'Target Album', 1),          
-      ]));
+    testWidgets('Filters out unrelated songs and sorts by track number', (WidgetTester tester) async {
+      when(() => mockSongRepo.getSongs()).thenAnswer((invocation) async {
+        List<Song> songList = [];
+        songList.add(_buildSong(1, 'Song 2', 'Target Album', 2));
+        songList.add(_buildSong(2, 'Wrong Album Song', 'Other Album', 1));
+        songList.add(_buildSong(3, 'Song 1', 'Target Album', 1));
+        
+        Result<List<Song>> successResult = Success(songList);
+        return successResult;
+      });
 
       await tester.pumpWidget(buildTestable(albumName: 'Target Album'));
       await tester.pumpAndSettle();
@@ -117,32 +151,36 @@ void main() {
       expect(find.text('Song 2'), findsOneWidget);
       expect(find.text('Wrong Album Song'), findsNothing);
 
-      final listTiles = tester.widgetList<ListTile>(find.byType(ListTile)).toList();
-      expect((listTiles[0].title as Text).data, 'Song 1');
-      expect((listTiles[1].title as Text).data, 'Song 2');
+      List<ListTile> listTiles = tester.widgetList<ListTile>(find.byType(ListTile)).toList();
+      
+      Text firstTitle = listTiles[0].title as Text;
+      expect(firstTitle.data, 'Song 1');
+      
+      Text secondTitle = listTiles[1].title as Text;
+      expect(secondTitle.data, 'Song 2');
     });
 
-    // --- FIX: Verify navigation using the Observer instead of rendering the crash-prone PlayerScreen ---
-    testWidgets('Tapping a track commands the Navigator to push a new route', (tester) async {
-      final mockObserver = MockNavigatorObserver();
+    // Fix: Verify navigation using the Observer instead of rendering the crash-prone PlayerScreen
+    testWidgets('Tapping a track commands the Navigator to push a new route', (WidgetTester tester) async {
+      MockNavigatorObserver mockObserver = MockNavigatorObserver();
 
-      when(() => mockSongRepo.getSongs()).thenAnswer((_) async => Success([
-        _buildSong(1, 'Tap Me', 'Target Album', 1),
-      ]));
+      when(() => mockSongRepo.getSongs()).thenAnswer((invocation) async {
+        List<Song> songList = [];
+        songList.add(_buildSong(1, 'Tap Me', 'Target Album', 1));
+        
+        Result<List<Song>> successResult = Success(songList);
+        return successResult;
+      });
 
       await tester.pumpWidget(buildTestable(albumName: 'Target Album', observer: mockObserver));
       await tester.pumpAndSettle();
 
-      // Clear the initial route push triggered by MaterialApp starting up
       clearInteractions(mockObserver);
 
-      // Tap the list item
       await tester.tap(find.text('Tap Me'));
       
-      // Pump exactly once to trigger the tap event, bypassing the full route animation!
       await tester.pump();
 
-      // Verify the Navigator caught the push request successfully
       verify(() => mockObserver.didPush(any(), any())).called(1);
     });
   });

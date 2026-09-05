@@ -30,10 +30,13 @@ class MockAlbum extends Mock implements Album {}
 class MockPlaylist extends Mock implements Playlist {}
 
 Song _buildSong(int id, String title, String artist) {
+  List<String> artistsList = [];
+  artistsList.add(artist);
+  
   return Song(
     id: id,
     title: title,
-    artists: UnmodifiableListView([artist]),
+    artists: UnmodifiableListView(artistsList),
     album: 'Test Album',
     albumId: 1,
     path: '/path/$id.mp3',
@@ -66,25 +69,59 @@ void main() {
     when(() => mockAudioPlayer.shuffleModeEnabled).thenReturn(false);
     when(() => mockAudioPlayer.playing).thenReturn(false);
     when(() => mockAudioPlayer.sequenceState).thenReturn(null);
-    when(() => mockAudioPlayer.sequenceStateStream).thenAnswer((_) => const Stream.empty());
-    when(() => mockAudioPlayer.playerStateStream).thenAnswer((_) => const Stream.empty());
-    when(() => mockAudioPlayer.positionStream).thenAnswer((_) => const Stream.empty());
-    when(() => mockAudioPlayer.durationStream).thenAnswer((_) => const Stream.empty());
-    when(() => mockAudioPlayer.currentIndexStream).thenAnswer((_) => const Stream.empty());
-    when(() => mockAudioPlayer.setAudioSource(any(), initialIndex: any(named: 'initialIndex'), initialPosition: any(named: 'initialPosition'))).thenAnswer((_) async => Duration.zero);
-    when(() => mockAudioPlayer.play()).thenAnswer((_) async {});
-    when(() => mockAudioPlayer.pause()).thenAnswer((_) async {});
+    
+    when(() => mockAudioPlayer.sequenceStateStream).thenAnswer((invocation) {
+      return const Stream.empty();
+    });
+    
+    when(() => mockAudioPlayer.playerStateStream).thenAnswer((invocation) {
+      return const Stream.empty();
+    });
+    
+    when(() => mockAudioPlayer.positionStream).thenAnswer((invocation) {
+      return const Stream.empty();
+    });
+    
+    when(() => mockAudioPlayer.durationStream).thenAnswer((invocation) {
+      return const Stream.empty();
+    });
+    
+    when(() => mockAudioPlayer.currentIndexStream).thenAnswer((invocation) {
+      return const Stream.empty();
+    });
+    
+    when(() => mockAudioPlayer.setAudioSource(
+      any(), 
+      initialIndex: any(named: 'initialIndex'), 
+      initialPosition: any(named: 'initialPosition')
+    )).thenAnswer((invocation) async {
+      Duration zeroDuration = Duration.zero;
+      return zeroDuration;
+    });
+    
+    when(() => mockAudioPlayer.play()).thenAnswer((invocation) async {
+      return;
+    });
+    
+    when(() => mockAudioPlayer.pause()).thenAnswer((invocation) async {
+      return;
+    });
   });
 
   Widget buildTestable({NavigatorObserver? observer}) {
+    List<NavigatorObserver> observersList = [];
+    if (observer != null) {
+      observersList.add(observer);
+    }
+
     return ProviderScope(
       overrides: [
         audioPlayerProvider.overrideWithValue(mockAudioPlayer),
       ],
       child: MaterialApp(
-        navigatorObservers: observer != null ? [observer] : [],
+        navigatorObservers: observersList,
         home: SearchScreen(
-          // --- FIX: Feed the repositories so they can be securely passed down ---
+          // Fix: Feed the repositories so they can be securely passed down
           testDatabaseService: mockDb,
           testSongRepository: mockSongRepo,
           testPlaylistRepository: mockPlaylistRepo,
@@ -95,21 +132,39 @@ void main() {
 
   group('SearchScreen Widget Tests', () {
     
-    testWidgets('Shows empty instructions initially', (tester) async {
+    testWidgets('Shows empty instructions initially', (WidgetTester tester) async {
       await tester.pumpWidget(buildTestable());
       await tester.pumpAndSettle();
 
       expect(find.text("Enter a search term to find your music"), findsOneWidget);
     });
 
-    testWidgets('Entering a query fetches and displays matching data', (tester) async {
-      when(() => mockDb.getSongs()).thenAnswer((_) async => Success([
-        _buildSong(1, 'Magic Track', 'Cool Band'),
-        _buildSong(2, 'Other Song', 'Other Band'),
-      ]));
-      when(() => mockDb.getArtists()).thenAnswer((_) async => const Success([]));
-      when(() => mockDb.getAlbums()).thenAnswer((_) async => const Success([]));
-      when(() => mockDb.getPlaylists()).thenAnswer((_) async => const Success([]));
+    testWidgets('Entering a query fetches and displays matching data', (WidgetTester tester) async {
+      when(() => mockDb.getSongs()).thenAnswer((invocation) async {
+        List<Song> songList = [];
+        songList.add(_buildSong(1, 'Magic Track', 'Cool Band'));
+        songList.add(_buildSong(2, 'Other Song', 'Other Band'));
+        Result<List<Song>> successResult = Success(songList);
+        return successResult;
+      });
+      
+      when(() => mockDb.getArtists()).thenAnswer((invocation) async {
+        List<Artist> emptyArtistList = [];
+        Result<List<Artist>> successResult = Success(emptyArtistList);
+        return successResult;
+      });
+      
+      when(() => mockDb.getAlbums()).thenAnswer((invocation) async {
+        List<Album> emptyAlbumList = [];
+        Result<List<Album>> successResult = Success(emptyAlbumList);
+        return successResult;
+      });
+      
+      when(() => mockDb.getPlaylists()).thenAnswer((invocation) async {
+        List<Playlist> emptyPlaylistList = [];
+        Result<List<Playlist>> successResult = Success(emptyPlaylistList);
+        return successResult;
+      });
 
       await tester.pumpWidget(buildTestable());
       await tester.pumpAndSettle();
@@ -121,15 +176,33 @@ void main() {
       expect(find.text('Other Song'), findsNothing);
     });
 
-    testWidgets('Clicking a song result navigates correctly', (tester) async {
-      final mockObserver = MockNavigatorObserver();
+    testWidgets('Clicking a song result navigates correctly', (WidgetTester tester) async {
+      MockNavigatorObserver mockObserver = MockNavigatorObserver();
       
-      when(() => mockDb.getSongs()).thenAnswer((_) async => Success([
-        _buildSong(1, 'Target Track', 'Some Band'),
-      ]));
-      when(() => mockDb.getArtists()).thenAnswer((_) async => const Success([]));
-      when(() => mockDb.getAlbums()).thenAnswer((_) async => const Success([]));
-      when(() => mockDb.getPlaylists()).thenAnswer((_) async => const Success([]));
+      when(() => mockDb.getSongs()).thenAnswer((invocation) async {
+        List<Song> songList = [];
+        songList.add(_buildSong(1, 'Target Track', 'Some Band'));
+        Result<List<Song>> successResult = Success(songList);
+        return successResult;
+      });
+      
+      when(() => mockDb.getArtists()).thenAnswer((invocation) async {
+        List<Artist> emptyArtistList = [];
+        Result<List<Artist>> successResult = Success(emptyArtistList);
+        return successResult;
+      });
+      
+      when(() => mockDb.getAlbums()).thenAnswer((invocation) async {
+        List<Album> emptyAlbumList = [];
+        Result<List<Album>> successResult = Success(emptyAlbumList);
+        return successResult;
+      });
+      
+      when(() => mockDb.getPlaylists()).thenAnswer((invocation) async {
+        List<Playlist> emptyPlaylistList = [];
+        Result<List<Playlist>> successResult = Success(emptyPlaylistList);
+        return successResult;
+      });
 
       await tester.pumpWidget(buildTestable(observer: mockObserver));
       await tester.pumpAndSettle();
