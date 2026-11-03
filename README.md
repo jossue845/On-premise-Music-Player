@@ -11,7 +11,6 @@
   <img src="https://img.shields.io/badge/Database-SQLite-003B57?logo=sqlite" alt="SQLite" />
   <img src="https://img.shields.io/badge/State-Riverpod-black" alt="Riverpod" />
   <img src="https://img.shields.io/badge/Audio-JustAudio-orange" alt="JustAudio" />
-  <img src="https://img.shields.io/badge/License-MIT-green" alt="License" />
 </p>
 
 ---
